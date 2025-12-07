@@ -1,0 +1,93 @@
+[
+  {
+    "id": "PROD-1000",
+    "name": "A2 Desi Cow Ghee",
+    "category": "Ghee",
+    "size": "500 ml",
+    "price": 1090,
+    "dimension": {
+      "height": 19,
+      "width": 14,
+      "length": 14
+    },
+    "weight": 900
+  },
+  {
+    "id": "PROD-1001",
+    "name": "A2 Desi Cow Ghee",
+    "category": "Ghee",
+    "size": "1000 ml",
+    "price": 1890,
+    "dimension": {
+      "height": 24,
+      "width": 15,
+      "length": 15
+    },
+    "weight": 1800
+  },
+  {
+    "id": "PROD-1002",
+    "name": "A2 Gir Cow Ghee",
+    "category": "Ghee",
+    "size": "1000 ml",
+    "price": 2280,
+    "dimension": {
+      "height": 24,
+      "width": 15,
+      "length": 15
+    },
+    "weight": 1800
+  },
+  {
+    "id": "PROD-1003",
+    "name": "A2 Gir Cow Ghee",
+    "category": "Ghee",
+    "size": "500 ml",
+    "price": 1230,
+    "dimension": {
+      "height": 19,
+      "width": 14,
+      "length": 14
+    },
+    "weight": 900
+  },
+  {
+    "id": "PROD-1004",
+    "name": "A2 Gir Cow Ghee",
+    "category": "Ghee",
+    "size": "5 ltr",
+    "price": 11400,
+    "dimension": {
+      "height": 32,
+      "width": 26,
+      "length": 26
+    },
+    "weight": 6800
+  },
+  {
+    "id": "PROD-1005",
+    "name": "A2 Desi Cow Ghee",
+    "category": "Ghee",
+    "size": "5 ltr",
+    "price": 9450,
+    "dimension": {
+      "height": 32,
+      "width": 26,
+      "length": 26
+    },
+    "weight": 6800
+  },
+  {
+    "id": "PROD-1007",
+    "name": "A2 Buffalo Ghee",
+    "category": "Ghee",
+    "size": "1000 ml",
+    "price": 1549,
+    "dimension": {
+      "height": 24,
+      "width": 15,
+      "length": 15
+    },
+    "weight": 1800
+  }
+]
