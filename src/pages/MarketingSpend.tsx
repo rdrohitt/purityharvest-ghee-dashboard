@@ -109,19 +109,45 @@ export default function MarketingSpend() {
                 />
                 <div style={{ 
                     width: '100%', 
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
-                    gap: 0,
-                    padding: '16px 0',
-                    borderTop: '1px solid var(--border)',
-                    borderBottom: '1px solid var(--border)',
-                    background: 'var(--bg)',
-                    borderRadius: 8
+                    display: 'flex',
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    border: '1px solid var(--border)',
+                    marginTop: 12,
+                    background: 'var(--bg-elev)',
                 }}>
-                    <MetricItem label="Meta Wallet" value={formatCurrency(totals.meta)} isLast={false} />
-                    <MetricItem label="Amazon Wallet" value={formatCurrency(totals.amazon)} isLast={false} />
-                    <MetricItem label="Flipkart Wallet" value={formatCurrency(totals.flipkart)} isLast={false} />
-                    <MetricItem label="Miscellaneous" value={formatCurrency(totals.misc)} isLast={true} />
+                    <ModernMetricItem 
+                        icon="📱" 
+                        label="Meta Wallet" 
+                        value={formatCurrency(totals.meta)} 
+                        iconColor="#1877f2"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItem 
+                        icon="📦" 
+                        label="Amazon Wallet" 
+                        value={formatCurrency(totals.amazon)} 
+                        iconColor="#ff9900"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItem 
+                        icon="🛒" 
+                        label="Flipkart Wallet" 
+                        value={formatCurrency(totals.flipkart)} 
+                        iconColor="#2874f0"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItem 
+                        icon="💰" 
+                        label="Miscellaneous" 
+                        value={formatCurrency(totals.misc)} 
+                        iconColor="#8b5cf6"
+                        isLast={true}
+                        isEven={true}
+                    />
                 </div>
             </div>
 
@@ -195,19 +221,51 @@ export default function MarketingSpend() {
     );
 }
 
-function MetricItem({ label, value, isLast }: { label: string; value: string; isLast: boolean }) {
+function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { icon: string; label: string; value: string; iconColor: string; isLast: boolean; isEven: boolean }) {
     return (
         <div style={{ 
+            background: isEven ? '#f8f9fa' : 'transparent',
+            flex: 1,
+            padding: '12px 10px',
             display: 'flex', 
             flexDirection: 'column', 
             gap: 6,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 12px',
-            borderRight: isLast ? 'none' : '1px solid var(--border)'
-        }}>
-            <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1.2 }}>{label}</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>{value}</div>
+            borderRight: isLast ? 'none' : '1px solid var(--border)',
+            transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg)';
+        }}
+        onMouseLeave={(e) => {
+            e.currentTarget.style.background = isEven ? '#f8f9fa' : 'transparent';
+        }}
+        >
+            <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 2
+            }}>
+                <span style={{ fontSize: 16, opacity: 0.8 }}>{icon}</span>
+                <div style={{ 
+                    fontSize: 10, 
+                    color: 'var(--muted)', 
+                    fontWeight: 600, 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.4px',
+                }}>
+                    {label}
+                </div>
+            </div>
+            <div style={{ 
+                fontSize: 16, 
+                fontWeight: 700, 
+                color: 'var(--text)',
+                lineHeight: 1.2,
+                letterSpacing: '-0.2px'
+            }}>
+                {value}
+            </div>
         </div>
     );
 }

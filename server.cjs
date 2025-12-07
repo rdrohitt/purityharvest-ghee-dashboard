@@ -470,6 +470,52 @@ app.post('/api/wa-leads-orders', async (req, res) => {
   }
 });
 
+app.put('/api/wa-leads-orders/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updated = req.body;
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ message: 'Invalid order payload' });
+    }
+
+    const orders = await readWALeadsOrders();
+    const index = orders.findIndex((o) => o.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Preserve ID from URL/path
+    orders[index] = { ...orders[index], ...updated, id };
+    await writeWALeadsOrders(orders);
+
+    res.json(orders[index]);
+  } catch (err) {
+    console.error('Error updating wa-leads-orders.json', err);
+    res.status(500).json({ message: 'Failed to update WA Leads order' });
+  }
+});
+
+app.delete('/api/wa-leads-orders/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const orders = await readWALeadsOrders();
+    const index = orders.findIndex((o) => o.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    orders.splice(index, 1);
+    await writeWALeadsOrders(orders);
+
+    res.status(204).end();
+  } catch (err) {
+    console.error('Error deleting from wa-leads-orders.json', err);
+    res.status(500).json({ message: 'Failed to delete WA Leads order' });
+  }
+});
+
 app.get('/api/abandoned-cart-orders', async (_req, res) => {
   try {
     const orders = await readAbandonedCartOrders();

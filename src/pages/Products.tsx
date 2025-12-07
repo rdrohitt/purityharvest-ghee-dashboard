@@ -154,20 +154,61 @@ export default function Products() {
 
                 <div style={{ 
                     width: '100%', 
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(6, 1fr)',
-                    gap: 12,
-                    padding: '12px 0',
-                    borderTop: '1px solid var(--border)',
-                    marginTop: 8,
-                    background: 'var(--bg)'
+                    display: 'flex',
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    border: '1px solid var(--border)',
+                    marginTop: 12,
+                    background: 'var(--bg-elev)',
                 }}>
-                    <MetricItem label="Total Products" value={metrics.total.toLocaleString()} isLast={false} />
-                    <MetricItem label="Avg Price" value={formatCurrency(metrics.avgPrice)} isLast={false} />
-                    <MetricItem label="Min Price" value={formatCurrency(metrics.minPrice)} isLast={false} />
-                    <MetricItem label="Max Price" value={formatCurrency(metrics.maxPrice)} isLast={false} />
-                    <MetricItem label="Categories" value={metrics.categories.toString()} isLast={false} />
-                    <MetricItem label="Avg Weight" value={`${metrics.avgWeight} g`} isLast={true} />
+                    <ModernMetricItem 
+                        icon="📦" 
+                        label="Total Products" 
+                        value={metrics.total.toLocaleString()} 
+                        iconColor="#16a34a"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItem 
+                        icon="💰" 
+                        label="Avg Price" 
+                        value={formatCurrency(metrics.avgPrice)} 
+                        iconColor="#3b82f6"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItem 
+                        icon="📉" 
+                        label="Min Price" 
+                        value={formatCurrency(metrics.minPrice)} 
+                        iconColor="#f59e0b"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItem 
+                        icon="📈" 
+                        label="Max Price" 
+                        value={formatCurrency(metrics.maxPrice)} 
+                        iconColor="#ef4444"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItem 
+                        icon="🏷️" 
+                        label="Categories" 
+                        value={metrics.categories.toString()} 
+                        iconColor="#8b5cf6"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItem 
+                        icon="⚖️" 
+                        label="Avg Weight" 
+                        value={`${metrics.avgWeight} g`} 
+                        iconColor="#06b6d4"
+                        isLast={true}
+                        isEven={true}
+                    />
                 </div>
             </div>
 
@@ -284,34 +325,48 @@ function CategoryFilter({ label, value, onChange, options }: { label: string; va
     );
 }
 
-function MetricItem({ label, value, isLast }: { label: string; value: string; isLast: boolean }) {
+function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { icon: string; label: string; value: string; iconColor: string; isLast: boolean; isEven: boolean }) {
     return (
         <div style={{ 
+            background: isEven ? '#f8f9fa' : 'transparent',
+            flex: 1,
+            padding: '12px 10px',
             display: 'flex', 
             flexDirection: 'column', 
             gap: 6,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '10px',
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            borderRadius: 8
-        }}>
+            borderRight: isLast ? 'none' : '1px solid var(--border)',
+            transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg)';
+        }}
+        onMouseLeave={(e) => {
+            e.currentTarget.style.background = isEven ? '#f8f9fa' : 'transparent';
+        }}
+        >
             <div style={{ 
-                fontSize: 10, 
-                color: 'var(--muted)', 
-                fontWeight: 600, 
-                textTransform: 'uppercase', 
-                letterSpacing: '0.5px',
-                lineHeight: 1.2
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 2
             }}>
-                {label}
+                <span style={{ fontSize: 16, opacity: 0.8 }}>{icon}</span>
+                <div style={{ 
+                    fontSize: 10, 
+                    color: 'var(--muted)', 
+                    fontWeight: 600, 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.4px',
+                }}>
+                    {label}
+                </div>
             </div>
             <div style={{ 
                 fontSize: 16, 
                 fontWeight: 700, 
                 color: 'var(--text)',
-                lineHeight: 1.2
+                lineHeight: 1.2,
+                letterSpacing: '-0.2px'
             }}>
                 {value}
             </div>

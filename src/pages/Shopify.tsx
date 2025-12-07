@@ -453,21 +453,70 @@ export default function Shopify() {
                 </div>
                 <div style={{ 
                     width: '100%', 
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(7, 1fr)',
-                    gap: 0,
-                    padding: '16px 0',
-                    borderTop: '1px solid var(--border)',
+                    display: 'flex',
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    border: '1px solid var(--border)',
                     marginTop: 12,
-                    background: 'var(--bg)',
+                    background: 'var(--bg-elev)',
                 }}>
-                    <MetricItem label="Total Sales" value={formatCurrency(metrics.totalSales)} isLast={false} />
-                    <QuantityMetric quantityBySize={metrics.quantityBySize} isLast={false} />
-                    <MetricItemWithAmount label="Delivered" count={metrics.delivered} amount={metrics.deliveredAmount} isLast={false} />
-                    <MetricItemWithAmount label="RTO" count={metrics.rto} amount={metrics.rtoAmount} isLast={false} />
-                    <MetricItemWithAmount label="In Transit" count={metrics.inTransit} amount={metrics.inTransitAmount} isLast={false} />
-                    <MetricItem label="Shipping Charges" value={formatCurrency(metrics.shippingCharges)} isLast={false} />
-                    <MetricItem label="ROAS" value={metrics.roas > 0 ? metrics.roas.toFixed(2) : '—'} isLast={true} />
+                    <ModernMetricItem 
+                        icon="💰" 
+                        label="Total Sales" 
+                        value={formatCurrency(metrics.totalSales)} 
+                        iconColor="#16a34a"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernQuantityMetric 
+                        quantityBySize={metrics.quantityBySize}
+                        iconColor="#3b82f6"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItemWithAmount 
+                        icon="✅" 
+                        label="Delivered" 
+                        count={metrics.delivered} 
+                        amount={metrics.deliveredAmount}
+                        iconColor="#10b981"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItemWithAmount 
+                        icon="↩️" 
+                        label="RTO" 
+                        count={metrics.rto} 
+                        amount={metrics.rtoAmount}
+                        iconColor="#f59e0b"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItemWithAmount 
+                        icon="🚚" 
+                        label="In Transit" 
+                        count={metrics.inTransit} 
+                        amount={metrics.inTransitAmount}
+                        iconColor="#06b6d4"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItem 
+                        icon="📦" 
+                        label="Shipping Charges" 
+                        value={formatCurrency(metrics.shippingCharges)} 
+                        iconColor="#8b5cf6"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItem 
+                        icon="📊" 
+                        label="ROAS" 
+                        value={metrics.roas > 0 ? metrics.roas.toFixed(2) : '—'} 
+                        iconColor="#ec4899"
+                        isLast={true}
+                        isEven={false}
+                    />
                 </div>
 
                 {showCustom ? (
@@ -483,12 +532,16 @@ export default function Shopify() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 4 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <label className="label" style={{ fontSize: 12, margin: 0 }}>Start</label>
-                                <input className="input" type="date" value={customStart} onChange={(e)=>setCustomStart(e.target.value)} style={{ height: 36 }} />
+                                <div style={{ width: 160 }}>
+                                    <DatePicker value={customStart} onChange={setCustomStart} placeholder="Select start date" />
+                                </div>
                             </div>
                             <span style={{ color: 'var(--muted)' }}>—</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <label className="label" style={{ fontSize: 12, margin: 0 }}>End</label>
-                                <input className="input" type="date" value={customEnd} onChange={(e)=>setCustomEnd(e.target.value)} style={{ height: 36 }} />
+                                <div style={{ width: 160 }}>
+                                    <DatePicker value={customEnd} onChange={setCustomEnd} placeholder="Select end date" />
+                                </div>
                             </div>
                             <button className="button" style={{ width: 'auto', padding: '0 16px', height: 36 }} onClick={() => setShowCustom(false)}>Apply</button>
                         </div>
@@ -827,34 +880,307 @@ function toInputDate(d: Date) {
     return `${y}-${m}-${day}`;
 }
 
-function MetricItem({ label, value, isLast }: { label: string; value: string; isLast: boolean }) {
+function DatePicker({ value, onChange, required, placeholder }: { value: string; onChange: (value: string) => void; required?: boolean; placeholder?: string }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [currentMonth, setCurrentMonth] = useState(() => {
+        const date = value ? new Date(value) : new Date();
+        return new Date(date.getFullYear(), date.getMonth(), 1);
+    });
+    const containerRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLDivElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+
+    const selectedDate = value ? new Date(value) : null;
+    const displayValue = selectedDate ? selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && inputRef.current && popupRef.current) {
+            const inputRect = inputRef.current.getBoundingClientRect();
+            const popup = popupRef.current;
+            const popupHeight = 350; // Approximate height of calendar
+            const popupWidth = 280;
+            
+            // Position below the input by default
+            let top = inputRect.bottom + window.scrollY + 4;
+            let left = inputRect.left + window.scrollX;
+            
+            // Check if there's enough space below, if not, position above
+            if (inputRect.bottom + popupHeight > window.innerHeight) {
+                top = inputRect.top + window.scrollY - popupHeight - 4;
+            }
+            
+            // Check if there's enough space on the right, if not, adjust left
+            if (inputRect.left + popupWidth > window.innerWidth) {
+                left = window.innerWidth - popupWidth - 10;
+            }
+            
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+        }
+    }, [isOpen]);
+
+    const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+    const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    function handleDateSelect(day: number) {
+        const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+        onChange(toInputDate(newDate));
+        setIsOpen(false);
+    }
+
+    function handlePrevMonth() {
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+    }
+
+    function handleNextMonth() {
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+    }
+
+    function handleToday() {
+        const today = new Date();
+        onChange(toInputDate(today));
+        setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+        setIsOpen(false);
+    }
+
+    return (
+        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+            <div
+                ref={inputRef}
+                onClick={() => setIsOpen(!isOpen)}
+                className="input"
+                style={{
+                    width: '100%',
+                    marginTop: 6,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    userSelect: 'none'
+                }}
+            >
+                <span style={{ color: displayValue ? 'var(--text)' : 'var(--muted)' }}>
+                    {displayValue || placeholder || 'Select date'}
+                </span>
+                <span style={{ fontSize: 18, color: 'var(--muted)' }}>📅</span>
+            </div>
+            <input
+                type="date"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                required={required}
+                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+                tabIndex={-1}
+            />
+            {isOpen && (
+                <div
+                    ref={popupRef}
+                    style={{
+                        position: 'fixed',
+                        background: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 12,
+                        padding: 20,
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+                        zIndex: 10000,
+                        minWidth: 300,
+                        maxWidth: 300,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <button
+                            type="button"
+                            onClick={handlePrevMonth}
+                            style={{ 
+                                padding: '6px 10px', 
+                                fontSize: 18,
+                                border: 'none',
+                                background: '#f3f4f6',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                color: '#374151',
+                                fontWeight: 600,
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#f3f4f6';
+                            }}
+                            aria-label="Previous month"
+                        >
+                            ‹
+                        </button>
+                        <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>
+                            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleNextMonth}
+                            style={{ 
+                                padding: '6px 10px', 
+                                fontSize: 18,
+                                border: 'none',
+                                background: '#f3f4f6',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                color: '#374151',
+                                fontWeight: 600,
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#f3f4f6';
+                            }}
+                            aria-label="Next month"
+                        >
+                            ›
+                        </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 16 }}>
+                        {weekDays.map((day) => (
+                            <div key={day} style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#6b7280', padding: '8px 0' }}>
+                                {day}
+                            </div>
+                        ))}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                        {Array(firstDayOfMonth).fill(null).map((_, i) => (
+                            <div key={`empty-${i}`} />
+                        ))}
+                        {days.map((day) => {
+                            const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                            const isSelected = selectedDate && 
+                                date.getDate() === selectedDate.getDate() &&
+                                date.getMonth() === selectedDate.getMonth() &&
+                                date.getFullYear() === selectedDate.getFullYear();
+                            const isToday = date.toDateString() === new Date().toDateString();
+                            return (
+                                <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => handleDateSelect(day)}
+                                    style={{
+                                        padding: '10px 4px',
+                                        border: 'none',
+                                        background: isSelected ? '#16a34a' : isToday ? '#dcfce7' : 'transparent',
+                                        color: isSelected ? '#ffffff' : isToday ? '#16a34a' : '#111827',
+                                        borderRadius: 8,
+                                        cursor: 'pointer',
+                                        fontSize: 14,
+                                        fontWeight: isSelected ? 700 : isToday ? 600 : 400,
+                                        transition: 'all 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!isSelected && !isToday) {
+                                            e.currentTarget.style.background = '#f3f4f6';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isSelected && !isToday) {
+                                            e.currentTarget.style.background = 'transparent';
+                                        } else if (isToday && !isSelected) {
+                                            e.currentTarget.style.background = '#dcfce7';
+                                        }
+                                    }}
+                                >
+                                    {day}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleToday}
+                        style={{
+                            marginTop: 16,
+                            width: '100%',
+                            padding: '10px',
+                            border: '1px solid #e5e7eb',
+                            background: '#f9fafb',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: '#111827',
+                            transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#f3f4f6';
+                            e.currentTarget.style.borderColor = '#d1d5db';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f9fafb';
+                            e.currentTarget.style.borderColor = '#e5e7eb';
+                        }}
+                    >
+                        Today
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { icon: string; label: string; value: string; iconColor: string; isLast: boolean; isEven: boolean }) {
     return (
         <div style={{ 
+            background: isEven ? '#f8f9fa' : 'transparent',
+            flex: 1,
+            padding: '12px 10px',
             display: 'flex', 
             flexDirection: 'column', 
             gap: 6,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 12px',
             borderRight: isLast ? 'none' : '1px solid var(--border)',
-            position: 'relative'
-        }}>
+            transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg)';
+        }}
+        onMouseLeave={(e) => {
+            e.currentTarget.style.background = isEven ? '#f8f9fa' : 'transparent';
+        }}
+        >
+            <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 2
+            }}>
+                <span style={{ fontSize: 16, opacity: 0.8 }}>{icon}</span>
             <div style={{ 
                 fontSize: 10, 
                 color: 'var(--muted)', 
                 fontWeight: 600, 
                 textTransform: 'uppercase', 
-                letterSpacing: '0.8px',
-                lineHeight: 1.3,
-                marginBottom: 2
+                    letterSpacing: '0.4px',
             }}>
                 {label}
+                </div>
             </div>
             <div style={{ 
-                fontSize: 15, 
+                fontSize: 16, 
                 fontWeight: 700, 
                 color: 'var(--text)',
-                lineHeight: 1.3,
+                lineHeight: 1.2,
                 letterSpacing: '-0.2px'
             }}>
                 {value}
@@ -863,102 +1189,130 @@ function MetricItem({ label, value, isLast }: { label: string; value: string; is
     );
 }
 
-function QuantityMetric({ quantityBySize, isLast }: { quantityBySize: { [key: string]: number }; isLast: boolean }) {
+function ModernQuantityMetric({ quantityBySize, iconColor, isLast, isEven }: { quantityBySize: { [key: string]: number }; iconColor: string; isLast: boolean; isEven: boolean }) {
+    const totalQuantity = (quantityBySize['500ml'] || 0) + (quantityBySize['1ltr'] || 0) + (quantityBySize['5ltr'] || 0);
     return (
         <div style={{ 
+            background: isEven ? '#f8f9fa' : 'transparent',
+            flex: 1,
+            padding: '12px 10px',
             display: 'flex', 
             flexDirection: 'column', 
-            gap: 4,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 12px',
+            gap: 6,
             borderRight: isLast ? 'none' : '1px solid var(--border)',
-            position: 'relative'
-        }}>
+            transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg)';
+        }}
+        onMouseLeave={(e) => {
+            e.currentTarget.style.background = isEven ? '#f8f9fa' : 'transparent';
+        }}
+        >
+            <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 2
+            }}>
+                <span style={{ fontSize: 16, opacity: 0.8 }}>📊</span>
             <div style={{ 
                 fontSize: 10, 
                 color: 'var(--muted)', 
                 fontWeight: 600, 
                 textTransform: 'uppercase', 
-                letterSpacing: '0.8px',
-                lineHeight: 1.3,
-                marginBottom: 2
+                    letterSpacing: '0.4px',
             }}>
                 Quantity
+                </div>
             </div>
             <div style={{ 
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 2,
-                alignItems: 'center',
-                fontSize: 12,
-                fontWeight: 600,
-                color: 'var(--text)',
-                lineHeight: 1.4
+                gap: 3,
+                width: '100%'
             }}>
                 {quantityBySize['500ml'] > 0 && (
-                    <div>500ml → {quantityBySize['500ml'].toLocaleString()}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>500ml</span>
+                        <span>{quantityBySize['500ml'].toLocaleString()}</span>
+                    </div>
                 )}
                 {quantityBySize['1ltr'] > 0 && (
-                    <div>1ltr → {quantityBySize['1ltr'].toLocaleString()}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>1ltr</span>
+                        <span>{quantityBySize['1ltr'].toLocaleString()}</span>
+                    </div>
                 )}
                 {quantityBySize['5ltr'] > 0 && (
-                    <div>5ltr → {quantityBySize['5ltr'].toLocaleString()}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>5ltr</span>
+                        <span>{quantityBySize['5ltr'].toLocaleString()}</span>
+                    </div>
                 )}
-                {quantityBySize['500ml'] === 0 && quantityBySize['1ltr'] === 0 && quantityBySize['5ltr'] === 0 && (
-                    <div style={{ fontSize: 15, fontWeight: 700 }}>0</div>
+                {totalQuantity === 0 && (
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>0</div>
                 )}
             </div>
         </div>
     );
 }
 
-function MetricItemWithAmount({ label, count, amount, isLast }: { label: string; count: number; amount: number; isLast: boolean }) {
+function ModernMetricItemWithAmount({ icon, label, count, amount, iconColor, isLast, isEven }: { icon: string; label: string; count: number; amount: number; iconColor: string; isLast: boolean; isEven: boolean }) {
     return (
         <div style={{ 
+            background: isEven ? '#f8f9fa' : 'transparent',
+            flex: 1,
+            padding: '12px 10px',
             display: 'flex', 
             flexDirection: 'column', 
             gap: 6,
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 12px',
             borderRight: isLast ? 'none' : '1px solid var(--border)',
-            position: 'relative'
-        }}>
+            transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg)';
+        }}
+        onMouseLeave={(e) => {
+            e.currentTarget.style.background = isEven ? '#f8f9fa' : 'transparent';
+        }}
+        >
+            <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 2
+            }}>
+                <span style={{ fontSize: 16, opacity: 0.8 }}>{icon}</span>
             <div style={{ 
                 fontSize: 10, 
                 color: 'var(--muted)', 
                 fontWeight: 600, 
                 textTransform: 'uppercase', 
-                letterSpacing: '0.8px',
-                lineHeight: 1.3,
-                marginBottom: 2
+                    letterSpacing: '0.4px',
             }}>
                 {label}
+                </div>
             </div>
             <div style={{ 
                 display: 'flex',
-                alignItems: 'baseline',
-                gap: 10,
-                justifyContent: 'center',
-                flexWrap: 'wrap',
-                width: '100%'
+                flexDirection: 'column',
+                gap: 3
             }}>
                 <div style={{ 
-                    fontSize: 15, 
+                    fontSize: 16, 
                     fontWeight: 700, 
                     color: 'var(--text)',
-                    lineHeight: 1.3,
+                    lineHeight: 1.2,
                     letterSpacing: '-0.2px'
                 }}>
                     {count.toLocaleString()}
                 </div>
                 <div style={{ 
                     fontSize: 12, 
-                    fontWeight: 600, 
+                    fontWeight: 500, 
                     color: 'var(--muted)',
-                    lineHeight: 1.3,
-                    opacity: 0.85
+                    lineHeight: 1.2
                 }}>
                     {formatCurrency(amount)}
                 </div>
@@ -1108,7 +1462,7 @@ function AddOrderModal({
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
                         <div>
                             <label className="label">Date</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
+                            <DatePicker value={date} onChange={setDate} placeholder="Select date" />
                         </div>
                         <div>
                             <label className="label">State</label>

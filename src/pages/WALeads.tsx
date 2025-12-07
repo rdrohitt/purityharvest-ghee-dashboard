@@ -1,41 +1,76 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type Order, type OrderItem, type PaymentStatus, type FulfillmentStatus, type DeliveryStatus } from '../utils/orders';
 
-type WAPaymentStatus = 'Paid' | 'Pending' | 'Refunded' | 'Failed';
+type LeadStatus = 'New' | 'Contacted' | 'Converted' | 'Not Interested' | 'No Answer' | 'Potential Customer' | 'Very Interested' | 'CBA';
 
-function formatCurrency(n: number): string { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); }
+type Toast = {
+    id: string;
+    message: string;
+    type: 'success' | 'error' | 'delete';
+};
 
-type UiRange = 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
+type WALead = {
+    id: string;
+    customerName: string;
+    mobile: string;
+    callingDate: string; // ISO date
+    callingDetail: string;
+    callBackDate?: string; // ISO date
+    notes: string;
+    status: LeadStatus;
+};
 
 export default function WALeads() {
-    const [range, setRange] = useState<UiRange>('today');
     const [customerFilter, setCustomerFilter] = useState('');
-    const [customStart, setCustomStart] = useState<string>(toInputDate(new Date()));
-    const [customEnd, setCustomEnd] = useState<string>(toInputDate(new Date()));
-    const [showCustom, setShowCustom] = useState(false);
-    const [showAddOrder, setShowAddOrder] = useState(false);
-    const [orders, setOrders] = useState<Order[]>([]);
+    const [showAddLead, setShowAddLead] = useState(false);
+    const [editingLead, setEditingLead] = useState<WALead | null>(null);
+    const [leads, setLeads] = useState<WALead[]>([]);
     const [loading, setLoading] = useState(true);
-    const [paymentStatusFilter, setPaymentStatusFilter] = useState<WAPaymentStatus | ''>('');
-    const [fulfillmentStatusFilter, setFulfillmentStatusFilter] = useState<FulfillmentStatus | ''>('');
-    const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<DeliveryStatus | ''>('');
-    const customBtnRef = useRef<HTMLButtonElement | null>(null);
-    const popoverRef = useRef<HTMLDivElement | null>(null);
+    const [statusFilter, setStatusFilter] = useState<LeadStatus | ''>('');
+    const [toasts, setToasts] = useState<Toast[]>([]);
+
+    function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
+        const id = `toast-${Date.now()}-${Math.random()}`;
+        setToasts((prev) => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setToasts((prev) => prev.filter((t) => t.id !== id));
+        }, 3000);
+    }
 
     useEffect(() => {
         let cancelled = false;
         fetch('/api/wa-leads-orders')
             .then((res) => {
-                if (!res.ok) throw new Error('Failed to load WA Leads orders');
+                if (!res.ok) throw new Error('Failed to load Leads');
                 return res.json();
             })
             .then((data) => {
                 if (cancelled) return;
-                setOrders(data);
+                // Transform old order data to new lead format if needed
+                const transformedLeads: WALead[] = Array.isArray(data) ? data.map((item: any) => {
+                    // If it's already in the new format, return as is
+                    if (item.customerName && item.mobile) {
+                        return {
+                            ...item,
+                            callingDate: item.callingDate || '',
+                        };
+                    }
+                    // Otherwise, transform from old order format
+                    return {
+                        id: item.id || '',
+                        customerName: item.customer || '',
+                        mobile: item.customerPhone || '',
+                        callingDate: item.date || item.callingDate || '',
+                        callingDetail: '',
+                        callBackDate: undefined,
+                        notes: '',
+                        status: 'New' as LeadStatus,
+                    };
+                }) : [];
+                setLeads(transformedLeads);
             })
             .catch((err) => {
-                console.error('Failed to load WA Leads orders', err);
-                if (!cancelled) setOrders([]);
+                console.error('Failed to load Leads', err);
+                if (!cancelled) setLeads([]);
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -46,343 +81,339 @@ export default function WALeads() {
         };
     }, []);
 
-    const generatedPlusUser = useMemo(() => {
-        return [...orders].sort((a, b) => (a.date < b.date ? 1 : -1));
-    }, [orders]);
-
-    const byRange = useMemo(() => {
-        if (range === 'custom') {
-            const start = new Date(customStart);
-            const end = new Date(customEnd);
-            end.setHours(23,59,59,999);
-            return generatedPlusUser.filter(o => {
-                const d = new Date(o.date).getTime();
-                return d >= start.getTime() && d <= end.getTime();
-            });
-        }
-        
-        const now = new Date();
-        const orderDate = (o: Order) => new Date(o.date).getTime();
-        
-        if (range === 'today') {
-            const start = new Date(now);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(now);
-            end.setHours(23, 59, 59, 999);
-            return generatedPlusUser.filter(o => {
-                const d = orderDate(o);
-                return d >= start.getTime() && d <= end.getTime();
-            });
-        } else if (range === 'yesterday') {
-            const start = new Date(now);
-            start.setDate(start.getDate() - 1);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(start);
-            end.setHours(23, 59, 59, 999);
-            return generatedPlusUser.filter(o => {
-                const d = orderDate(o);
-                return d >= start.getTime() && d <= end.getTime();
-            });
-        } else if (range === 'last7') {
-            const start = new Date(now);
-            start.setDate(start.getDate() - 6);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(now);
-            end.setHours(23, 59, 59, 999);
-            return generatedPlusUser.filter(o => {
-                const d = orderDate(o);
-                return d >= start.getTime() && d <= end.getTime();
-            });
-        } else if (range === 'currentMonth') {
-            const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(now);
-            end.setHours(23, 59, 59, 999);
-            return generatedPlusUser.filter(o => {
-                const d = orderDate(o);
-                return d >= start.getTime() && d <= end.getTime();
-            });
-        } else if (range === 'lastMonth') {
-            const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            start.setHours(0, 0, 0, 0);
-            const end = new Date(now.getFullYear(), now.getMonth(), 0);
-            end.setHours(23, 59, 59, 999);
-            return generatedPlusUser.filter(o => {
-                const d = orderDate(o);
-                return d >= start.getTime() && d <= end.getTime();
-            });
-        }
-        
-        return generatedPlusUser;
-    }, [generatedPlusUser, range, customStart, customEnd]);
+    const sortedLeads = useMemo(() => {
+        return [...leads].sort((a, b) => {
+            if (!a.callingDate && !b.callingDate) return 0;
+            if (!a.callingDate) return 1;
+            if (!b.callingDate) return -1;
+            return a.callingDate < b.callingDate ? 1 : -1;
+        });
+    }, [leads]);
 
     const filtered = useMemo(() => {
-        return byRange.filter(o => {
-            const matchesCustomer = o.customer.toLowerCase().includes(customerFilter.toLowerCase());
-            const matchesPayment = !paymentStatusFilter || (o.paymentStatus as string) === paymentStatusFilter;
-            const matchesFulfillment = !fulfillmentStatusFilter || o.fulfillmentStatus === fulfillmentStatusFilter;
-            const matchesDelivery = !deliveryStatusFilter || o.deliveryStatus === deliveryStatusFilter;
-            return matchesCustomer && matchesPayment && matchesFulfillment && matchesDelivery;
+        const filteredLeads = sortedLeads.filter(lead => {
+            const matchesCustomer = lead.customerName.toLowerCase().includes(customerFilter.toLowerCase());
+            const matchesStatus = !statusFilter || lead.status === statusFilter;
+            return matchesCustomer && matchesStatus;
         });
-    }, [byRange, customerFilter, paymentStatusFilter, fulfillmentStatusFilter, deliveryStatusFilter]);
+        return filteredLeads;
+    }, [sortedLeads, customerFilter, statusFilter]);
 
     const metrics = useMemo(() => {
-        const totalSales = filtered.reduce((s, o) => s + o.amount, 0);
-        const quantity = filtered.reduce((s, o) => s + o.items.reduce((sum, item) => sum + item.quantity, 0), 0);
-        const shipping = filtered.reduce((s, o) => s + (o.shippingAmount || 0), 0);
-        
-        const deliveredOrders = filtered.filter(o => o.deliveryStatus === 'Delivered');
-        const delivered = deliveredOrders.length;
-        const deliveredAmount = deliveredOrders.reduce((s, o) => s + o.amount, 0);
-        
-        const rtoOrders = filtered.filter(o => o.deliveryStatus === 'RTO');
-        const rto = rtoOrders.length;
-        const rtoAmount = rtoOrders.reduce((s, o) => s + o.amount, 0);
-        
-        const inTransitOrders = filtered.filter(o => o.deliveryStatus === 'In Transit');
-        const inTransit = inTransitOrders.length;
-        const inTransitAmount = inTransitOrders.reduce((s, o) => s + o.amount, 0);
+        const totalLeads = filtered.length;
+        const newLeads = filtered.filter(l => l.status === 'New').length;
+        const convertedLeads = filtered.filter(l => l.status === 'Converted').length;
+        const interestedLeads = filtered.filter(l => l.status === 'Very Interested' || l.status === 'Potential Customer').length;
+        const cbaLeads = filtered.filter(l => l.status === 'CBA').length;
         
         return {
-            leads: filtered.length,
-            leadsAmount: totalSales,
-            totalSales,
-            quantity,
-            shipping,
-            delivered,
-            deliveredAmount,
-            rto,
-            rtoAmount,
-            inTransit,
-            inTransitAmount,
-            totalOrders: filtered.length
+            totalLeads,
+            newLeads,
+            convertedLeads,
+            interestedLeads,
+            cbaLeads,
         };
     }, [filtered]);
 
-    useEffect(() => {
-        function onDocClick(e: MouseEvent) {
-            if (!showCustom) return;
-            const target = e.target as Node;
-            if (popoverRef.current && popoverRef.current.contains(target)) return;
-            if (customBtnRef.current && customBtnRef.current.contains(target as Node)) return;
-            setShowCustom(false);
-        }
-        document.addEventListener('click', onDocClick);
-        return () => document.removeEventListener('click', onDocClick);
-    }, [showCustom]);
-
-    const groupedByDate = useMemo(() => {
-        const groups: Array<{ label: string; items: Order[] }> = [];
-        const dateToIndex = new Map<string, number>();
-        for (const o of filtered) {
-            const label = new Date(o.date).toLocaleDateString();
-            const idx = dateToIndex.get(label);
-            if (idx === undefined) {
-                groups.push({ label, items: [o] });
-                dateToIndex.set(label, groups.length - 1);
-            } else {
-                groups[idx].items.push(o);
-            }
-        }
-        return groups;
-    }, [filtered]);
-
     return (
-        <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
+        <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden', position: 'relative' }}>
+            <ToastContainer toasts={toasts} />
             <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
-                <div style={{ fontWeight: 800 }}>WA Leads</div>
+                <div style={{ fontWeight: 800 }}>Leads</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div className="filter-group" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                            <FilterButton active={range === 'today'} onClick={() => { setRange('today'); setShowCustom(false); }}>Today</FilterButton>
-                            <FilterButton active={range === 'yesterday'} onClick={() => { setRange('yesterday'); setShowCustom(false); }}>Yesterday</FilterButton>
-                            <FilterButton active={range === 'last7'} onClick={() => { setRange('last7'); setShowCustom(false); }}>Last 7 days</FilterButton>
-                            <FilterButton active={range === 'currentMonth'} onClick={() => { setRange('currentMonth'); setShowCustom(false); }}>Current Month</FilterButton>
-                            <FilterButton active={range === 'lastMonth'} onClick={() => { setRange('lastMonth'); setShowCustom(false); }}>Last Month</FilterButton>
-                            <FilterButton
-                                refEl={customBtnRef}
-                                active={range === 'custom'}
-                                onClick={() => {
-                                    setRange('custom');
-                                    setShowCustom((v) => !v);
-                                }}
-                            >Custom</FilterButton>
-                        </div>
-                        <div style={{ flex: 1 }} />
-                        <input className="input" placeholder="Search customer" style={{ width: 240 }} value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} />
-                        <button className="button" style={{ width: 'auto', padding: '0 16px' }} onClick={() => setShowAddOrder(true)}>Add Lead</button>
-                    </div>
-                    <div className="status-filters-row" style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <div style={{ 
+                        display: 'flex', 
+                        gap: 10, 
+                        alignItems: 'center', 
+                        flexWrap: 'wrap', 
+                        justifyContent: 'space-between',
+                        background: '#f8f9fa',
+                        padding: '12px 16px',
+                        borderRadius: 8,
+                        width: '100%'
+                    }}>
+                        <div className="status-filters-row" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                         <StatusFilter
-                            label="Payment"
-                            value={paymentStatusFilter}
-                            onChange={setPaymentStatusFilter}
-                            options={['Paid', 'Pending', 'Refunded', 'Failed'] as WAPaymentStatus[]}
-                        />
-                        <StatusFilter
-                            label="Fulfillment"
-                            value={fulfillmentStatusFilter}
-                            onChange={setFulfillmentStatusFilter}
-                            options={['Unfulfilled', 'Fulfilled', 'Partial'] as FulfillmentStatus[]}
-                        />
-                        <StatusFilter
-                            label="Delivery"
-                            value={deliveryStatusFilter}
-                            onChange={setDeliveryStatusFilter}
-                            options={['In Transit', 'Delivered', 'RTO', 'Pending Pickup'] as DeliveryStatus[]}
-                        />
-                        {(paymentStatusFilter || fulfillmentStatusFilter || deliveryStatusFilter) ? (
+                                label="Status"
+                                value={statusFilter}
+                                onChange={setStatusFilter}
+                                options={['New', 'Contacted', 'Converted', 'Not Interested', 'No Answer', 'Potential Customer', 'Very Interested', 'CBA'] as LeadStatus[]}
+                            />
+                            {statusFilter ? (
                             <button 
                                 className="filter-btn" 
-                                onClick={() => { setPaymentStatusFilter(''); setFulfillmentStatusFilter(''); setDeliveryStatusFilter(''); }}
+                                    onClick={() => { setStatusFilter(''); }}
                                 style={{ fontSize: 12, padding: '6px 12px' }}
                             >
-                                Clear All
+                                    Clear
                             </button>
                         ) : null}
+                        </div>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input className="input" placeholder="Search customer" style={{ width: 240 }} value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} />
+                            <button className="button" style={{ width: 'auto', padding: '0 16px' }} onClick={() => {
+                                setEditingLead(null);
+                                setShowAddLead(true);
+                            }}>Add Lead</button>
+                        </div>
                     </div>
                 </div>
                 <div style={{ 
                     width: '100%', 
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(6, 1fr)',
-                    gap: 0,
-                    padding: '16px 0',
-                    borderTop: '1px solid var(--border)',
-                    borderBottom: '1px solid var(--border)',
-                    marginTop: 8,
-                    background: 'var(--bg)',
-                    borderRadius: 8
+                    display: 'flex',
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    border: '1px solid var(--border)',
+                    marginTop: 12,
+                    background: 'var(--bg-elev)',
                 }}>
-                    <MetricItemWithAmount label="Total Leads" count={metrics.leads} amount={metrics.leadsAmount} isLast={false} />
-                    <MetricItemWithAmount label="Converted" count={metrics.delivered} amount={metrics.deliveredAmount} isLast={false} />
-                    <MetricItem label="Quantity" value={metrics.quantity.toLocaleString()} isLast={false} />
-                    <MetricItemWithAmount label="RTO" count={metrics.rto} amount={metrics.rtoAmount} isLast={false} />
-                    <MetricItemWithAmount label="In Transit" count={metrics.inTransit} amount={metrics.inTransitAmount} isLast={false} />
-                    <MetricItem label="Shipping" value={formatCurrency(metrics.shipping)} isLast={true} />
+                    <ModernMetricItem 
+                        icon="👥" 
+                        label="Total Leads" 
+                        value={metrics.totalLeads.toLocaleString()} 
+                        iconColor="#16a34a"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItem 
+                        icon="🆕" 
+                        label="New" 
+                        value={metrics.newLeads.toLocaleString()} 
+                        iconColor="#3b82f6"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItem 
+                        icon="⭐" 
+                        label="Interested" 
+                        value={metrics.interestedLeads.toLocaleString()} 
+                        iconColor="#f59e0b"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItem 
+                        icon="💬" 
+                        label="CBA" 
+                        value={metrics.cbaLeads.toLocaleString()} 
+                        iconColor="#8b5cf6"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItem 
+                        icon="✅" 
+                        label="Converted" 
+                        value={metrics.convertedLeads.toLocaleString()} 
+                        iconColor="#10b981"
+                        isLast={true}
+                        isEven={false}
+                    />
                 </div>
-
-                {showCustom ? (
-                    <div
-                        ref={popoverRef}
-                        className="date-range-popover"
-                        style={{
-                            position: 'absolute',
-                            top: 56,
-                            left: customBtnRef.current ? customBtnRef.current.offsetLeft : 0,
-                        }}
-                    >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 4 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <label className="label" style={{ fontSize: 12, margin: 0 }}>Start</label>
-                                <input className="input" type="date" value={customStart} onChange={(e)=>setCustomStart(e.target.value)} style={{ height: 36 }} />
-                            </div>
-                            <span style={{ color: 'var(--muted)' }}>—</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <label className="label" style={{ fontSize: 12, margin: 0 }}>End</label>
-                                <input className="input" type="date" value={customEnd} onChange={(e)=>setCustomEnd(e.target.value)} style={{ height: 36 }} />
-                            </div>
-                            <button className="button" style={{ width: 'auto', padding: '0 16px', height: 36 }} onClick={() => setShowCustom(false)}>Apply</button>
-                        </div>
-                    </div>
-                ) : null}
             </div>
 
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div className="table-scroll-wrapper">
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000, tableLayout: 'auto' }}>
                         <colgroup>
-                            <col style={{ width: '120px', minWidth: '120px' }} />
-                            <col style={{ width: '200px', minWidth: '200px' }} />
-                            <col style={{ width: '240px', minWidth: '240px' }} />
+                            <col style={{ width: '180px', minWidth: '180px' }} />
                             <col style={{ width: '140px', minWidth: '140px' }} />
-                            <col style={{ width: '160px', minWidth: '160px' }} />
-                            <col style={{ width: '160px', minWidth: '160px' }} />
-                            <col style={{ width: '160px', minWidth: '160px' }} />
-                            <col style={{ width: '160px', minWidth: '160px' }} />
+                            <col style={{ width: '140px', minWidth: '140px' }} />
+                            <col style={{ width: '200px', minWidth: '200px' }} />
+                            <col style={{ width: '140px', minWidth: '140px' }} />
+                            <col style={{ width: '250px', minWidth: '250px' }} />
+                            <col style={{ width: '150px', minWidth: '150px' }} />
                             <col style={{ width: '120px', minWidth: '120px' }} />
                         </colgroup>
                         <thead>
                             <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-                                <Th>Date</Th>
-                                <Th>Customer</Th>
-                                <Th>Variant</Th>
-                                <Th>Amount</Th>
-                                <Th>Payment Status</Th>
-                                <Th>Fullfillment Status</Th>
-                                <Th>Shipping</Th>
-                                <Th>Delivery Status</Th>
-                                <Th>State</Th>
+                                <Th>Customer Name</Th>
+                                <Th>Mobile</Th>
+                                <Th>Calling Date</Th>
+                                <Th>Calling Detail</Th>
+                                <Th>Call Back Date</Th>
+                                <Th>Notes</Th>
+                                <Th>Status</Th>
+                                <Th>Actions</Th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
-                                        Loading orders…
+                                    <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                                        Loading leads…
                                     </td>
                                 </tr>
-                            ) : groupedByDate.length === 0 ? (
+                            ) : filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
-                                        No orders found. Click "Add Lead" to create your first order.
+                                    <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                                        No leads found. Click "Add Lead" to create your first lead.
                                     </td>
                                 </tr>
                             ) : (
-                                groupedByDate.map((group) => (
-                                    group.items.map((o, idx) => (
-                                        <tr key={o.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                            {idx === 0 ? (
-                                                <td rowSpan={group.items.length} style={{ padding: '12px', verticalAlign: 'top', fontWeight: 600, color: 'var(--text)', borderRight: '1px solid var(--border)' }}>
-                                                    {group.label}
-                                                </td>
-                                            ) : null}
+                                filtered.map((lead, rowIndex) => {
+                                    const isEven = rowIndex % 2 === 1;
+                                    return (
+                                        <tr key={lead.id} style={{ 
+                                            borderBottom: '1px solid var(--border)',
+                                            background: isEven ? '#f8f9fa' : 'transparent'
+                                        }}>
                                             <Td>
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span title={o.customerAddress} style={{ fontWeight: 600 }}>{o.customer}</span>
-                                                <a className="link" href={`tel:${o.customerPhone}`} style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>{o.customerPhone}</a>
+                                                    <span style={{ fontWeight: 600 }}>{lead.customerName}</span>
                                             </div>
                                             </Td>
                                             <Td>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                {(o.items ?? []).length === 0 ? <span>—</span> : null}
-                                                {(o.items ?? []).map((it: OrderItem, idx: number) => (
-                                                    <div key={idx}>{it.variant} × {it.quantity}</div>
-                                                ))}
-                                            </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                    <span style={{ fontSize: 13, color: 'var(--text)' }}>{lead.mobile}</span>
+                                                    <a 
+                                                        href={`tel:${lead.mobile}`}
+                                                        aria-label={`Call ${lead.mobile}`}
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        style={{ 
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            textDecoration: 'none',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            border: 'none',
+                                                            outline: 'none',
+                                                            background: 'transparent',
+                                                            padding: '6px',
+                                                            borderRadius: '6px',
+                                                            color: '#10b981',
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            e.currentTarget.style.background = '#f0fdf4';
+                                                            e.currentTarget.style.color = '#059669';
+                                                            e.currentTarget.style.transform = 'scale(1.1)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            e.currentTarget.style.background = 'transparent';
+                                                            e.currentTarget.style.color = '#10b981';
+                                                            e.currentTarget.style.transform = 'scale(1)';
+                                                        }}
+                                                        onFocus={(e) => {
+                                                            e.currentTarget.style.outline = '2px solid #10b981';
+                                                            e.currentTarget.style.outlineOffset = '2px';
+                                                            e.currentTarget.style.borderRadius = '6px';
+                                                            e.currentTarget.style.background = '#f0fdf4';
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            e.currentTarget.style.outline = 'none';
+                                                            e.currentTarget.style.background = 'transparent';
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                                e.preventDefault();
+                                                                window.location.href = `tel:${lead.mobile}`;
+                                                            }
+                                                        }}
+                                                        title={`Call ${lead.mobile}`}
+                                                    >
+                                                        <svg 
+                                                            aria-hidden="true"
+                                                            width="18" 
+                                                            height="18" 
+                                                            viewBox="0 0 24 24" 
+                                                            fill="none" 
+                                                            stroke="currentColor" 
+                                                            strokeWidth="2" 
+                                                            strokeLinecap="round" 
+                                                            strokeLinejoin="round"
+                                                            style={{ display: 'block' }}
+                                                        >
+                                                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                                        </svg>
+                                                    </a>
+                                                </div>
                                             </Td>
-                                            <Td>{formatCurrency(o.amount)}</Td>
-                                            <Td><StatusTag kind={o.paymentStatus} type="payment" /></Td>
-                                            <Td>{o.fulfillmentStatus}</Td>
-                                            <Td>{formatCurrency(o.shippingAmount ?? 0)}</Td>
-                                            <Td><StatusTag kind={o.deliveryStatus} type="delivery" /></Td>
-                                            <Td>{o.state}</Td>
+                                            <Td>{lead.callingDate ? new Date(lead.callingDate).toLocaleDateString() : '—'}</Td>
+                                            <Td>{lead.callingDetail || '—'}</Td>
+                                            <Td>{lead.callBackDate ? new Date(lead.callBackDate).toLocaleDateString() : '—'}</Td>
+                                            <Td style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={lead.notes}>{lead.notes || '—'}</Td>
+                                            <Td><StatusTag kind={lead.status} type="lead" /></Td>
+                                            <Td>
+                                                <div style={{ display: 'flex', gap: 8 }}>
+                                                    <button
+                                                        type="button"
+                                                        className="icon-btn"
+                                                        onClick={() => {
+                                                            setEditingLead(lead);
+                                                            setShowAddLead(true);
+                                                        }}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="icon-btn icon-btn--danger"
+                                                        onClick={async () => {
+                                                            if (confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
+                                                                try {
+                                                                    const response = await fetch(`/api/wa-leads-orders/${lead.id}`, {
+                                                                        method: 'DELETE',
+                                                                    });
+                                                                    if (!response.ok) throw new Error('Failed to delete lead');
+                                                                    setLeads((prev) => prev.filter(l => l.id !== lead.id));
+                                                                    showToast('Lead deleted successfully!', 'delete');
+                                                                } catch (err) {
+                                                                    console.error('Failed to delete lead', err);
+                                                                    showToast('Failed to delete lead. Please check that the server is running and try again.', 'error');
+                                                                }
+                                                            }
+                                                        }}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </Td>
                                         </tr>
-                                    ))
-                                ))
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            {showAddOrder ? (
-                <AddOrderModal 
-                    onClose={() => setShowAddOrder(false)} 
-                    onCreate={async (o) => {
+            {showAddLead ? (
+                <AddLeadModal 
+                    lead={editingLead}
+                    onClose={() => {
+                        setShowAddLead(false);
+                        setEditingLead(null);
+                    }} 
+                    onSave={async (lead) => {
                         try {
+                            if (editingLead) {
+                                // Update existing lead
+                                const response = await fetch(`/api/wa-leads-orders/${editingLead.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(lead),
+                                });
+                                if (!response.ok) throw new Error('Failed to update lead');
+                                const updated = await response.json();
+                                setLeads((prev) => prev.map(l => l.id === editingLead.id ? updated : l));
+                                showToast('Lead updated successfully!', 'success');
+                            } else {
+                                // Create new lead
                             const response = await fetch('/api/wa-leads-orders', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(o),
+                                    body: JSON.stringify(lead),
                             });
-                            if (!response.ok) throw new Error('Failed to save order');
+                                if (!response.ok) throw new Error('Failed to save lead');
                             const saved = await response.json();
-                            setOrders((prev) => [saved, ...prev]);
-                            setShowAddOrder(false);
+                                setLeads((prev) => [saved, ...prev]);
+                                showToast('Lead added successfully!', 'success');
+                            }
+                            setShowAddLead(false);
+                            setEditingLead(null);
                         } catch (err) {
-                            console.error('Failed to create order', err);
-                            alert('Failed to create order. Please check that the server is running and try again.');
+                            console.error('Failed to save lead', err);
+                            showToast(`Failed to ${editingLead ? 'update' : 'create'} lead. Please check that the server is running and try again.`, 'error');
                         }
                     }} 
                 />
@@ -391,56 +422,210 @@ export default function WALeads() {
     );
 }
 
-function FilterButton({ active, onClick, children, refEl }: { active: boolean; onClick: () => void; children: string; refEl?: React.MutableRefObject<HTMLButtonElement | null> }) {
-    return (
-        <button
-            ref={refEl as any}
-            onClick={onClick}
-            className={`filter-btn ${active ? 'active' : ''}`}
-        >
-            {children}
-        </button>
-    );
-}
-
 function Th({ children }: { children: string }) {
     return <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{children}</th>;
 }
-function Td({ children }: { children: React.ReactNode }) {
-    return <td style={{ padding: '12px' }}>{children}</td>;
+function Td({ children, style, title }: { children: React.ReactNode; style?: React.CSSProperties; title?: string }) {
+    return <td style={{ padding: '12px', ...style }} title={title}>{children}</td>;
 }
 
-function StatusFilter<T extends string>({ label, value, onChange, options }: { label: string; value: T | ''; onChange: (val: T | '') => void; options: T[] }) {
+function StatusFilter<T extends LeadStatus>({ label, value, onChange, options }: { label: string; value: T | ''; onChange: (val: T | '') => void; options: T[] }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLDivElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+
+    const statusConfig: Record<LeadStatus, { icon: string; color: string; bgColor: string }> = {
+        'New': { icon: '🆕', color: '#075985', bgColor: '#e0f2fe' },
+        'Contacted': { icon: '📞', color: '#854d0e', bgColor: '#fef9c3' },
+        'Converted': { icon: '✅', color: '#166534', bgColor: '#dcfce7' },
+        'Not Interested': { icon: '❌', color: '#991b1b', bgColor: '#fee2e2' },
+        'No Answer': { icon: '🔇', color: '#075985', bgColor: '#e0f2fe' },
+        'Potential Customer': { icon: '⭐', color: '#854d0e', bgColor: '#fef9c3' },
+        'Very Interested': { icon: '🔥', color: '#854d0e', bgColor: '#fef9c3' },
+        'CBA': { icon: '💬', color: '#854d0e', bgColor: '#fef9c3' },
+    };
+
+    const currentStatus = value ? statusConfig[value] : null;
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && buttonRef.current && popupRef.current) {
+            const buttonRect = buttonRef.current.getBoundingClientRect();
+            const popup = popupRef.current;
+            const popupHeight = 260;
+            const popupWidth = 220;
+            
+            let top = buttonRect.bottom + window.scrollY + 4;
+            let left = buttonRect.left + window.scrollX;
+            
+            if (buttonRect.bottom + popupHeight > window.innerHeight) {
+                top = buttonRect.top + window.scrollY - popupHeight - 4;
+            }
+            
+            if (buttonRect.left + popupWidth > window.innerWidth) {
+                left = window.innerWidth - popupWidth - 10;
+            }
+            
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+        }
+    }, [isOpen]);
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <label className="label" style={{ fontSize: 11, margin: 0, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</label>
-            <select
+            <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+                <div
+                    ref={buttonRef}
+                    onClick={() => setIsOpen(!isOpen)}
                 className="input"
-                value={value}
-                onChange={(e) => onChange(e.target.value as T | '')}
-                style={{ height: 32, minWidth: 120, cursor: 'pointer', fontSize: 13 }}
-            >
-                <option value="">All</option>
-                {options.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                ))}
-            </select>
+                    style={{
+                        height: 42,
+                        minWidth: 200,
+                        cursor: 'pointer',
+                        display: 'flex', 
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        userSelect: 'none',
+                        padding: '0 14px',
+                        fontSize: 14,
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {currentStatus ? (
+                            <>
+                                <span style={{ fontSize: 16 }}>{currentStatus.icon}</span>
+                                <span style={{ color: 'var(--text)', fontWeight: 500, fontSize: 14 }}>{value}</span>
+                            </>
+                        ) : (
+                            <span style={{ color: 'var(--muted)', fontSize: 14 }}>All</span>
+                        )}
+                    </div>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>▼</span>
+                </div>
+                {isOpen && (
+                    <div
+                        ref={popupRef}
+                        style={{
+                            position: 'fixed',
+                            background: '#ffffff',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: 8,
+                            padding: 6,
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+                            zIndex: 10000,
+                            minWidth: 220,
+                            maxWidth: 220,
+                            maxHeight: 260,
+                            overflowY: 'auto',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div
+                            onClick={() => {
+                                onChange('' as T | '');
+                                setIsOpen(false);
+                            }}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '8px 10px',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                background: !value ? '#f3f4f6' : 'transparent',
+                                border: !value ? '1.5px solid #6b7280' : '1.5px solid transparent',
+                                transition: 'all 0.2s',
+                                marginBottom: 2,
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!value) return;
+                                e.currentTarget.style.background = '#f9fafb';
+                            }}
+                            onMouseLeave={(e) => {
+                                if (!value) return;
+                                e.currentTarget.style.background = 'transparent';
+                            }}
+                        >
+                            <span style={{ fontSize: 14, width: 20, textAlign: 'center' }}>—</span>
+                            <span style={{ color: 'var(--text)', fontWeight: 500, fontSize: 13 }}>All</span>
+                        </div>
+                        {options.map((status) => {
+                            const config = statusConfig[status];
+                            const isSelected = value === status;
+                            return (
+                                <div
+                                    key={status}
+                                    onClick={() => {
+                                        onChange(status);
+                                        setIsOpen(false);
+                                    }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                        padding: '8px 10px',
+                                        borderRadius: 6,
+                                        cursor: 'pointer',
+                                        background: isSelected ? config.bgColor : 'transparent',
+                                        border: isSelected ? `1.5px solid ${config.color}` : '1.5px solid transparent',
+                                        transition: 'all 0.2s',
+                                        marginBottom: 2,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!isSelected) {
+                                            e.currentTarget.style.background = '#f9fafb';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isSelected) {
+                                            e.currentTarget.style.background = 'transparent';
+                                        }
+                                    }}
+                                >
+                                    <span style={{ fontSize: 14, width: 20, textAlign: 'center' }}>{config.icon}</span>
+                                    <span style={{ color: 'var(--text)', fontWeight: 500, fontSize: 13 }}>{status}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
 
-function StatusTag({ kind, type }: { kind: string; type: 'payment' | 'delivery' }) {
+function StatusTag({ kind, type }: { kind: string; type: 'payment' | 'delivery' | 'lead' }) {
     let cls = 'tag info';
     if (type === 'payment') {
         if (kind === 'Paid') cls = 'tag success';
         else if (kind === 'Pending') cls = 'tag warning';
         else if (kind === 'Failed') cls = 'tag danger';
         else cls = 'tag info';
-    } else {
+    } else if (type === 'delivery') {
         if (kind === 'Delivered') cls = 'tag success';
         else if (kind === 'In Transit') cls = 'tag info';
         else if (kind === 'Pending Pickup') cls = 'tag warning';
         else if (kind === 'RTO') cls = 'tag danger';
+    } else if (type === 'lead') {
+        if (kind === 'Converted') cls = 'tag success';
+        else if (kind === 'New') cls = 'tag info';
+        else if (kind === 'Contacted' || kind === 'Potential Customer' || kind === 'Very Interested' || kind === 'CBA') cls = 'tag warning';
+        else if (kind === 'Not Interested') cls = 'tag danger';
+        else if (kind === 'No Answer') cls = 'tag info';
+        else cls = 'tag info';
     }
     return <span className={cls}>{kind}</span>;
 }
@@ -452,33 +637,47 @@ function toInputDate(d: Date) {
     return `${y}-${m}-${day}`;
 }
 
-function MetricItem({ label, value, isLast }: { label: string; value: string; isLast: boolean }) {
+function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { icon: string; label: string; value: string; iconColor: string; isLast: boolean; isEven: boolean }) {
     return (
         <div style={{ 
+            background: isEven ? '#f8f9fa' : 'transparent',
+            flex: 1,
+            padding: '12px 10px',
             display: 'flex', 
             flexDirection: 'column', 
             gap: 6,
+            borderRight: isLast ? 'none' : '1px solid var(--border)',
+            transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg)';
+        }}
+        onMouseLeave={(e) => {
+            e.currentTarget.style.background = isEven ? '#f8f9fa' : 'transparent';
+        }}
+        >
+            <div style={{ 
+                display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 12px',
-            borderRight: isLast ? 'none' : '1px solid var(--border)'
+                gap: 6,
+                marginBottom: 2
         }}>
+                <span style={{ fontSize: 16, opacity: 0.8 }}>{icon}</span>
             <div style={{ 
                 fontSize: 10, 
                 color: 'var(--muted)', 
                 fontWeight: 600, 
                 textTransform: 'uppercase', 
-                letterSpacing: '0.8px',
-                lineHeight: 1.3,
-                marginBottom: 2
+                    letterSpacing: '0.4px',
             }}>
                 {label}
+                </div>
             </div>
             <div style={{ 
-                fontSize: 15, 
+                fontSize: 16, 
                 fontWeight: 700, 
                 color: 'var(--text)',
-                lineHeight: 1.3,
+                lineHeight: 1.2,
                 letterSpacing: '-0.2px'
             }}>
                 {value}
@@ -487,98 +686,478 @@ function MetricItem({ label, value, isLast }: { label: string; value: string; is
     );
 }
 
-function MetricItemWithAmount({ label, count, amount, isLast }: { label: string; count: number; amount: number; isLast: boolean }) {
+function DatePicker({ value, onChange, required, placeholder }: { value: string; onChange: (value: string) => void; required?: boolean; placeholder?: string }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [currentMonth, setCurrentMonth] = useState(() => {
+        const date = value ? new Date(value) : new Date();
+        return new Date(date.getFullYear(), date.getMonth(), 1);
+    });
+    const containerRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLDivElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+
+    const selectedDate = value ? new Date(value) : null;
+    const displayValue = selectedDate ? selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && inputRef.current && popupRef.current) {
+            const inputRect = inputRef.current.getBoundingClientRect();
+            const popup = popupRef.current;
+            const popupHeight = 350; // Approximate height of calendar
+            const popupWidth = 280;
+            
+            // Position below the input by default
+            let top = inputRect.bottom + window.scrollY + 4;
+            let left = inputRect.left + window.scrollX;
+            
+            // Check if there's enough space below, if not, position above
+            if (inputRect.bottom + popupHeight > window.innerHeight) {
+                top = inputRect.top + window.scrollY - popupHeight - 4;
+            }
+            
+            // Check if there's enough space on the right, if not, adjust left
+            if (inputRect.left + popupWidth > window.innerWidth) {
+                left = window.innerWidth - popupWidth - 10;
+            }
+            
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+        }
+    }, [isOpen]);
+
+    const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+    const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    function handleDateSelect(day: number) {
+        const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+        onChange(toInputDate(newDate));
+        setIsOpen(false);
+    }
+
+    function handlePrevMonth() {
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+    }
+
+    function handleNextMonth() {
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+    }
+
+    function handleToday() {
+        const today = new Date();
+        onChange(toInputDate(today));
+        setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+        setIsOpen(false);
+    }
+
     return (
-        <div style={{ 
+        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+            <div
+                ref={inputRef}
+                onClick={() => setIsOpen(!isOpen)}
+                className="input"
+                style={{
+                    width: '100%',
+                    marginTop: 6,
+                    cursor: 'pointer',
             display: 'flex', 
-            flexDirection: 'column', 
-            gap: 6,
             alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 12px',
-            borderRight: isLast ? 'none' : '1px solid var(--border)'
-        }}>
-            <div style={{ 
-                fontSize: 10, 
-                color: 'var(--muted)', 
+                    justifyContent: 'space-between',
+                    userSelect: 'none'
+                }}
+            >
+                <span style={{ color: displayValue ? 'var(--text)' : 'var(--muted)' }}>
+                    {displayValue || placeholder || 'Select date'}
+                </span>
+                <span style={{ fontSize: 18, color: 'var(--muted)' }}>📅</span>
+            </div>
+            <input
+                type="date"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                required={required}
+                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+                tabIndex={-1}
+            />
+            {isOpen && (
+                <div
+                    ref={popupRef}
+                    style={{
+                        position: 'fixed',
+                        background: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 12,
+                        padding: 20,
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+                        zIndex: 10000,
+                        minWidth: 300,
+                        maxWidth: 300,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <button
+                            type="button"
+                            onClick={handlePrevMonth}
+                            style={{ 
+                                padding: '6px 10px', 
+                                fontSize: 18,
+                                border: 'none',
+                                background: '#f3f4f6',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                color: '#374151',
                 fontWeight: 600, 
-                textTransform: 'uppercase', 
-                letterSpacing: '0.8px',
-                lineHeight: 1.3,
-                marginBottom: 2
-            }}>
-                {label}
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#f3f4f6';
+                            }}
+                            aria-label="Previous month"
+                        >
+                            ‹
+                        </button>
+                        <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>
+                            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </div>
-            <div style={{ 
-                display: 'flex',
-                alignItems: 'baseline',
-                gap: 10,
-                justifyContent: 'center',
-                flexWrap: 'wrap',
-                width: '100%'
-            }}>
-                <div style={{ 
-                    fontSize: 15, 
-                    fontWeight: 700, 
-                    color: 'var(--text)',
-                    lineHeight: 1.3,
-                    letterSpacing: '-0.2px'
-                }}>
-                    {count.toLocaleString()}
-                </div>
-                <div style={{ 
-                    fontSize: 12, 
+                        <button
+                            type="button"
+                            onClick={handleNextMonth}
+                            style={{ 
+                                padding: '6px 10px', 
+                                fontSize: 18,
+                                border: 'none',
+                                background: '#f3f4f6',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                color: '#374151',
                     fontWeight: 600, 
-                    color: 'var(--muted)',
-                    lineHeight: 1.3,
-                    opacity: 0.85
-                }}>
-                    {formatCurrency(amount)}
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#f3f4f6';
+                            }}
+                            aria-label="Next month"
+                        >
+                            ›
+                        </button>
                 </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 16 }}>
+                        {weekDays.map((day) => (
+                            <div key={day} style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#6b7280', padding: '8px 0' }}>
+                                {day}
             </div>
+                        ))}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                        {Array(firstDayOfMonth).fill(null).map((_, i) => (
+                            <div key={`empty-${i}`} />
+                        ))}
+                        {days.map((day) => {
+                            const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                            const isSelected = selectedDate && 
+                                date.getDate() === selectedDate.getDate() &&
+                                date.getMonth() === selectedDate.getMonth() &&
+                                date.getFullYear() === selectedDate.getFullYear();
+                            const isToday = date.toDateString() === new Date().toDateString();
+                            return (
+                                <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => handleDateSelect(day)}
+                                    style={{
+                                        padding: '10px 4px',
+                                        border: 'none',
+                                        background: isSelected ? '#16a34a' : isToday ? '#dcfce7' : 'transparent',
+                                        color: isSelected ? '#ffffff' : isToday ? '#16a34a' : '#111827',
+                                        borderRadius: 8,
+                                        cursor: 'pointer',
+                                        fontSize: 14,
+                                        fontWeight: isSelected ? 700 : isToday ? 600 : 400,
+                                        transition: 'all 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!isSelected && !isToday) {
+                                            e.currentTarget.style.background = '#f3f4f6';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isSelected && !isToday) {
+                                            e.currentTarget.style.background = 'transparent';
+                                        } else if (isToday && !isSelected) {
+                                            e.currentTarget.style.background = '#dcfce7';
+                                        }
+                                    }}
+                                >
+                                    {day}
+                                </button>
+                            );
+                        })}
+                </div>
+                    <button
+                        type="button"
+                        onClick={handleToday}
+                        style={{
+                            marginTop: 16,
+                            width: '100%',
+                            padding: '10px',
+                            border: '1px solid #e5e7eb',
+                            background: '#f9fafb',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            fontSize: 14,
+                    fontWeight: 600, 
+                            color: '#111827',
+                            transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#f3f4f6';
+                            e.currentTarget.style.borderColor = '#d1d5db';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f9fafb';
+                            e.currentTarget.style.borderColor = '#e5e7eb';
+                        }}
+                    >
+                        Today
+                    </button>
+            </div>
+            )}
         </div>
     );
 }
 
-function AddOrderModal({ onClose, onCreate }: { onClose: () => void; onCreate: (o: Order) => void }) {
-    const [date, setDate] = useState<string>(toInputDate(new Date()));
-    const [name, setName] = useState('');
-    const [phone, setPhone] = useState('');
-    const [address, setAddress] = useState('');
-    const [state, setState] = useState('');
-    const [payment, setPayment] = useState<WAPaymentStatus>('Paid');
-    const [fulfillment, setFulfillment] = useState<FulfillmentStatus>('Unfulfilled');
-    const [delivery, setDelivery] = useState<DeliveryStatus>('In Transit');
-    const [pincode, setPincode] = useState('');
-    const [shipping, setShipping] = useState<string>('');
-    const [discount, setDiscount] = useState<string>('');
-    const [items, setItems] = useState<Array<{ variant: string; quantity: number }>>([{ variant: '', quantity: 1 }]);
-    const [amount, setAmount] = useState<string>('');
+function StatusDropdown({ value, onChange, required }: { value: LeadStatus; onChange: (value: LeadStatus) => void; required?: boolean }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLDivElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
 
-    function addItem() { setItems((prev) => [...prev, { variant: '500ml Ghee', quantity: 1 }]); }
-    function removeItem(idx: number) { setItems((prev) => prev.filter((_, i) => i !== idx)); }
-    function updateItem(idx: number, key: 'variant' | 'quantity', value: string) {
-        setItems((prev) => prev.map((it, i) => i === idx ? { ...it, [key]: key === 'quantity' ? Number(value || 0) : value } : it));
-    }
+    const statusConfig: Record<LeadStatus, { icon: string; color: string; bgColor: string }> = {
+        'New': { icon: '🆕', color: '#075985', bgColor: '#e0f2fe' },
+        'Contacted': { icon: '📞', color: '#854d0e', bgColor: '#fef9c3' },
+        'Converted': { icon: '✅', color: '#166534', bgColor: '#dcfce7' },
+        'Not Interested': { icon: '❌', color: '#991b1b', bgColor: '#fee2e2' },
+        'No Answer': { icon: '🔇', color: '#075985', bgColor: '#e0f2fe' },
+        'Potential Customer': { icon: '⭐', color: '#854d0e', bgColor: '#fef9c3' },
+        'Very Interested': { icon: '🔥', color: '#854d0e', bgColor: '#fef9c3' },
+        'CBA': { icon: '💬', color: '#854d0e', bgColor: '#fef9c3' },
+    };
+
+    const currentStatus = statusConfig[value];
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && buttonRef.current && popupRef.current) {
+            const buttonRect = buttonRef.current.getBoundingClientRect();
+            const popup = popupRef.current;
+            const popupHeight = 260;
+            const popupWidth = 220;
+            
+            let top = buttonRect.bottom + window.scrollY + 4;
+            let left = buttonRect.left + window.scrollX;
+            
+            if (buttonRect.bottom + popupHeight > window.innerHeight) {
+                top = buttonRect.top + window.scrollY - popupHeight - 4;
+            }
+            
+            if (buttonRect.left + popupWidth > window.innerWidth) {
+                left = window.innerWidth - popupWidth - 10;
+            }
+            
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+        }
+    }, [isOpen]);
+
+    const statusOptions: LeadStatus[] = ['New', 'Contacted', 'Converted', 'Not Interested', 'No Answer', 'Potential Customer', 'Very Interested', 'CBA'];
+
+    return (
+        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+            <div
+                ref={buttonRef}
+                onClick={() => setIsOpen(!isOpen)}
+                className="input"
+                style={{
+                    width: '100%',
+                    marginTop: 6,
+                    cursor: 'pointer',
+            display: 'flex', 
+            alignItems: 'center',
+                    justifyContent: 'space-between',
+                    userSelect: 'none',
+            padding: '0 12px',
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>{currentStatus.icon}</span>
+                    <span style={{ color: 'var(--text)', fontWeight: 500, fontSize: 14 }}>{value}</span>
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--muted)' }}>▼</span>
+            </div>
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value as LeadStatus)}
+                required={required}
+                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+                tabIndex={-1}
+            >
+                {statusOptions.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                ))}
+            </select>
+            {isOpen && (
+                <div
+                    ref={popupRef}
+                    style={{
+                        position: 'fixed',
+                        background: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 8,
+                        padding: 6,
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+                        zIndex: 10000,
+                        minWidth: 220,
+                        maxWidth: 220,
+                        maxHeight: 260,
+                        overflowY: 'auto',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {statusOptions.map((status) => {
+                        const config = statusConfig[status];
+                        const isSelected = value === status;
+                        return (
+                            <div
+                                key={status}
+                                onClick={() => {
+                                    onChange(status);
+                                    setIsOpen(false);
+                                }}
+                                style={{
+                display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    padding: '8px 10px',
+                                    borderRadius: 6,
+                                    cursor: 'pointer',
+                                    background: isSelected ? config.bgColor : 'transparent',
+                                    border: isSelected ? `1.5px solid ${config.color}` : '1.5px solid transparent',
+                                    transition: 'all 0.2s',
+                                    marginBottom: 2,
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isSelected) {
+                                        e.currentTarget.style.background = '#f9fafb';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isSelected) {
+                                        e.currentTarget.style.background = 'transparent';
+                                    }
+                                }}
+                            >
+                                <span style={{ fontSize: 16 }}>{config.icon}</span>
+                                <span style={{ 
+                                    color: isSelected ? config.color : '#111827', 
+                                    fontWeight: isSelected ? 600 : 500,
+                                    fontSize: 13,
+                                }}>
+                                    {status}
+                                </span>
+                                {isSelected && (
+                                    <span style={{ marginLeft: 'auto', fontSize: 14, color: config.color }}>✓</span>
+                                )}
+                </div>
+                        );
+                    })}
+            </div>
+            )}
+        </div>
+    );
+}
+
+function AddLeadModal({ lead, onClose, onSave }: { lead?: WALead | null; onClose: () => void; onSave: (lead: WALead) => void }) {
+    const [callingDate, setCallingDate] = useState<string>(lead?.callingDate && lead.callingDate.trim() ? toInputDate(new Date(lead.callingDate)) : '');
+    const [customerName, setCustomerName] = useState(lead?.customerName || '');
+    const [mobile, setMobile] = useState(lead?.mobile || '');
+    const [callingDetail, setCallingDetail] = useState(lead?.callingDetail || '');
+    const [callBackDate, setCallBackDate] = useState<string>(lead?.callBackDate && lead.callBackDate.trim() ? toInputDate(new Date(lead.callBackDate)) : '');
+    const [notes, setNotes] = useState(lead?.notes || '');
+    const [status, setStatus] = useState<LeadStatus>(lead?.status || 'New');
+
+    // Update form when lead prop changes
+    useEffect(() => {
+        if (lead) {
+            setCallingDate(lead.callingDate && lead.callingDate.trim() ? toInputDate(new Date(lead.callingDate)) : '');
+            setCustomerName(lead.customerName || '');
+            setMobile(lead.mobile || '');
+            setCallingDetail(lead.callingDetail || '');
+            setCallBackDate(lead.callBackDate && lead.callBackDate.trim() ? toInputDate(new Date(lead.callBackDate)) : '');
+            setNotes(lead.notes || '');
+            setStatus(lead.status || 'New');
+        } else {
+            // Reset form for new lead
+            setCallingDate('');
+            setCustomerName('');
+            setMobile('');
+            setCallingDetail('');
+            setCallBackDate('');
+            setNotes('');
+            setStatus('New');
+        }
+    }, [lead]);
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        const order: Order = {
-            id: '', // Server will generate the ID
-            date: new Date(date).toISOString(),
-            customer: name,
-            customerPhone: phone,
-            customerAddress: address,
-            items: items.map((it) => ({ variant: it.variant, quantity: it.quantity, lineAmount: 0 } as OrderItem)),
-            amount: Number(amount || 0),
-            paymentStatus: payment as PaymentStatus,
-            fulfillmentStatus: fulfillment,
-            deliveryStatus: delivery,
-            pincode: pincode || undefined,
-            shippingAmount: shipping ? Number(shipping) : undefined,
-            state,
+        
+        // Validate mobile number
+        if (mobile.length !== 10 || !/^\d{10}$/.test(mobile)) {
+            alert('Mobile number must be exactly 10 digits');
+            return;
+        }
+        
+        const leadData: WALead = {
+            id: lead?.id || '', // Keep existing ID for updates
+            customerName,
+            mobile,
+            callingDate: callingDate ? new Date(callingDate).toISOString() : '',
+            callingDetail,
+            callBackDate: callBackDate ? new Date(callBackDate).toISOString() : undefined,
+            notes,
+            status,
         };
-        onCreate(order);
+        onSave(leadData);
     }
 
     useEffect(() => {
@@ -597,103 +1176,75 @@ function AddOrderModal({ onClose, onCreate }: { onClose: () => void; onCreate: (
             <div
                 className="card"
                 onClick={(e)=>e.stopPropagation()}
-                style={{ width: '100%', maxWidth: 820, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}
+                style={{ width: '100%', maxWidth: 1100, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}
             >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: '1px solid var(--border)' }}>
-                    <h3 style={{ margin: 0 }}>Add Lead</h3>
+                    <h3 style={{ margin: 0 }}>{lead ? 'Edit Lead' : 'Add Lead'}</h3>
                     <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
                 </div>
                 <form onSubmit={submit} style={{ display: 'grid', gap: 20, padding: 20, maxHeight: '70vh', overflow: 'auto' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
-                        <div>
-                            <label className="label">Date</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
-                        </div>
-                        <div>
-                            <label className="label">State</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={state} onChange={(e)=>setState(e.target.value)} required />
-                        </div>
-                        <div>
-                            <label className="label">Pincode</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={pincode} onChange={(e)=>setPincode(e.target.value)} required />
-                        </div>
-                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
                         <div>
                             <label className="label">Customer Name</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={name} onChange={(e)=>setName(e.target.value)} required />
+                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={customerName} onChange={(e)=>setCustomerName(e.target.value)} required />
                         </div>
                         <div>
-                            <label className="label">Phone</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={phone} onChange={(e)=>setPhone(e.target.value)} required />
+                            <label className="label">Mobile</label>
+                            <input 
+                                className="input" 
+                                style={{ width: '100%', marginTop: 6 }} 
+                                type="tel" 
+                                value={mobile} 
+                                onChange={(e) => {
+                                    const value = e.target.value.replace(/\D/g, ''); // Remove non-numeric characters
+                                    if (value.length <= 10) {
+                                        setMobile(value);
+                                    }
+                                }}
+                                pattern="[0-9]{10}"
+                                minLength={10}
+                                maxLength={10}
+                                required 
+                                placeholder="Enter 10 digit mobile number"
+                            />
+                            {mobile && mobile.length !== 10 && (
+                                <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
+                                    Mobile number must be exactly 10 digits
                         </div>
-                        <div style={{ gridColumn: '1 / -1' }}>
-                            <label className="label">Address</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={address} onChange={(e)=>setAddress(e.target.value)} required />
-                        </div>
-                    </div>
-
-                    <div>
-                        <div style={{ display: 'grid', gap: 10 }}>
-                            {items.map((it, idx) => (
-                                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 44px', gap: 10, alignItems: 'end', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
-                                    <div>
-                                        <label className="label">Variant</label>
-                                        <input className="input" style={{ width: '100%', marginTop: 6 }} placeholder="Variant name" value={it.variant} onChange={(e)=>updateItem(idx, 'variant', e.target.value)} required />
-                                    </div>
-                                    <div>
-                                        <label className="label">Quantity</label>
-                                        <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={1} value={it.quantity} onChange={(e)=>updateItem(idx, 'quantity', e.target.value)} required />
-                                    </div>
-                                    <div>
-                                        <label className="label" style={{ visibility: 'hidden' }}>Remove</label>
-                                        <button type="button" className="icon-btn" onClick={()=>removeItem(idx)} aria-label="Remove item">–</button>
-                                    </div>
-                                </div>
-                            ))}
-                            <button type="button" className="filter-btn" onClick={addItem} style={{ width: 'fit-content' }}>+ Add item</button>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 16 }}>
-                        <div>
-                            <label className="label">Payment Status</label>
-                            <select className="input" style={{ width: '100%', marginTop: 6 }} value={payment} onChange={(e)=>setPayment(e.target.value as WAPaymentStatus)} required>
-                                {(['Paid','Pending','Refunded','Failed'] as WAPaymentStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="label">Fullfillment Status</label>
-                            <select className="input" style={{ width: '100%', marginTop: 6 }} value={fulfillment} onChange={(e)=>setFulfillment(e.target.value as FulfillmentStatus)} required>
-                                {(['Unfulfilled','Fulfilled','Partial'] as FulfillmentStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="label">Delivery Status</label>
-                            <select className="input" style={{ width: '100%', marginTop: 6 }} value={delivery} onChange={(e)=>setDelivery(e.target.value as DeliveryStatus)} required>
-                                {(['In Transit','Delivered','RTO','Pending Pickup'] as DeliveryStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
-                            </select>
+                            )}
                         </div>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
-                        <div>
-                            <label className="label">Total Amount (₹)</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} value={amount} onChange={(e)=>setAmount(e.target.value)} required />
+                    <div>
+                            <label className="label">Calling Date</label>
+                            <DatePicker value={callingDate} onChange={setCallingDate} placeholder="Select calling date" />
+                                    </div>
+                                    <div>
+                            <label className="label">Call Back Date</label>
+                            <DatePicker value={callBackDate} onChange={setCallBackDate} placeholder="Select call back date" />
+                                    </div>
+                                    <div>
+                            <label className="label">Status</label>
+                            <StatusDropdown value={status} onChange={setStatus} />
                         </div>
+                    </div>
+
                         <div>
-                            <label className="label">Shipping (₹)</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} value={shipping} onChange={(e)=>setShipping(e.target.value)} required />
-                        </div>
+                        <label className="label">Calling Detail</label>
+                        <textarea className="input" style={{ width: '100%', marginTop: 6, minHeight: 80, resize: 'vertical', paddingTop: 12 }} value={callingDetail} onChange={(e)=>setCallingDetail(e.target.value)} />
+                    </div>
+
                         <div>
-                            <label className="label">Discount (₹)</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} value={discount} onChange={(e)=>setDiscount(e.target.value)} />
-                        </div>
+                        <label className="label">Notes</label>
+                        <textarea className="input" style={{ width: '100%', marginTop: 6, minHeight: 80, resize: 'vertical', paddingTop: 12 }} value={notes} onChange={(e)=>setNotes(e.target.value)} />
                     </div>
 
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                         <button type="button" className="icon-btn" onClick={onClose}>Cancel</button>
-                        <button type="submit" className="button" style={{ width: 'auto', padding: '0 16px' }}>Create</button>
+                        <button type="submit" className="button" style={{ width: 'auto', padding: '0 16px' }}>
+                            {lead ? 'Save Changes' : 'Create'}
+                        </button>
                     </div>
                 </form>
             </div>
@@ -701,3 +1252,38 @@ function AddOrderModal({ onClose, onCreate }: { onClose: () => void; onCreate: (
     );
 }
 
+function ToastContainer({ toasts }: { toasts: Toast[] }) {
+    return (
+        <div
+            style={{
+                position: 'fixed',
+                top: 20,
+                right: 20,
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+                pointerEvents: 'none',
+            }}
+        >
+            {toasts.map((toast) => (
+                <div
+                    key={toast.id}
+                    className="toast"
+                    style={{
+                        pointerEvents: 'auto',
+                        animation: 'slideInRight 0.3s ease-out',
+                    }}
+                    data-type={toast.type}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span style={{ fontSize: 18 }}>
+                            {toast.type === 'success' ? '✓' : toast.type === 'delete' ? '🗑' : '✕'}
+                        </span>
+                        <span>{toast.message}</span>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
