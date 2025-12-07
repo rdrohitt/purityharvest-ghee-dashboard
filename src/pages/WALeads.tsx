@@ -47,11 +47,19 @@ export default function WALeads() {
                 if (cancelled) return;
                 // Transform old order data to new lead format if needed
                 const transformedLeads: WALead[] = Array.isArray(data) ? data.map((item: any) => {
-                    // If it's already in the new format, return as is
+                    // If it's already in the new format, ensure all required fields are present
                     if (item.customerName && item.mobile) {
                         return {
-                            ...item,
+                            id: item.id || '',
+                            customerName: item.customerName || '',
+                            mobile: item.mobile || '',
                             callingDate: item.callingDate || '',
+                            callingDetail: item.callingDetail || '',
+                            callBackDate: item.callBackDate || undefined,
+                            notes: item.notes || '',
+                            status: (item.status && ['New', 'Contacted', 'Converted', 'Not Interested', 'No Answer', 'Potential Customer', 'Very Interested', 'CBA'].includes(item.status)) 
+                                ? item.status as LeadStatus 
+                                : 'New' as LeadStatus,
                         };
                     }
                     // Otherwise, transform from old order format
@@ -60,10 +68,12 @@ export default function WALeads() {
                         customerName: item.customer || '',
                         mobile: item.customerPhone || '',
                         callingDate: item.date || item.callingDate || '',
-                        callingDetail: '',
-                        callBackDate: undefined,
-                        notes: '',
-                        status: 'New' as LeadStatus,
+                        callingDetail: item.callingDetail || '',
+                        callBackDate: item.callBackDate || undefined,
+                        notes: item.notes || '',
+                        status: (item.status && ['New', 'Contacted', 'Converted', 'Not Interested', 'No Answer', 'Potential Customer', 'Very Interested', 'CBA'].includes(item.status)) 
+                            ? item.status as LeadStatus 
+                            : 'New' as LeadStatus,
                     };
                 }) : [];
                 setLeads(transformedLeads);
