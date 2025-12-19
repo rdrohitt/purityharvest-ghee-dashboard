@@ -1,0 +1,27 @@
+[
+  {
+    "name": "MB Mart",
+    "mobile": "8685045943",
+    "sector": "Sector 9A",
+    "address": "Sector 9A Main Market",
+    "date": "2025-12-19",
+    "quantities": {
+      "gir500": 2,
+      "buffalo500": 3,
+      "gir1": 2,
+      "buffalo1": 4,
+      "desi1": 1,
+      "desi500": 2
+    },
+    "prices": {
+      "gir500": 900,
+      "buffalo500": 650,
+      "gir1": 1720,
+      "buffalo1": 1250,
+      "desi1": 1350,
+      "desi500": 710
+    },
+    "id": "GGM-1766146695101",
+    "commission": 15
+  }
+]

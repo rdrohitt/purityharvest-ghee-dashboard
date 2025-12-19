@@ -13,6 +13,8 @@ import Followups from './pages/Followups';
 import MarketingSpend from './pages/MarketingSpend';
 import Products from './pages/Products';
 import Callers from './pages/Callers';
+import GurugramMarts from './pages/GurugramMarts';
+import DelhiMarts from './pages/DelhiMarts';
 import { isAuthenticated } from './auth';
 
 function PrivateRoute({ children }: { children: ReactElement }) {
@@ -33,26 +35,28 @@ export default function App() {
 					isAuthenticated() ? <Navigate to="/admin" replace /> : <Login />
 				} 
 			/>
-			<Route
-				path="/admin"
-				element={
-					<PrivateRoute>
-						<AdminLayout />
-					</PrivateRoute>
-				}
-			>
-				<Route index element={<Dashboard />} />
-                <Route path="shopify" element={<Shopify />} />
-                <Route path="wa-leads" element={<WALeads />} />
-                <Route path="amazon" element={<Amazon />} />
-                <Route path="flipkart" element={<Flipkart />} />
-                <Route path="callers" element={<Callers />} />
-                <Route path="products" element={<Products />} />
-                <Route path="followups" element={<Followups />} />
-                <Route path="marketing-spend" element={<MarketingSpend />} />
-                <Route path="users" element={<Users />} />
-                <Route path="settings" element={<Settings />} />
-			</Route>
+				<Route
+					path="/admin"
+					element={
+						<PrivateRoute>
+							<AdminLayout />
+						</PrivateRoute>
+					}
+				>
+					<Route index element={<Dashboard />} />
+					<Route path="shopify" element={<Shopify />} />
+					<Route path="wa-leads" element={<WALeads />} />
+					<Route path="amazon" element={<Amazon />} />
+					<Route path="flipkart" element={<Flipkart />} />
+					<Route path="callers" element={<Callers />} />
+					<Route path="products" element={<Products />} />
+					<Route path="followups" element={<Followups />} />
+					<Route path="marketing-spend" element={<MarketingSpend />} />
+					<Route path="gurugram-marts" element={<GurugramMarts />} />
+					<Route path="delhi-marts" element={<DelhiMarts />} />
+					<Route path="users" element={<Users />} />
+					<Route path="settings" element={<Settings />} />
+				</Route>
 			<Route path="*" element={<Navigate to="/" replace />} />
 		</Routes>
 	);

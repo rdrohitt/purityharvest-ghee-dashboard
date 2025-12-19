@@ -11002,7 +11002,7 @@
     "amount": 2280,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "793002",
     "codCharges": 0,
     "shippingCharges": 287,

@@ -17,6 +17,8 @@ const META_SPEND_PATH = path.join(__dirname, 'public', 'meta-spend.json');
 const AMAZON_SPEND_PATH = path.join(__dirname, 'public', 'amazon-spend.json');
 const FLIPKART_SPEND_PATH = path.join(__dirname, 'public', 'flipkart-spend.json');
 const MISC_SPEND_PATH = path.join(__dirname, 'public', 'misc-spend.json');
+const GURUGRAM_MARTS_PATH = path.join(__dirname, 'public', 'gurugram-marts.json');
+const DELHI_MARTS_PATH = path.join(__dirname, 'public', 'delhi-marts.json');
 
 async function readProducts() {
   const data = await fs.readFile(PRODUCTS_PATH, 'utf8');
@@ -182,6 +184,40 @@ async function readMiscSpend() {
 async function writeMiscSpend(records) {
   const json = JSON.stringify(records, null, 2);
   await fs.writeFile(MISC_SPEND_PATH, json, 'utf8');
+}
+
+async function readGurugramMarts() {
+  try {
+    const data = await fs.readFile(GURUGRAM_MARTS_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function writeGurugramMarts(marts) {
+  const json = JSON.stringify(marts, null, 2);
+  await fs.writeFile(GURUGRAM_MARTS_PATH, json, 'utf8');
+}
+
+async function readDelhiMarts() {
+  try {
+    const data = await fs.readFile(DELHI_MARTS_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function writeDelhiMarts(marts) {
+  const json = JSON.stringify(marts, null, 2);
+  await fs.writeFile(DELHI_MARTS_PATH, json, 'utf8');
 }
 
 app.get('/api/products', async (_req, res) => {
@@ -856,6 +892,160 @@ app.delete('/api/misc-spend/:id', async (req, res) => {
   } catch (err) {
     console.error('Error deleting from misc-spend.json', err);
     res.status(500).json({ message: 'Failed to delete Misc spend' });
+  }
+});
+
+// Gurugram Marts API endpoints
+app.get('/api/gurugram-marts', async (_req, res) => {
+  try {
+    const marts = await readGurugramMarts();
+    res.json(marts);
+  } catch (err) {
+    console.error('Error reading gurugram-marts.json', err);
+    res.status(500).json({ message: 'Failed to read Gurugram marts' });
+  }
+});
+
+app.post('/api/gurugram-marts', async (req, res) => {
+  try {
+    const newMart = req.body;
+    if (!newMart || typeof newMart !== 'object') {
+      return res.status(400).json({ message: 'Invalid mart payload' });
+    }
+
+    const marts = await readGurugramMarts();
+    if (!newMart.id) {
+      newMart.id = `GGM-${Date.now()}`;
+    }
+    marts.push(newMart);
+    await writeGurugramMarts(marts);
+
+    res.status(201).json(newMart);
+  } catch (err) {
+    console.error('Error writing to gurugram-marts.json', err);
+    res.status(500).json({ message: 'Failed to save Gurugram mart' });
+  }
+});
+
+app.put('/api/gurugram-marts/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updated = req.body;
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ message: 'Invalid mart payload' });
+    }
+
+    const marts = await readGurugramMarts();
+    const index = marts.findIndex((m) => m.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Mart not found' });
+    }
+
+    marts[index] = { ...marts[index], ...updated, id };
+    await writeGurugramMarts(marts);
+
+    res.json(marts[index]);
+  } catch (err) {
+    console.error('Error updating gurugram-marts.json', err);
+    res.status(500).json({ message: 'Failed to update Gurugram mart' });
+  }
+});
+
+app.delete('/api/gurugram-marts/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const marts = await readGurugramMarts();
+    const index = marts.findIndex((m) => m.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Mart not found' });
+    }
+
+    marts.splice(index, 1);
+    await writeGurugramMarts(marts);
+
+    res.status(204).end();
+  } catch (err) {
+    console.error('Error deleting from gurugram-marts.json', err);
+    res.status(500).json({ message: 'Failed to delete Gurugram mart' });
+  }
+});
+
+// Delhi Marts API endpoints
+app.get('/api/delhi-marts', async (_req, res) => {
+  try {
+    const marts = await readDelhiMarts();
+    res.json(marts);
+  } catch (err) {
+    console.error('Error reading delhi-marts.json', err);
+    res.status(500).json({ message: 'Failed to read Delhi marts' });
+  }
+});
+
+app.post('/api/delhi-marts', async (req, res) => {
+  try {
+    const newMart = req.body;
+    if (!newMart || typeof newMart !== 'object') {
+      return res.status(400).json({ message: 'Invalid mart payload' });
+    }
+
+    const marts = await readDelhiMarts();
+    if (!newMart.id) {
+      newMart.id = `DLM-${Date.now()}`;
+    }
+    marts.push(newMart);
+    await writeDelhiMarts(marts);
+
+    res.status(201).json(newMart);
+  } catch (err) {
+    console.error('Error writing to delhi-marts.json', err);
+    res.status(500).json({ message: 'Failed to save Delhi mart' });
+  }
+});
+
+app.put('/api/delhi-marts/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updated = req.body;
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ message: 'Invalid mart payload' });
+    }
+
+    const marts = await readDelhiMarts();
+    const index = marts.findIndex((m) => m.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Mart not found' });
+    }
+
+    marts[index] = { ...marts[index], ...updated, id };
+    await writeDelhiMarts(marts);
+
+    res.json(marts[index]);
+  } catch (err) {
+    console.error('Error updating delhi-marts.json', err);
+    res.status(500).json({ message: 'Failed to update Delhi mart' });
+  }
+});
+
+app.delete('/api/delhi-marts/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const marts = await readDelhiMarts();
+    const index = marts.findIndex((m) => m.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Mart not found' });
+    }
+
+    marts.splice(index, 1);
+    await writeDelhiMarts(marts);
+
+    res.status(204).end();
+  } catch (err) {
+    console.error('Error deleting from delhi-marts.json', err);
+    res.status(500).json({ message: 'Failed to delete Delhi mart' });
   }
 });
 
