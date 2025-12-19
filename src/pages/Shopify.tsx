@@ -89,7 +89,21 @@ type Toast = {
     type: 'success' | 'error' | 'delete';
 };
 
-export default function Shopify() {
+type ShopifyProps = {
+    /**
+     * Title shown in the header card.
+     * Defaults to "Shopify" for the main orders page.
+     */
+    title?: string;
+    /**
+     * Optional state filter – when provided, the page will only show
+     * orders whose `state` exactly matches this value.
+     * Used by derived pages like Gurugram / Delhi marts.
+     */
+    stateFilter?: string;
+};
+
+export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps) {
     const [range, setRange] = useState<UiRange>('all');
     const [customerFilter, setCustomerFilter] = useState('');
     const [customStart, setCustomStart] = useState<string>(toInputDate(new Date()));
@@ -97,6 +111,9 @@ export default function Shopify() {
     const [showCustom, setShowCustom] = useState(false);
     const [showAddOrder, setShowAddOrder] = useState(false);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+    const [showCustomerProfile, setShowCustomerProfile] = useState(false);
+    const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
+    const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
     const [orders, setOrders] = useState<Order[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [marketingSpend, setMarketingSpend] = useState<SpendRecord[]>([]);
@@ -231,21 +248,47 @@ export default function Shopify() {
 
     const filtered = useMemo(() => {
         return byRange.filter(o => {
-            const matchesCustomer = o.customer.toLowerCase().includes(customerFilter.toLowerCase());
+            const searchTerm = customerFilter.toLowerCase();
+            const matchesCustomer =
+                o.customer.toLowerCase().includes(searchTerm) ||
+                (o.customerPhone && o.customerPhone.includes(searchTerm));
             const matchesPayment = !paymentStatusFilter || o.paymentStatus === paymentStatusFilter;
             const matchesFulfillment = !fulfillmentStatusFilter || o.fulfillmentStatus === fulfillmentStatusFilter;
             const matchesDelivery = !deliveryStatusFilter || o.deliveryStatus === deliveryStatusFilter;
             const matchesPlatform = !platformFilter || o.platform === platformFilter;
             const matchesType = !typeFilter || o.type === typeFilter;
-            return matchesCustomer && matchesPayment && matchesFulfillment && matchesDelivery && matchesPlatform && matchesType;
+            const matchesState = !stateFilter || o.state === stateFilter;
+            return (
+                matchesCustomer &&
+                matchesPayment &&
+                matchesFulfillment &&
+                matchesDelivery &&
+                matchesPlatform &&
+                matchesType &&
+                matchesState
+            );
         });
-    }, [byRange, customerFilter, paymentStatusFilter, fulfillmentStatusFilter, deliveryStatusFilter, platformFilter, typeFilter]);
+    }, [
+        byRange,
+        customerFilter,
+        paymentStatusFilter,
+        fulfillmentStatusFilter,
+        deliveryStatusFilter,
+        platformFilter,
+        typeFilter,
+        stateFilter,
+    ]);
 
     const metrics = useMemo(() => {
         const totalSales = filtered.reduce((s, o) => s + o.amount, 0);
         const quantity = filtered.reduce((s, o) => s + o.items.reduce((sum, item) => sum + item.quantity, 0), 0);
         const codCharges = filtered.reduce((s, o) => s + (o.codCharges || (o.shippingAmount || 0)), 0);
         const shippingCharges = filtered.reduce((s, o) => s + (o.shippingCharges || 0), 0);
+        
+        // Calculate delivered orders amount first (needed for ROAS calculation)
+        const deliveredOrders = filtered.filter(o => o.deliveryStatus === 'Delivered');
+        const delivered = deliveredOrders.length;
+        const deliveredAmount = deliveredOrders.reduce((s, o) => s + o.amount, 0);
         
         // Calculate total marketing spend from meta-spend.json for the same date range
         let totalMarketingSpend = 0;
@@ -266,8 +309,8 @@ export default function Shopify() {
                 .reduce((sum, spend) => sum + spend.amount, 0);
         }
         
-        // Calculate ROAS (Return on Ad Spend) = Revenue / Marketing Spend
-        const roas = totalMarketingSpend > 0 ? totalSales / totalMarketingSpend : 0;
+        // Calculate ROAS (Return on Ad Spend) = Delivered Orders Amount / Meta Spend
+        const roas = totalMarketingSpend > 0 ? deliveredAmount / totalMarketingSpend : 0;
         
         // Calculate quantities by size
         const quantityBySize: { [key: string]: number } = {
@@ -313,10 +356,6 @@ export default function Shopify() {
                 }
             });
         });
-        
-        const deliveredOrders = filtered.filter(o => o.deliveryStatus === 'Delivered');
-        const delivered = deliveredOrders.length;
-        const deliveredAmount = deliveredOrders.reduce((s, o) => s + o.amount, 0);
         
         const rtoOrders = filtered.filter(o => o.deliveryStatus === 'RTO');
         const rto = rtoOrders.length;
@@ -380,7 +419,7 @@ export default function Shopify() {
     return (
         <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
             <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
-                <div style={{ fontWeight: 800 }}>Shopify</div>
+                <div style={{ fontWeight: 800 }}>{title}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                         <div className="filter-group" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -400,7 +439,7 @@ export default function Shopify() {
                             >Custom</FilterButton>
                         </div>
                         <div style={{ flex: 1 }} />
-                        <input className="input" placeholder="Search customer" style={{ width: 240 }} value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} />
+                        <input className="input" placeholder="Search customer name or phone" style={{ width: 240 }} value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} />
                         <button className="button" style={{ width: 'auto', padding: '0 16px' }} onClick={() => setShowAddOrder(true)}>Add Order</button>
                     </div>
                     <div className="status-filters-row" style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -642,7 +681,30 @@ export default function Shopify() {
                                             ) : null}
                                             <Td>
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span title={o.customerAddress} style={{ fontWeight: 600 }}>{o.customer}</span>
+                                                <span 
+                                                    title={o.customerAddress} 
+                                                    style={{ 
+                                                        fontWeight: 600, 
+                                                        cursor: 'pointer',
+                                                        color: 'var(--text)',
+                                                        textDecoration: 'none',
+                                                        transition: 'color 0.2s'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.color = '#10b981';
+                                                        e.currentTarget.style.textDecoration = 'underline';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.color = 'var(--text)';
+                                                        e.currentTarget.style.textDecoration = 'none';
+                                                    }}
+                                                    onClick={() => {
+                                                        setSelectedCustomerPhone(o.customerPhone);
+                                                        setShowCustomerProfile(true);
+                                                    }}
+                                                >
+                                                    {o.customer}
+                                                </span>
                                                 <a className="link" href={`tel:${o.customerPhone}`} style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>{o.customerPhone}</a>
                                             </div>
                                             </Td>
@@ -679,18 +741,7 @@ export default function Shopify() {
                                                     <button
                                                         type="button"
                                                         className="icon-btn icon-btn--danger"
-                                                        onClick={async () => {
-                                                            if (confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
-                                                                try {
-                                                                    await deleteOrder(o.id);
-                                                                    setOrders((prev) => prev.filter((ord) => ord.id !== o.id));
-                                                                    showToast('Order deleted successfully!', 'delete');
-                                                                } catch (err) {
-                                                                    console.error('Failed to delete order', err);
-                                                                    showToast('Failed to delete order. Please check that the server is running and try again.', 'error');
-                                                                }
-                                                            }
-                                                        }}
+                                                        onClick={() => setOrderToDelete(o)}
                                                     >
                                                         Delete
                                                     </button>
@@ -708,6 +759,7 @@ export default function Shopify() {
             {showAddOrder || editingOrder ? (
                 <AddOrderModal 
                     products={products}
+                    orders={orders}
                     mode={editingOrder ? 'edit' : 'add'}
                     initialOrder={editingOrder || undefined}
                     onClose={() => {
@@ -734,6 +786,35 @@ export default function Shopify() {
                     }} 
                 />
             ) : null}
+
+            {showCustomerProfile && selectedCustomerPhone ? (
+                <CustomerProfileModal
+                    customerPhone={selectedCustomerPhone}
+                    orders={orders}
+                    onClose={() => {
+                        setShowCustomerProfile(false);
+                        setSelectedCustomerPhone(null);
+                    }} 
+                />
+            ) : null}
+
+            {orderToDelete ? (
+                <DeleteConfirmationModal
+                    order={orderToDelete}
+                    onConfirm={async () => {
+                        try {
+                            await deleteOrder(orderToDelete.id);
+                            setOrders((prev) => prev.filter((ord) => ord.id !== orderToDelete.id));
+                            showToast('Order deleted successfully!', 'delete');
+                            setOrderToDelete(null);
+                        } catch (err) {
+                            console.error('Failed to delete order', err);
+                            showToast('Failed to delete order. Please check that the server is running and try again.', 'error');
+                        }
+                    }}
+                    onCancel={() => setOrderToDelete(null)}
+                />
+            ) : null}
             
             <ToastContainer toasts={toasts} />
         </section>
@@ -755,8 +836,8 @@ function FilterButton({ active, onClick, children, refEl }: { active: boolean; o
 function Th({ children }: { children: string }) {
     return <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{children}</th>;
 }
-function Td({ children }: { children: React.ReactNode }) {
-    return <td style={{ padding: '12px' }}>{children}</td>;
+function Td({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+    return <td style={{ padding: '12px', ...style }}>{children}</td>;
 }
 
 function StatusFilter<T extends string>({ label, value, onChange, options }: { label: string; value: T | ''; onChange: (val: T | '') => void; options: T[] }) {
@@ -1322,14 +1403,287 @@ function ModernMetricItemWithAmount({ icon, label, count, amount, iconColor, isL
 }
 
 // Simple modal to capture a new order
+function PhoneDropdown({ customers, selectedPhone, onSelect, onNewPhone, phone, required }: { 
+    customers: Order[]; 
+    selectedPhone: string; 
+    phone: string;
+    onSelect: (customer: Order) => void; 
+    onNewPhone?: (phone: string) => void;
+    required?: boolean 
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const containerRef = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLDivElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Find selected customer
+    const selectedCustomer = customers.find(c => c.customerPhone === selectedPhone);
+
+    // Filter customers based on phone number search (numeric only)
+    const activeSearch = searchQuery.trim() || phone.trim();
+    const filteredCustomers = useMemo(() => {
+        if (!activeSearch) return customers;
+        // Only search by phone number (numeric)
+        const query = activeSearch.replace(/\D/g, '');
+        if (!query) return customers;
+        return customers.filter(c => 
+            c.customerPhone.replace(/\D/g, '').includes(query)
+        );
+    }, [customers, activeSearch]);
+
+    // Check if search query doesn't match any customer (for "Create new" option)
+    const showCreateNew = activeSearch.length > 0 && filteredCustomers.length === 0 && phone.trim() !== '' && phone.replace(/\D/g, '').length === 10;
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+                setSearchQuery('');
+            }
+        }
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && containerRef.current && popupRef.current) {
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const popup = popupRef.current;
+            const popupHeight = 300;
+            const popupWidth = 400;
+            
+            let top = containerRect.bottom + window.scrollY + 4;
+            let left = containerRect.left + window.scrollX;
+            
+            if (containerRect.bottom + popupHeight > window.innerHeight) {
+                top = containerRect.top + window.scrollY - popupHeight - 4;
+            }
+            
+            if (containerRect.left + popupWidth > window.innerWidth) {
+                left = window.innerWidth - popupWidth - 10;
+            }
+            
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+        }
+    }, [isOpen, filteredCustomers.length]);
+
+    return (
+        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+            <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                    type="tel"
+                    className="input"
+                    value={phone}
+                    onChange={(e) => {
+                        // Only allow numeric input
+                        const value = e.target.value.replace(/\D/g, '');
+                        if (value.length <= 10) {
+                            if (onNewPhone) {
+                                onNewPhone(value);
+                            }
+                            setSearchQuery(value);
+                            setIsOpen(true);
+                        }
+                    }}
+                    onFocus={() => setIsOpen(true)}
+                    placeholder="Type phone number to search..."
+                    maxLength={10}
+                    pattern="[0-9]{10}"
+                    style={{
+                        width: '100%',
+                        marginTop: 6,
+                        paddingRight: '32px',
+                    }}
+                    required={required}
+                />
+                <div
+                    ref={buttonRef}
+                    onClick={() => setIsOpen(!isOpen)}
+                    style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        marginTop: 6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        pointerEvents: 'auto',
+                    }}
+                >
+                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>▼</span>
+                </div>
+            </div>
+            {isOpen && (
+                <div
+                    ref={popupRef}
+                    style={{
+                        position: 'fixed',
+                        background: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 8,
+                        padding: 8,
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+                        zIndex: 10000,
+                        minWidth: 400,
+                        maxWidth: 400,
+                        maxHeight: 300,
+                        display: 'flex',
+                        flexDirection: 'column',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <input
+                        ref={inputRef}
+                        type="tel"
+                        placeholder="Search by phone number..."
+                        value={searchQuery || phone}
+                        onChange={(e) => {
+                            // Only allow numeric input
+                            const value = e.target.value.replace(/\D/g, '');
+                            if (value.length <= 10) {
+                                setSearchQuery(value);
+                                if (onNewPhone) {
+                                    onNewPhone(value);
+                                }
+                            }
+                        }}
+                        maxLength={10}
+                        pattern="[0-9]{10}"
+                        style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: 6,
+                            fontSize: 14,
+                            marginBottom: 8,
+                            outline: 'none',
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                    <div style={{ overflowY: 'auto', flex: 1 }}>
+                        {filteredCustomers.length === 0 && !showCreateNew ? (
+                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--muted)', fontSize: 14 }}>
+                                {searchQuery.trim() ? 'No customers found' : 'Start typing phone number to search...'}
+                            </div>
+                        ) : (
+                            <>
+                                {filteredCustomers.map((customer) => {
+                                    const isSelected = selectedPhone === customer.customerPhone;
+                                    return (
+                                        <div
+                                            key={customer.customerPhone}
+                                            onClick={() => {
+                                                onSelect(customer);
+                                                setIsOpen(false);
+                                                setSearchQuery('');
+                                            }}
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                padding: '10px 12px',
+                                                borderRadius: 6,
+                                                cursor: 'pointer',
+                                                background: isSelected ? '#f0fdf4' : 'transparent',
+                                                border: isSelected ? '1.5px solid #10b981' : '1.5px solid transparent',
+                                                transition: 'all 0.2s',
+                                                marginBottom: 4,
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (!isSelected) {
+                                                    e.currentTarget.style.background = '#f9fafb';
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (!isSelected) {
+                                                    e.currentTarget.style.background = 'transparent';
+                                                }
+                                            }}
+                                        >
+                                            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>
+                                                {customer.customer}
+                                            </span>
+                                            <span style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                                                {customer.customerPhone}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                                {showCreateNew && (
+                                    <div
+                                        onClick={() => {
+                                            if (onNewPhone) {
+                                                onNewPhone(searchQuery.trim() || phone.trim());
+                                            }
+                                            setIsOpen(false);
+                                            setSearchQuery('');
+                                        }}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 8,
+                                            padding: '10px 12px',
+                                            borderRadius: 6,
+                                            cursor: 'pointer',
+                                            background: 'transparent',
+                                            border: '1.5px solid #10b981',
+                                            transition: 'all 0.2s',
+                                            marginTop: 8,
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = '#f0fdf4';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'transparent';
+                                        }}
+                                    >
+                                        <span style={{ fontSize: 16 }}>➕</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontSize: 14, fontWeight: 600, color: '#10b981' }}>
+                                                Create new customer
+                                            </span>
+                                            <span style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                                                Phone: "{searchQuery.trim() || phone.trim()}"
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+            <input
+                type="hidden"
+                value={selectedPhone}
+                required={required}
+            />
+        </div>
+    );
+}
+
 function AddOrderModal({ 
     products, 
+    orders,
     mode = 'add', 
     initialOrder, 
     onClose, 
     onCreate 
 }: { 
     products: Product[]; 
+    orders: Order[];
     mode?: 'add' | 'edit';
     initialOrder?: Order;
     onClose: () => void; 
@@ -1359,6 +1713,25 @@ function AddOrderModal({
             : [{ variant: '', quantity: 1, price: 0 }]
     );
     const [amount, setAmount] = useState<string>('');
+
+    // Extract unique customers from orders (grouped by phone number)
+    const uniqueCustomers = useMemo(() => {
+        const customerMap = new Map<string, Order>();
+        orders.forEach(order => {
+            const phone = order.customerPhone;
+            if (!customerMap.has(phone)) {
+                customerMap.set(phone, order);
+            } else {
+                // Keep the most recent order for each customer
+                const existing = customerMap.get(phone)!;
+                if (new Date(order.date) > new Date(existing.date)) {
+                    customerMap.set(phone, order);
+                }
+            }
+        });
+        return Array.from(customerMap.values())
+            .sort((a, b) => a.customer.localeCompare(b.customer));
+    }, [orders]);
 
     // Get available products (exclude already selected ones)
     const getAvailableProducts = (currentIdx: number) => {
@@ -1459,6 +1832,50 @@ function AddOrderModal({
                     <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
                 </div>
                 <form onSubmit={submit} style={{ display: 'grid', gap: 20, padding: 20, overflowY: 'auto', flex: 1 }}>
+                    {/* First Row: Phone and Customer Name */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                        <div>
+                            <label className="label">Phone</label>
+                            <PhoneDropdown
+                                customers={uniqueCustomers}
+                                selectedPhone={phone}
+                                phone={phone}
+                                onSelect={(customer) => {
+                                    setName(customer.customer);
+                                    setPhone(customer.customerPhone);
+                                    setAddress(customer.customerAddress);
+                                    setState(customer.state);
+                                    setPincode(customer.pincode || '');
+                                }}
+                                onNewPhone={(newPhone) => {
+                                    setPhone(newPhone);
+                                    // Clear other fields when creating new customer
+                                    setName('');
+                                    setAddress('');
+                                    setState('');
+                                    setPincode('');
+                                }}
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="label">Customer Name</label>
+                            <input 
+                                className="input" 
+                                style={{ width: '100%', marginTop: 6 }} 
+                                type="text"
+                                value={name} 
+                                onChange={(e) => setName(e.target.value)}
+                                required 
+                            />
+                        </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+                        <div>
+                            <label className="label">Address</label>
+                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={address} onChange={(e)=>setAddress(e.target.value)} required />
+                        </div>
+                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
                         <div>
                             <label className="label">Date</label>
@@ -1494,34 +1911,6 @@ function AddOrderModal({
                                 <option value="Repeat">Repeat</option>
                                 <option value="Reference">Reference</option>
                             </select>
-                        </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
-                        <div>
-                            <label className="label">Customer Name</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={name} onChange={(e)=>setName(e.target.value)} required />
-                        </div>
-                        <div>
-                            <label className="label">Phone</label>
-                            <input 
-                                className="input" 
-                                style={{ width: '100%', marginTop: 6 }} 
-                                type="tel"
-                                value={phone} 
-                                onChange={(e) => {
-                                    const value = e.target.value.replace(/\D/g, ''); // Remove non-numeric characters
-                                    if (value.length <= 10) {
-                                        setPhone(value);
-                                    }
-                                }}
-                                maxLength={10}
-                                pattern="[0-9]{10}"
-                                required 
-                            />
-                        </div>
-                        <div style={{ gridColumn: '1 / -1' }}>
-                            <label className="label">Address</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={address} onChange={(e)=>setAddress(e.target.value)} required />
                         </div>
                     </div>
 
@@ -1638,6 +2027,273 @@ function AddOrderModal({
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    );
+}
+
+function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhone: string; orders: Order[]; onClose: () => void }) {
+    // Get all orders for this customer (grouped by phone number)
+    const customerOrders = useMemo(() => {
+        return orders.filter(o => o.customerPhone === customerPhone)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [orders, customerPhone]);
+
+    // Get customer profile from the most recent order
+    const customerProfile = useMemo(() => {
+        if (customerOrders.length === 0) return null;
+        const latestOrder = customerOrders[0];
+        return {
+            name: latestOrder.customer,
+            phone: latestOrder.customerPhone,
+            address: latestOrder.customerAddress,
+            state: latestOrder.state,
+            pincode: latestOrder.pincode || '—',
+        };
+    }, [customerOrders]);
+
+    const totalOrders = customerOrders.length;
+    const totalAmount = customerOrders.reduce((sum, o) => sum + o.amount, 0);
+
+    useEffect(() => {
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = prev; };
+    }, []);
+
+    if (!customerProfile) {
+        return null;
+    }
+
+    return (
+        <div
+            role="dialog"
+            aria-modal="true"
+            onClick={onClose}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.45)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', zIndex: 60 }}
+        >
+            <div
+                className="card"
+                onClick={(e) => e.stopPropagation()}
+                style={{ width: '100%', maxWidth: 1200, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+            >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: '1px solid var(--border)' }}>
+                    <h3 style={{ margin: 0 }}>Customer Profile</h3>
+                    <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+                </div>
+                
+                <div style={{ padding: 20, overflow: 'auto', flex: 1 }}>
+                    {/* Customer Information */}
+                    <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-elev)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                        <h4 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Customer Information</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            {/* First Row: Name and Phone */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                                <div>
+                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Name</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.name}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Phone</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>
+                                        <a className="link" href={`tel:${customerProfile.phone}`} style={{ textDecoration: 'none' }}>{customerProfile.phone}</a>
+                                    </div>
+                                </div>
+                            </div>
+                            {/* Second Row: Address (full width) */}
+                            <div>
+                                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Address</div>
+                                <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.address}</div>
+                            </div>
+                            {/* Third Row: State and Pincode */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                                <div>
+                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>State</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.state}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Pincode</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.pincode}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', gap: 24 }}>
+                            <div>
+                                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Total Orders</div>
+                                <div style={{ fontSize: 18, color: 'var(--text)', fontWeight: 700 }}>{totalOrders}</div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Total Amount</div>
+                                <div style={{ fontSize: 18, color: 'var(--text)', fontWeight: 700 }}>{formatCurrency(totalAmount)}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Orders Table */}
+                    <div>
+                        <h4 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Order History</h4>
+                        <div className="table-scroll-wrapper" style={{ maxHeight: '400px', overflow: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+                                <thead>
+                                    <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
+                                        <Th>Date</Th>
+                                        <Th>Items</Th>
+                                        <Th>Amount</Th>
+                                        <Th>Payment</Th>
+                                        <Th>Delivery</Th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {customerOrders.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                                                No orders found
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        customerOrders.map((order) => (
+                                            <tr key={order.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <Td>{formatDate(order.date)}</Td>
+                                                <Td>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                        {(order.items ?? []).length === 0 ? <span>—</span> : null}
+                                                        {(order.items ?? []).map((it: OrderItem, idx: number) => (
+                                                            <div key={idx} style={{ fontSize: 12 }}>{it.variant} × {it.quantity}</div>
+                                                        ))}
+                                                    </div>
+                                                </Td>
+                                                <Td style={{ fontWeight: 600 }}>{formatCurrency(order.amount)}</Td>
+                                                <Td><StatusTag kind={order.paymentStatus} type="payment" /></Td>
+                                                <Td><StatusTag kind={order.deliveryStatus} type="delivery" /></Td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DeleteConfirmationModal({ order, onConfirm, onCancel }: { order: Order; onConfirm: () => void | Promise<void>; onCancel: () => void }) {
+    useEffect(() => {
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = prev; };
+    }, []);
+
+    return (
+        <div
+            role="dialog"
+            aria-modal="true"
+            onClick={onCancel}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.45)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', zIndex: 70 }}
+        >
+            <div
+                className="card"
+                onClick={(e) => e.stopPropagation()}
+                style={{ width: '100%', maxWidth: 480, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}
+            >
+                <div style={{ padding: 24 }}>
+                    {/* Warning Icon */}
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                        <div style={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: '50%',
+                            background: '#fef2f2',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}>
+                            <span style={{ fontSize: 32, color: '#ef4444' }}>⚠️</span>
+                        </div>
+                    </div>
+
+                    {/* Title */}
+                    <h3 style={{ margin: '0 0 12px 0', fontSize: 20, fontWeight: 700, color: 'var(--text)', textAlign: 'center' }}>
+                        Delete Order?
+                    </h3>
+
+                    {/* Warning Message */}
+                    <p style={{ margin: '0 0 20px 0', fontSize: 14, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.6 }}>
+                        Are you sure you want to delete this order? This action cannot be undone.
+                    </p>
+
+                    {/* Customer Name Warning */}
+                    <div style={{
+                        padding: '12px 16px',
+                        background: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        borderRadius: 8,
+                        marginBottom: 24,
+                    }}>
+                        <div style={{ fontSize: 11, color: '#991b1b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+                            Customer
+                        </div>
+                        <div style={{ fontSize: 16, color: '#7f1d1d', fontWeight: 600 }}>
+                            {order.customer}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#991b1b', marginTop: 4 }}>
+                            Order Amount: {formatCurrency(order.amount)}
+                        </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: 12 }}>
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            style={{
+                                flex: 1,
+                                padding: '10px 20px',
+                                border: '1px solid var(--border)',
+                                borderRadius: 8,
+                                background: 'var(--bg)',
+                                color: 'var(--text)',
+                                fontSize: 14,
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'var(--bg-elev)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'var(--bg)';
+                            }}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onConfirm}
+                            style={{
+                                flex: 1,
+                                padding: '10px 20px',
+                                border: 'none',
+                                borderRadius: 8,
+                                background: '#ef4444',
+                                color: '#ffffff',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#dc2626';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#ef4444';
+                            }}
+                        >
+                            Delete Order
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );

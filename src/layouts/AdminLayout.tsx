@@ -73,6 +73,14 @@ export default function AdminLayout() {
                         <span className="mi-icon">📋</span>
                         <span className="mi-label">Follow-ups</span>
                     </NavLink>
+                    <NavLink to="/admin/gurugram-marts" className={({ isActive }) => (isActive ? 'active' : '')}>
+                        <span className="mi-icon">🏬</span>
+                        <span className="mi-label">Gurugram Marts</span>
+                    </NavLink>
+                    <NavLink to="/admin/delhi-marts" className={({ isActive }) => (isActive ? 'active' : '')}>
+                        <span className="mi-icon">🏙️</span>
+                        <span className="mi-label">Delhi Marts</span>
+                    </NavLink>
                 </nav>
                 <div style={{ marginTop: 'auto' }}>
                     <button className="button" onClick={handleLogout}>Logout</button>

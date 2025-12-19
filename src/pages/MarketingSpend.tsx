@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadMarketingSpend, addMarketingSpend, updateMarketingSpend, deleteMarketingSpend, type SpendRecord, type MiscRecord } from '../utils/marketing-spend';
 
-type DateFilterMode = 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
+type DateFilterMode = 'all' | 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
 type Platform = 'Meta' | 'Amazon' | 'Flipkart' | 'Miscellaneous';
 
 type Toast = {
@@ -577,6 +577,9 @@ function presetBounds(mode: DateFilterMode): { from: Date; to: Date } | null {
     const now = new Date();
     const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
     const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+    if (mode === 'all') {
+        return null; // No filtering for 'all'
+    }
     if (mode === 'today') {
         const from = startOfDay(now);
         const to = endOfDay(now);
@@ -654,6 +657,7 @@ function DateFilterBar({ mode, setMode, customFrom, setCustomFrom, customTo, set
 
     return (
         <div className="filter-group" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', position: 'relative' }}>
+            <FilterButton active={mode==='all'} onClick={() => { setMode('all'); setShowCustom(false); }}>All</FilterButton>
             <FilterButton active={mode==='today'} onClick={() => { setMode('today'); setShowCustom(false); }}>Today</FilterButton>
             <FilterButton active={mode==='yesterday'} onClick={() => { setMode('yesterday'); setShowCustom(false); }}>Yesterday</FilterButton>
             <FilterButton active={mode==='last7'} onClick={() => { setMode('last7'); setShowCustom(false); }}>Last 7 days</FilterButton>

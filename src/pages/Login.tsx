@@ -1,6 +1,6 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { loginWithEmailPassword } from '../auth';
+import { loginWithEmailPassword, isAuthenticated } from '../auth';
 
 export default function Login() {
 	const navigate = useNavigate();
@@ -8,6 +8,13 @@ export default function Login() {
 	const [password, setPassword] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+
+	// Redirect if already authenticated (remembered credentials)
+	useEffect(() => {
+		if (isAuthenticated()) {
+			navigate('/admin', { replace: true });
+		}
+	}, [navigate]);
 
 	async function onSubmit(e: FormEvent) {
 		e.preventDefault();

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 type LeadStatus = 'New' | 'Contacted' | 'Converted' | 'Not Interested' | 'No Answer' | 'Potential Customer' | 'Very Interested' | 'CBA';
+type Platform = 'Maatripure' | 'STW' | 'Abandoned' | 'Whatsapp';
 
 type Toast = {
     id: string;
@@ -17,6 +18,7 @@ type WALead = {
     callBackDate?: string; // ISO date
     notes: string;
     status: LeadStatus;
+    platform?: Platform;
 };
 
 export default function WALeads() {
@@ -232,6 +234,7 @@ export default function WALeads() {
                             <col style={{ width: '250px', minWidth: '250px' }} />
                             <col style={{ width: '150px', minWidth: '150px' }} />
                             <col style={{ width: '120px', minWidth: '120px' }} />
+                            <col style={{ width: '120px', minWidth: '120px' }} />
                         </colgroup>
                         <thead>
                             <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
@@ -242,6 +245,7 @@ export default function WALeads() {
                                 <Th>Call Back Date</Th>
                                 <Th>Notes</Th>
                                 <Th>Status</Th>
+                                <Th>Platform</Th>
                                 <Th>Actions</Th>
                             </tr>
                         </thead>
@@ -254,7 +258,7 @@ export default function WALeads() {
                                 </tr>
                             ) : filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
                                         No leads found. Click "Add Lead" to create your first lead.
                                     </td>
                                 </tr>
@@ -343,6 +347,7 @@ export default function WALeads() {
                                             <Td>{lead.callBackDate ? new Date(lead.callBackDate).toLocaleDateString() : '—'}</Td>
                                             <Td style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={lead.notes}>{lead.notes || '—'}</Td>
                                             <Td><StatusTag kind={lead.status} type="lead" /></Td>
+                                            <Td>{lead.platform || '—'}</Td>
                                             <Td>
                                                 <div style={{ display: 'flex', gap: 8 }}>
                                                     <button
@@ -390,6 +395,7 @@ export default function WALeads() {
             {showAddLead ? (
                 <AddLeadModal 
                     lead={editingLead}
+                    existingLeads={leads}
                     onClose={() => {
                         setShowAddLead(false);
                         setEditingLead(null);
@@ -1117,7 +1123,7 @@ function StatusDropdown({ value, onChange, required }: { value: LeadStatus; onCh
     );
 }
 
-function AddLeadModal({ lead, onClose, onSave }: { lead?: WALead | null; onClose: () => void; onSave: (lead: WALead) => void }) {
+function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead | null; existingLeads: WALead[]; onClose: () => void; onSave: (lead: WALead) => void }) {
     const [callingDate, setCallingDate] = useState<string>(lead?.callingDate && lead.callingDate.trim() ? toInputDate(new Date(lead.callingDate)) : '');
     const [customerName, setCustomerName] = useState(lead?.customerName || '');
     const [mobile, setMobile] = useState(lead?.mobile || '');
@@ -1125,6 +1131,8 @@ function AddLeadModal({ lead, onClose, onSave }: { lead?: WALead | null; onClose
     const [callBackDate, setCallBackDate] = useState<string>(lead?.callBackDate && lead.callBackDate.trim() ? toInputDate(new Date(lead.callBackDate)) : '');
     const [notes, setNotes] = useState(lead?.notes || '');
     const [status, setStatus] = useState<LeadStatus>(lead?.status || 'New');
+    const [platform, setPlatform] = useState<Platform | ''>(lead?.platform || '');
+    const [mobileError, setMobileError] = useState<string>('');
 
     // Update form when lead prop changes
     useEffect(() => {
@@ -1136,6 +1144,8 @@ function AddLeadModal({ lead, onClose, onSave }: { lead?: WALead | null; onClose
             setCallBackDate(lead.callBackDate && lead.callBackDate.trim() ? toInputDate(new Date(lead.callBackDate)) : '');
             setNotes(lead.notes || '');
             setStatus(lead.status || 'New');
+            setPlatform(lead.platform || '');
+            setMobileError('');
         } else {
             // Reset form for new lead
             setCallingDate('');
@@ -1145,15 +1155,28 @@ function AddLeadModal({ lead, onClose, onSave }: { lead?: WALead | null; onClose
             setCallBackDate('');
             setNotes('');
             setStatus('New');
+            setPlatform('');
+            setMobileError('');
         }
     }, [lead]);
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
+        setMobileError('');
         
-        // Validate mobile number
+        // Validate mobile number format
         if (mobile.length !== 10 || !/^\d{10}$/.test(mobile)) {
-            alert('Mobile number must be exactly 10 digits');
+            setMobileError('Mobile number must be exactly 10 digits');
+            return;
+        }
+        
+        // Check for duplicate mobile number
+        const duplicateLead = existingLeads.find(l => 
+            l.mobile === mobile && l.id !== lead?.id
+        );
+        
+        if (duplicateLead) {
+            setMobileError(`Mobile number already exists for customer: ${duplicateLead.customerName}`);
             return;
         }
         
@@ -1166,6 +1189,7 @@ function AddLeadModal({ lead, onClose, onSave }: { lead?: WALead | null; onClose
             callBackDate: callBackDate ? new Date(callBackDate).toISOString() : undefined,
             notes,
             status,
+            platform: platform || undefined,
         };
         onSave(leadData);
     }
@@ -1202,13 +1226,29 @@ function AddLeadModal({ lead, onClose, onSave }: { lead?: WALead | null; onClose
                             <label className="label">Mobile</label>
                             <input 
                                 className="input" 
-                                style={{ width: '100%', marginTop: 6 }} 
+                                style={{ 
+                                    width: '100%', 
+                                    marginTop: 6,
+                                    borderColor: mobileError ? '#dc2626' : undefined
+                                }} 
                                 type="tel" 
                                 value={mobile} 
                                 onChange={(e) => {
                                     const value = e.target.value.replace(/\D/g, ''); // Remove non-numeric characters
                                     if (value.length <= 10) {
                                         setMobile(value);
+                                        setMobileError(''); // Clear error when user types
+                                    }
+                                }}
+                                onBlur={() => {
+                                    // Check for duplicate on blur
+                                    if (mobile.length === 10 && /^\d{10}$/.test(mobile)) {
+                                        const duplicateLead = existingLeads.find(l => 
+                                            l.mobile === mobile && l.id !== lead?.id
+                                        );
+                                        if (duplicateLead) {
+                                            setMobileError(`Mobile number already exists for customer: ${duplicateLead.customerName}`);
+                                        }
                                     }
                                 }}
                                 pattern="[0-9]{10}"
@@ -1217,15 +1257,20 @@ function AddLeadModal({ lead, onClose, onSave }: { lead?: WALead | null; onClose
                                 required 
                                 placeholder="Enter 10 digit mobile number"
                             />
-                            {mobile && mobile.length !== 10 && (
+                            {mobile && mobile.length !== 10 && !mobileError && (
                                 <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
                                     Mobile number must be exactly 10 digits
-                        </div>
+                                </div>
+                            )}
+                            {mobileError && (
+                                <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
+                                    {mobileError}
+                                </div>
                             )}
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
                     <div>
                             <label className="label">Calling Date</label>
                             <DatePicker value={callingDate} onChange={setCallingDate} placeholder="Select calling date" />
@@ -1237,6 +1282,21 @@ function AddLeadModal({ lead, onClose, onSave }: { lead?: WALead | null; onClose
                                     <div>
                             <label className="label">Status</label>
                             <StatusDropdown value={status} onChange={setStatus} />
+                        </div>
+                        <div>
+                            <label className="label">Platform</label>
+                            <select
+                                className="input"
+                                style={{ width: '100%', marginTop: 6 }}
+                                value={platform}
+                                onChange={(e) => setPlatform(e.target.value as Platform | '')}
+                            >
+                                <option value="">Select Platform</option>
+                                <option value="Maatripure">Maatripure</option>
+                                <option value="STW">STW</option>
+                                <option value="Abandoned">Abandoned</option>
+                                <option value="Whatsapp">Whatsapp</option>
+                            </select>
                         </div>
                     </div>
 
