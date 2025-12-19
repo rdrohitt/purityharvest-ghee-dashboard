@@ -1,3 +1,32 @@
+export type RefillEntry = {
+    id: string;
+    date: string;
+    quantities: {
+        gir500?: number;
+        gir1?: number;
+        desi500?: number;
+        desi1?: number;
+        buffalo500?: number;
+        buffalo1?: number;
+    };
+};
+
+export type SalesEntry = {
+    id: string;
+    date: string;
+    quantities: {
+        gir500?: number;
+        gir1?: number;
+        desi500?: number;
+        desi1?: number;
+        buffalo500?: number;
+        buffalo1?: number;
+    };
+    totalAmount: number;
+    status: 'Paid' | 'Partial Paid' | 'Pending';
+    amountReceived: number;
+};
+
 export type Mart = {
     id: string;
     name: string;
@@ -22,6 +51,8 @@ export type Mart = {
         buffalo500?: number;
         buffalo1?: number;
     };
+    refills?: RefillEntry[];
+    sales?: SalesEntry[];
 };
 
 export async function loadGurugramMarts(): Promise<Mart[]> {

@@ -6,7 +6,7 @@
     "address": "Sector 9A Main Market",
     "date": "2025-12-19",
     "quantities": {
-      "gir500": 2,
+      "gir500": 5,
       "buffalo500": 3,
       "gir1": 2,
       "buffalo1": 4,
@@ -22,6 +22,22 @@
       "desi500": 710
     },
     "id": "GGM-1766146695101",
-    "commission": 15
+    "commission": 15,
+    "refills": [
+      {
+        "id": "REF-1766163028155",
+        "date": "2025-12-19",
+        "quantities": {
+          "gir500": 1
+        }
+      },
+      {
+        "id": "REF-1766163054062",
+        "date": "2025-12-19",
+        "quantities": {
+          "gir500": 2
+        }
+      }
+    ]
   }
 ]

@@ -11052,7 +11052,7 @@
     "amount": 1230,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "760003",
     "codCharges": 0,
     "shippingCharges": 168,
