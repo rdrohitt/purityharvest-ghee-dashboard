@@ -1779,6 +1779,7 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                             <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Total Amount</th>
                                             <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Status</th>
                                             <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Amount Received</th>
+                                            <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Invoice</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1914,6 +1915,36 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                                                 width: 120,
                                                             }}
                                                         />
+                                                    </td>
+                                                    <td style={{ padding: '12px', fontSize: 13 }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => generateInvoicePDF(sale, mart)}
+                                                            style={{
+                                                                padding: '6px 12px',
+                                                                borderRadius: 6,
+                                                                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                                                color: '#ffffff',
+                                                                border: 'none',
+                                                                cursor: 'pointer',
+                                                                fontSize: 12,
+                                                                fontWeight: 600,
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: 6,
+                                                                transition: 'all 0.2s',
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+                                                                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+                                                                e.currentTarget.style.boxShadow = 'none';
+                                                            }}
+                                                        >
+                                                            📄 Download
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))

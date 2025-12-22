@@ -6,12 +6,12 @@
     "address": "Sector 9A Main Market",
     "date": "2025-12-19",
     "quantities": {
-      "gir500": 5,
-      "buffalo500": 3,
-      "gir1": 2,
-      "buffalo1": 4,
-      "desi1": 1,
-      "desi500": 2
+      "gir500": 0,
+      "buffalo500": 0,
+      "gir1": 0,
+      "buffalo1": 0,
+      "desi1": 0,
+      "desi500": 0
     },
     "prices": {
       "gir500": 900,
@@ -37,6 +37,57 @@
         "quantities": {
           "gir500": 2
         }
+      }
+    ],
+    "sales": [
+      {
+        "id": "SAL-1766209134537",
+        "date": "2025-12-20",
+        "quantities": {
+          "gir500": 4,
+          "gir1": 1
+        },
+        "totalAmount": 5320,
+        "status": "Paid",
+        "amountReceived": 5320
+      },
+      {
+        "id": "SAL-1766209190170",
+        "date": "2025-12-20",
+        "quantities": {
+          "gir1": 1,
+          "desi500": 1,
+          "buffalo500": 1,
+          "buffalo1": 3
+        },
+        "totalAmount": 6830,
+        "status": "Pending",
+        "amountReceived": 0
+      },
+      {
+        "id": "SAL-1766164065792",
+        "date": "2025-12-19",
+        "quantities": {
+          "gir500": 1
+        },
+        "totalAmount": 900,
+        "status": "Pending",
+        "amountReceived": 0
+      },
+      {
+        "id": "SAL-1766216430370",
+        "date": "2025-12-20",
+        "quantities": {
+          "gir500": 1,
+          "gir1": 2,
+          "desi500": 2,
+          "desi1": 7,
+          "buffalo500": 4,
+          "buffalo1": 5
+        },
+        "totalAmount": 24060,
+        "status": "Pending",
+        "amountReceived": 0
       }
     ]
   }
