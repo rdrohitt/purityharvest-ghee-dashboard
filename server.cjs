@@ -19,6 +19,7 @@ const FLIPKART_SPEND_PATH = path.join(__dirname, 'public', 'flipkart-spend.json'
 const MISC_SPEND_PATH = path.join(__dirname, 'public', 'misc-spend.json');
 const GURUGRAM_MARTS_PATH = path.join(__dirname, 'public', 'gurugram-marts.json');
 const DELHI_MARTS_PATH = path.join(__dirname, 'public', 'delhi-marts.json');
+const FOLLOWUPS_PATH = path.join(__dirname, 'public', 'followups.json');
 
 async function readProducts() {
   const data = await fs.readFile(PRODUCTS_PATH, 'utf8');
@@ -218,6 +219,23 @@ async function readDelhiMarts() {
 async function writeDelhiMarts(marts) {
   const json = JSON.stringify(marts, null, 2);
   await fs.writeFile(DELHI_MARTS_PATH, json, 'utf8');
+}
+
+async function readFollowups() {
+  try {
+    const data = await fs.readFile(FOLLOWUPS_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function writeFollowups(followups) {
+  const json = JSON.stringify(followups, null, 2);
+  await fs.writeFile(FOLLOWUPS_PATH, json, 'utf8');
 }
 
 app.get('/api/products', async (_req, res) => {
@@ -1046,6 +1064,83 @@ app.delete('/api/delhi-marts/:id', async (req, res) => {
   } catch (err) {
     console.error('Error deleting from delhi-marts.json', err);
     res.status(500).json({ message: 'Failed to delete Delhi mart' });
+  }
+});
+
+app.get('/api/followups', async (_req, res) => {
+  try {
+    const followups = await readFollowups();
+    res.json(followups);
+  } catch (err) {
+    console.error('Error reading followups.json', err);
+    res.status(500).json({ message: 'Failed to read followups' });
+  }
+});
+
+app.post('/api/followups', async (req, res) => {
+  try {
+    const newFollowup = req.body;
+    if (!newFollowup || typeof newFollowup !== 'object') {
+      return res.status(400).json({ message: 'Invalid followup payload' });
+    }
+
+    const followups = await readFollowups();
+    followups.push(newFollowup);
+    await writeFollowups(followups);
+
+    res.status(201).json(newFollowup);
+  } catch (err) {
+    console.error('Error writing to followups.json', err);
+    res.status(500).json({ message: 'Failed to save followup' });
+  }
+});
+
+app.put('/api/followups/:customerPhone', async (req, res) => {
+  try {
+    const customerPhone = decodeURIComponent(req.params.customerPhone);
+    const updated = req.body;
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ message: 'Invalid followup payload' });
+    }
+
+    const followups = await readFollowups();
+    const index = followups.findIndex((f) => f.customerPhone === customerPhone);
+
+    if (index === -1) {
+      // If not found, create a new one
+      const newFollowup = { ...updated, customerPhone };
+      followups.push(newFollowup);
+      await writeFollowups(followups);
+      return res.json(newFollowup);
+    }
+
+    followups[index] = { ...followups[index], ...updated, customerPhone };
+    await writeFollowups(followups);
+
+    res.json(followups[index]);
+  } catch (err) {
+    console.error('Error updating followups.json', err);
+    res.status(500).json({ message: 'Failed to update followup' });
+  }
+});
+
+app.delete('/api/followups/:customerPhone', async (req, res) => {
+  try {
+    const customerPhone = decodeURIComponent(req.params.customerPhone);
+    const followups = await readFollowups();
+    const index = followups.findIndex((f) => f.customerPhone === customerPhone);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Followup not found' });
+    }
+
+    followups.splice(index, 1);
+    await writeFollowups(followups);
+
+    res.status(204).end();
+  } catch (err) {
+    console.error('Error deleting from followups.json', err);
+    res.status(500).json({ message: 'Failed to delete followup' });
   }
 });
 

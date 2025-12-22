@@ -12,6 +12,67 @@ export type Followup = {
     callAgainDate: string | null; // ISO date or null
 };
 
+/**
+ * Followup data stored in JSON (only followup-specific fields, not customer order data)
+ */
+export type FollowupData = {
+    customerPhone: string; // Key to match with orders
+    feedback: string;
+    callingDate: string | null;
+    callerName: string;
+    callingDetail: string;
+    callAgainDate: string | null;
+};
+
+/**
+ * Load followups data from the backend API, which reads from followups.json on disk.
+ */
+export async function loadFollowupsData(): Promise<FollowupData[]> {
+    const response = await fetch('/api/followups');
+    if (!response.ok) {
+        throw new Error('Failed to load followups from API');
+    }
+    return (await response.json()) as FollowupData[];
+}
+
+/**
+ * Save followup data via the backend API so it is saved to followups.json on disk.
+ */
+export async function saveFollowupData(followupData: FollowupData): Promise<FollowupData> {
+    const response = await fetch('/api/followups', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(followupData),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to save followup data');
+    }
+
+    return (await response.json()) as FollowupData;
+}
+
+/**
+ * Update existing followup data via the backend API (creates if doesn't exist).
+ */
+export async function updateFollowupData(customerPhone: string, followupData: Partial<FollowupData>): Promise<FollowupData> {
+    const response = await fetch(`/api/followups/${encodeURIComponent(customerPhone)}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(followupData),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to update followup data');
+    }
+
+    return (await response.json()) as FollowupData;
+}
+
 function rand(seed: number) {
     const x = Math.sin(seed) * 10000;
     return x - Math.floor(x);

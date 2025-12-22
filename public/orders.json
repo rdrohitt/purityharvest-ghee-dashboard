@@ -11405,5 +11405,85 @@
     "state": "Karnataka",
     "platform": "Shopify",
     "type": "Repeat"
+  },
+  {
+    "id": "PH-20251222-1451",
+    "date": "2025-12-21T00:00:00.000Z",
+    "customer": "Gaganpreet Singh Lamba",
+    "customerPhone": "9802027776",
+    "customerAddress": "LAMBA Electronics showroom no 1 shopping complex opposite Santosh hospital kanahiya chowk, Opp santosh hospital, Yamuna Nagar",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1090
+      },
+      {
+        "variant": "A2 Gir Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1230
+      }
+    ],
+    "amount": 2196,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "135001",
+    "codCharges": 0,
+    "shippingCharges": 123,
+    "discountAmount": 124,
+    "state": "Haryana",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20251222-1452",
+    "date": "2025-12-21T00:00:00.000Z",
+    "customer": "Sanjay",
+    "customerPhone": "9412416120",
+    "customerAddress": "Sanjay Singh C/o SS Sector Eta Road Tundla Post Office: Tundla District: Firozabad State: Uttar Pradesh Pin Code: 283204 India Alt, No:8191001611(friend ), Firozabad ",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1950,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "283204",
+    "codCharges": 60,
+    "shippingCharges": 170,
+    "discountAmount": 0,
+    "state": "Uttar Pradesh",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20251222-1453",
+    "date": "2025-12-22T00:00:00.000Z",
+    "customer": "Krishna Kumar Shukla",
+    "customerPhone": "8797293477",
+    "customerAddress": "Near Grasim Industry, Rehala DANDILA khrud, Landmark - Near Grasim Industry, industry rehla, Garhwa Jharkhand",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1950,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "822124",
+    "codCharges": 60,
+    "shippingCharges": 246,
+    "discountAmount": 0,
+    "state": "Jharkhand",
+    "platform": "Shopify",
+    "type": "New"
   }
 ]

@@ -1,5 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { generateMockFollowups, type Followup } from '../utils/followups';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { type Followup, loadFollowupsData, updateFollowupData, type FollowupData } from '../utils/followups';
+import { loadOrders, type Order } from '../utils/orders';
+
+type Toast = {
+    id: string;
+    message: string;
+    type: 'success' | 'error' | 'delete';
+};
 
 function formatDate(dateStr: string | null): string {
     if (!dateStr) return '—';
@@ -29,7 +36,98 @@ export default function Followups() {
     const [callingDateFilter, setCallingDateFilter] = useState<string>('');
     const [upcomingFilter, setUpcomingFilter] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState<string>('');
-    const [followups, setFollowups] = useState<Followup[]>(() => generateMockFollowups(100));
+    const [followups, setFollowups] = useState<Followup[]>([]);
+    const [loading, setLoading] = useState(true);
+    
+    // Toast notifications
+    const [toasts, setToasts] = useState<Toast[]>([]);
+    function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
+        const id = `toast-${Date.now()}-${Math.random()}`;
+        setToasts((prev) => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setToasts((prev) => prev.filter((t) => t.id !== id));
+        }, 3000);
+    }
+
+    useEffect(() => {
+        async function loadData() {
+            try {
+                setLoading(true);
+                const [orders, followupsData] = await Promise.all([
+                    loadOrders(),
+                    loadFollowupsData()
+                ]);
+
+                // Create a map of followup data by customer phone
+                const followupsMap = new Map<string, FollowupData>();
+                followupsData.forEach(f => {
+                    followupsMap.set(f.customerPhone, f);
+                });
+
+                // Group orders by customer phone
+                const ordersByCustomer = new Map<string, Order[]>();
+                orders.forEach(order => {
+                    const phone = order.customerPhone;
+                    if (!ordersByCustomer.has(phone)) {
+                        ordersByCustomer.set(phone, []);
+                    }
+                    ordersByCustomer.get(phone)!.push(order);
+                });
+
+                // Create followups from orders and merge with followups data
+                const mergedFollowups: Followup[] = Array.from(ordersByCustomer.entries()).map(([phone, customerOrders]) => {
+                    // Sort orders by date (most recent first)
+                    const sortedOrders = [...customerOrders].sort((a, b) => 
+                        new Date(b.date).getTime() - new Date(a.date).getTime()
+                    );
+                    const lastOrder = sortedOrders[0];
+                    const totalOrders = customerOrders.length;
+
+                    // Get last order detail
+                    const lastOrderItems = lastOrder.items.map(item => 
+                        `${item.variant} × ${item.quantity}`
+                    ).join(', ');
+
+                    // Get followup data or use defaults
+                    const followupData = followupsMap.get(phone) || {
+                        customerPhone: phone,
+                        feedback: '',
+                        callingDate: null,
+                        callerName: '',
+                        callingDetail: '',
+                        callAgainDate: null,
+                    };
+
+                    return {
+                        id: `FU-${phone}`,
+                        customerName: lastOrder.customer,
+                        customerPhone: phone,
+                        lastOrder: lastOrder.date,
+                        totalOrders,
+                        lastOrderDetail: lastOrderItems,
+                        feedback: followupData.feedback || '',
+                        callingDate: followupData.callingDate,
+                        callerName: followupData.callerName || '',
+                        callingDetail: followupData.callingDetail || '',
+                        callAgainDate: followupData.callAgainDate,
+                    };
+                });
+
+                // Sort by last order date (most recent first)
+                mergedFollowups.sort((a, b) => 
+                    new Date(b.lastOrder).getTime() - new Date(a.lastOrder).getTime()
+                );
+
+                setFollowups(mergedFollowups);
+            } catch (error) {
+                console.error('Error loading followups data:', error);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        loadData();
+    }, []);
 
     const baseFollowups = followups;
 
@@ -90,13 +188,53 @@ export default function Followups() {
         });
     }, [baseFollowups, searchQuery, callerFilter, feedbackFilter, callingDateFilter, upcomingFilter]);
 
-    function updateFollowup(id: string, field: keyof Followup, value: string | null) {
+    async function updateFollowup(id: string, field: keyof Followup, value: string | null) {
+        const followup = followups.find(f => f.id === id);
+        if (!followup) return;
+
+        // Update local state immediately for responsive UI
+        const updatedFollowup = { ...followup, [field]: value };
         setFollowups(prev => prev.map(f => {
             if (f.id === id) {
-                return { ...f, [field]: value };
+                return updatedFollowup;
             }
             return f;
         }));
+
+        // Save to backend - only save followup-specific fields (not order-derived fields)
+        try {
+            const followupData: Partial<FollowupData> = {
+                customerPhone: followup.customerPhone,
+                feedback: updatedFollowup.feedback,
+                callingDate: updatedFollowup.callingDate,
+                callerName: updatedFollowup.callerName,
+                callingDetail: updatedFollowup.callingDetail,
+                callAgainDate: updatedFollowup.callAgainDate,
+            };
+
+            await updateFollowupData(followup.customerPhone, followupData);
+            showToast('Followup updated successfully!', 'success');
+        } catch (error) {
+            console.error('Error updating followup:', error);
+            showToast('Failed to save followup. Please try again.', 'error');
+            // Revert on error
+            setFollowups(prev => prev.map(f => {
+                if (f.id === id) {
+                    return followup;
+                }
+                return f;
+            }));
+        }
+    }
+
+    if (loading) {
+        return (
+            <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
+                <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                    Loading followups...
+                </div>
+            </section>
+        );
     }
 
     return (
@@ -313,6 +451,7 @@ export default function Followups() {
                     </table>
                 </div>
             </div>
+            <ToastContainer toasts={toasts} />
         </section>
     );
 }
@@ -357,33 +496,91 @@ function CallingDateFilterButton({ active, onClick, children }: { active: boolea
 }
 
 function DateInput({ value, onChange }: { value: string | null; onChange: (value: string | null) => void }) {
-    const dateInputRef = React.useRef<HTMLInputElement>(null);
-    const displayValue = formatDateWithMonth(value);
+    const [isOpen, setIsOpen] = useState(false);
+    const [currentMonth, setCurrentMonth] = useState(() => {
+        const date = value ? new Date(value) : new Date();
+        return new Date(date.getFullYear(), date.getMonth(), 1);
+    });
+    const containerRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLDivElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
 
-    function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const newValue = e.target.value ? new Date(e.target.value).toISOString() : null;
-        onChange(newValue);
+    const selectedDate = value ? new Date(value) : null;
+    const displayValue = selectedDate 
+        ? selectedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '—';
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && inputRef.current && popupRef.current) {
+            const inputRect = inputRef.current.getBoundingClientRect();
+            const popup = popupRef.current;
+            const popupHeight = 350;
+            const popupWidth = 300;
+            
+            let top = inputRect.bottom + window.scrollY + 4;
+            let left = inputRect.left + window.scrollX;
+            
+            if (inputRect.bottom + popupHeight > window.innerHeight) {
+                top = inputRect.top + window.scrollY - popupHeight - 4;
+            }
+            
+            if (inputRect.left + popupWidth > window.innerWidth) {
+                left = window.innerWidth - popupWidth - 10;
+            }
+            
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+        }
+    }, [isOpen]);
+
+    const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+    const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    function handleDateSelect(day: number) {
+        const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+        onChange(newDate.toISOString());
+        setIsOpen(false);
+    }
+
+    function handlePrevMonth() {
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+    }
+
+    function handleNextMonth() {
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+    }
+
+    function handleToday() {
+        const today = new Date();
+        onChange(today.toISOString());
+        setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+        setIsOpen(false);
+    }
+
+    function handleClear() {
+        onChange(null);
+        setIsOpen(false);
     }
 
     return (
-        <div style={{ position: 'relative', width: '100%' }}>
-            <input
-                ref={dateInputRef}
-                type="date"
-                value={toInputDate(value)}
-                onChange={handleDateChange}
-                style={{
-                    position: 'absolute',
-                    opacity: 0,
-                    width: '100%',
-                    height: '32px',
-                    cursor: 'pointer',
-                    zIndex: 2,
-                    top: 0,
-                    left: 0,
-                }}
-            />
+        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
             <div
+                ref={inputRef}
+                onClick={() => setIsOpen(!isOpen)}
                 className="input"
                 style={{
                     width: '100%',
@@ -392,29 +589,240 @@ function DateInput({ value, onChange }: { value: string | null; onChange: (value
                     padding: '4px 8px',
                     paddingRight: '32px',
                     cursor: 'pointer',
-                    userSelect: 'none',
-                    position: 'relative',
-                    zIndex: 1,
                     display: 'flex',
                     alignItems: 'center',
-                    pointerEvents: 'none',
+                    justifyContent: 'space-between',
+                    userSelect: 'none',
                 }}
             >
-                <span>{displayValue}</span>
-                <span
-                    style={{
-                        position: 'absolute',
-                        right: '8px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        fontSize: '14px',
-                        color: 'var(--muted)',
-                        pointerEvents: 'none',
-                    }}
-                >
-                    📅
+                <span style={{ color: displayValue && displayValue !== '—' ? 'var(--text)' : 'var(--muted)' }}>
+                    {displayValue}
                 </span>
+                <span style={{ fontSize: 14, color: 'var(--muted)', pointerEvents: 'none' }}>📅</span>
             </div>
+            <input
+                type="date"
+                value={toInputDate(value)}
+                onChange={(e) => {
+                    const newValue = e.target.value ? new Date(e.target.value).toISOString() : null;
+                    onChange(newValue);
+                }}
+                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+                tabIndex={-1}
+            />
+            {isOpen && (
+                <div
+                    ref={popupRef}
+                    style={{
+                        position: 'fixed',
+                        background: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 12,
+                        padding: 20,
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+                        zIndex: 10000,
+                        minWidth: 300,
+                        maxWidth: 300,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <button
+                            type="button"
+                            onClick={handlePrevMonth}
+                            style={{ 
+                                padding: '6px 10px', 
+                                fontSize: 18,
+                                border: 'none',
+                                background: '#f3f4f6',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                color: '#374151',
+                                fontWeight: 600,
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#f3f4f6';
+                            }}
+                            aria-label="Previous month"
+                        >
+                            ‹
+                        </button>
+                        <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>
+                            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleNextMonth}
+                            style={{ 
+                                padding: '6px 10px', 
+                                fontSize: 18,
+                                border: 'none',
+                                background: '#f3f4f6',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                color: '#374151',
+                                fontWeight: 600,
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#e5e7eb';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#f3f4f6';
+                            }}
+                            aria-label="Next month"
+                        >
+                            ›
+                        </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 16 }}>
+                        {weekDays.map((day) => (
+                            <div key={day} style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#6b7280', padding: '8px 0' }}>
+                                {day}
+                            </div>
+                        ))}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                        {Array(firstDayOfMonth).fill(null).map((_, i) => (
+                            <div key={`empty-${i}`} />
+                        ))}
+                        {days.map((day) => {
+                            const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                            const isSelected = selectedDate && 
+                                date.getDate() === selectedDate.getDate() &&
+                                date.getMonth() === selectedDate.getMonth() &&
+                                date.getFullYear() === selectedDate.getFullYear();
+                            const isToday = date.toDateString() === new Date().toDateString();
+                            return (
+                                <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => handleDateSelect(day)}
+                                    style={{
+                                        padding: '10px 4px',
+                                        border: 'none',
+                                        background: isSelected ? '#16a34a' : isToday ? '#dcfce7' : 'transparent',
+                                        color: isSelected ? '#ffffff' : isToday ? '#16a34a' : '#111827',
+                                        borderRadius: 8,
+                                        cursor: 'pointer',
+                                        fontSize: 14,
+                                        fontWeight: isSelected ? 700 : isToday ? 600 : 400,
+                                        transition: 'all 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!isSelected && !isToday) {
+                                            e.currentTarget.style.background = '#f3f4f6';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isSelected && !isToday) {
+                                            e.currentTarget.style.background = 'transparent';
+                                        } else if (isToday && !isSelected) {
+                                            e.currentTarget.style.background = '#dcfce7';
+                                        }
+                                    }}
+                                >
+                                    {day}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                        <button
+                            type="button"
+                            onClick={handleToday}
+                            style={{
+                                flex: 1,
+                                padding: '10px',
+                                border: '1px solid #e5e7eb',
+                                background: '#f9fafb',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                color: '#111827',
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#f3f4f6';
+                                e.currentTarget.style.borderColor = '#d1d5db';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#f9fafb';
+                                e.currentTarget.style.borderColor = '#e5e7eb';
+                            }}
+                        >
+                            Today
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleClear}
+                            style={{
+                                flex: 1,
+                                padding: '10px',
+                                border: '1px solid #e5e7eb',
+                                background: '#f9fafb',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                color: '#111827',
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#f3f4f6';
+                                e.currentTarget.style.borderColor = '#d1d5db';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#f9fafb';
+                                e.currentTarget.style.borderColor = '#e5e7eb';
+                            }}
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function ToastContainer({ toasts }: { toasts: Toast[] }) {
+    return (
+        <div
+            style={{
+                position: 'fixed',
+                top: 20,
+                right: 20,
+                zIndex: 1000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+                pointerEvents: 'none',
+            }}
+        >
+            {toasts.map((toast) => (
+                <div
+                    key={toast.id}
+                    className="toast"
+                    style={{
+                        pointerEvents: 'auto',
+                        animation: 'slideInRight 0.3s ease-out',
+                    }}
+                    data-type={toast.type}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span style={{ fontSize: 18 }}>
+                            {toast.type === 'success' ? '✓' : toast.type === 'delete' ? '🗑' : '✕'}
+                        </span>
+                        <span>{toast.message}</span>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }
