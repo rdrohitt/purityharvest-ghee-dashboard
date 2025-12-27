@@ -8297,9 +8297,9 @@
   {
     "id": "PH-20251018-1227",
     "date": "2025-10-18T00:00:00.000Z",
-    "customer": "Sudha",
+    "customer": "Sudha Verma",
     "customerPhone": "7007979237",
-    "customerAddress": "-",
+    "customerAddress": "House no. 119, Jamunipur Colony, Sant Ravidas Nagar, Bhadohi, Uttar Pradesh",
     "items": [
       {
         "variant": "A2 Gir Cow Ghee - 500 ml",
@@ -8311,11 +8311,11 @@
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
     "deliveryStatus": "Delivered",
-    "pincode": "000000",
+    "pincode": "221401",
     "codCharges": 0,
     "shippingCharges": 170,
     "discountAmount": 0,
-    "state": "-",
+    "state": "Uttar Pradesh",
     "platform": "Abandoned",
     "type": "New"
   },
@@ -11829,5 +11829,104 @@
     "state": "Assam",
     "platform": "Shopify",
     "type": "Repeat"
+  },
+  {
+    "id": "PH-20251227-1468",
+    "date": "2025-12-26T00:00:00.000Z",
+    "customer": "L Thapa",
+    "customerPhone": "7872948433",
+    "customerAddress": "Pokhriabong GPI Near Sujit Gupta soap Shanti tole, darjiling",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1950,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "734216",
+    "codCharges": 60,
+    "shippingCharges": 246,
+    "state": "West Bengal",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20251227-1469",
+    "date": "2025-12-26T00:00:00.000Z",
+    "customer": "Chhatrapati",
+    "customerPhone": "8409201978",
+    "customerAddress": "Village-Joga Chak, Post + Police Station: Kawakol, District-Nawada, behind the water tank",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1950,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "805106",
+    "codCharges": 60,
+    "shippingCharges": 246,
+    "discountAmount": 0,
+    "state": "Bihar",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20251227-1470",
+    "date": "2025-12-27T00:00:00.000Z",
+    "customer": "Sudha Verma",
+    "customerPhone": "7007979237",
+    "customerAddress": "House no. 119, Jamunipur Colony, Sant Ravidas Nagar, Bhadohi, Uttar Pradesh",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 2,
+        "lineAmount": 4560
+      }
+    ],
+    "amount": 4000,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "221401",
+    "codCharges": 0,
+    "shippingCharges": 290,
+    "discountAmount": 560,
+    "state": "Uttar Pradesh",
+    "platform": "Abandoned",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20251227-1471",
+    "date": "2025-12-27T00:00:00.000Z",
+    "customer": "Prakash",
+    "customerPhone": "7795409477",
+    "customerAddress": "Flat number 304 b 3, Today Cloud City, Rohinjan, Gazebo dhaba Kharghar Maharashtra India",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1852,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "410208",
+    "codCharges": 0,
+    "shippingCharges": 175,
+    "discountAmount": 38,
+    "state": "Maharashtra",
+    "platform": "Shopify",
+    "type": "New"
   }
 ]
