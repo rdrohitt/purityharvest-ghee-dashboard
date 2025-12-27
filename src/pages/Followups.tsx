@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { type Followup, loadFollowupsData, updateFollowupData, type FollowupData } from '../utils/followups';
-import { loadOrders, type Order } from '../utils/orders';
+import { loadOrders, type Order, type OrderItem } from '../utils/orders';
 
 type Toast = {
     id: string;
@@ -27,16 +27,33 @@ function formatDateWithMonth(dateStr: string | null): string {
     return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function getCustomerType(totalOrders: number): string {
+    if (totalOrders === 1) return 'new';
+    if (totalOrders >= 2 && totalOrders <= 4) return 'repeat';
+    if (totalOrders >= 5) return 'loyal';
+    return 'new';
+}
+
+function formatCurrency(n: number): string { 
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); 
+}
+
 const FEEDBACK_OPTIONS = ['Excellent ghee', 'smell issue', 'high price'];
 const CALLER_OPTIONS = ['Monia', 'Sarita'];
 
 export default function Followups() {
     const [callerFilter, setCallerFilter] = useState<string>('');
     const [feedbackFilter, setFeedbackFilter] = useState<string>('');
+    const [monthFilter, setMonthFilter] = useState<string>('');
+    const [yearFilter, setYearFilter] = useState<string>('');
     const [callingDateFilter, setCallingDateFilter] = useState<string>('');
     const [upcomingFilter, setUpcomingFilter] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [followups, setFollowups] = useState<Followup[]>([]);
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [ordersByCustomer, setOrdersByCustomer] = useState<Map<string, Order[]>>(new Map());
+    const [showCustomerProfile, setShowCustomerProfile] = useState(false);
+    const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     
     // Toast notifications
@@ -119,6 +136,8 @@ export default function Followups() {
                 );
 
                 setFollowups(mergedFollowups);
+                setOrders(orders);
+                setOrdersByCustomer(ordersByCustomer);
             } catch (error) {
                 console.error('Error loading followups data:', error);
             } finally {
@@ -131,6 +150,30 @@ export default function Followups() {
 
     const baseFollowups = followups;
 
+    // Generate month and year options from followups data
+    const { monthOptions, yearOptions } = useMemo(() => {
+        const months = new Set<number>();
+        const years = new Set<number>();
+        
+        baseFollowups.forEach(f => {
+            const date = new Date(f.lastOrder);
+            months.add(date.getMonth() + 1);
+            years.add(date.getFullYear());
+        });
+        
+        const monthOptions = Array.from(months).sort((a, b) => b - a).map(m => ({
+            value: m.toString(),
+            label: new Date(2000, m - 1, 1).toLocaleDateString('en-US', { month: 'long' })
+        }));
+        
+        const yearOptions = Array.from(years).sort((a, b) => b - a).map(y => ({
+            value: y.toString(),
+            label: y.toString()
+        }));
+        
+        return { monthOptions, yearOptions };
+    }, [baseFollowups]);
+
     const filtered = useMemo(() => {
         const now = new Date();
         return baseFollowups.filter(f => {
@@ -141,6 +184,28 @@ export default function Followups() {
             
             const matchesCaller = !callerFilter || f.callerName === callerFilter;
             const matchesFeedback = !feedbackFilter || f.feedback === feedbackFilter;
+            
+            // Month and year filter (last order date)
+            let matchesDate = true;
+            if (monthFilter || yearFilter) {
+                const lastOrderDate = new Date(f.lastOrder);
+                const orderMonth = lastOrderDate.getMonth() + 1; // 1-12
+                const orderYear = lastOrderDate.getFullYear();
+                
+                if (monthFilter) {
+                    const filterMonth = parseInt(monthFilter);
+                    if (orderMonth !== filterMonth) {
+                        matchesDate = false;
+                    }
+                }
+                
+                if (yearFilter && matchesDate) {
+                    const filterYear = parseInt(yearFilter);
+                    if (orderYear !== filterYear) {
+                        matchesDate = false;
+                    }
+                }
+            }
             
             // Calling date filter
             let matchesCallingDate = true;
@@ -184,9 +249,9 @@ export default function Followups() {
                 }
             }
             
-            return matchesSearch && matchesCaller && matchesFeedback && matchesCallingDate && matchesUpcoming;
+            return matchesSearch && matchesCaller && matchesFeedback && matchesDate && matchesCallingDate && matchesUpcoming;
         });
-    }, [baseFollowups, searchQuery, callerFilter, feedbackFilter, callingDateFilter, upcomingFilter]);
+    }, [baseFollowups, searchQuery, callerFilter, feedbackFilter, monthFilter, yearFilter, callingDateFilter, upcomingFilter]);
 
     async function updateFollowup(id: string, field: keyof Followup, value: string | null) {
         const followup = followups.find(f => f.id === id);
@@ -267,10 +332,24 @@ export default function Followups() {
                                 onChange={setFeedbackFilter}
                                 options={FEEDBACK_OPTIONS}
                             />
-                            {(searchQuery || callerFilter || feedbackFilter || callingDateFilter || upcomingFilter) ? (
+                            <StatusFilter
+                                label="Month"
+                                value={monthFilter}
+                                onChange={setMonthFilter}
+                                options={monthOptions.map(m => m.label)}
+                                optionValues={monthOptions.map(m => m.value)}
+                            />
+                            <StatusFilter
+                                label="Year"
+                                value={yearFilter}
+                                onChange={setYearFilter}
+                                options={yearOptions.map(y => y.label)}
+                                optionValues={yearOptions.map(y => y.value)}
+                            />
+                            {(searchQuery || callerFilter || feedbackFilter || monthFilter || yearFilter || callingDateFilter || upcomingFilter) ? (
                                 <button 
                                     className="filter-btn" 
-                                    onClick={() => { setSearchQuery(''); setCallerFilter(''); setFeedbackFilter(''); setCallingDateFilter(''); setUpcomingFilter(''); }}
+                                    onClick={() => { setSearchQuery(''); setCallerFilter(''); setFeedbackFilter(''); setMonthFilter(''); setYearFilter(''); setCallingDateFilter(''); setUpcomingFilter(''); }}
                                     style={{ fontSize: 12, padding: '6px 16px', height: 32, marginBottom: 0 }}
                                 >
                                     Clear All
@@ -381,11 +460,49 @@ export default function Followups() {
                             {filtered.map((f) => (
                                 <tr key={f.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                     <Td>
-                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                            <span style={{ fontWeight: 600 }}>{f.customerName}</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                            <span 
+                                                style={{ 
+                                                    fontWeight: 600, 
+                                                    cursor: 'pointer',
+                                                    color: 'var(--text)',
+                                                    transition: 'color 0.2s'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.color = '#10b981';
+                                                    e.currentTarget.style.textDecoration = 'underline';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.color = 'var(--text)';
+                                                    e.currentTarget.style.textDecoration = 'none';
+                                                }}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    setSelectedCustomerPhone(f.customerPhone);
+                                                    setShowCustomerProfile(true);
+                                                }}
+                                            >
+                                                {f.customerName}
+                                            </span>
                                             <a className="link" href={`tel:${f.customerPhone}`} style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>
                                                 {f.customerPhone}
                                             </a>
+                                            <span style={{
+                                                display: 'inline-block',
+                                                fontSize: 10,
+                                                fontWeight: 600,
+                                                textTransform: 'uppercase',
+                                                padding: '2px 6px',
+                                                borderRadius: 4,
+                                                backgroundColor: getCustomerType(f.totalOrders) === 'new' ? '#dbeafe' : 
+                                                               getCustomerType(f.totalOrders) === 'repeat' ? '#dcfce7' : '#fef3c7',
+                                                color: getCustomerType(f.totalOrders) === 'new' ? '#1e40af' : 
+                                                       getCustomerType(f.totalOrders) === 'repeat' ? '#166534' : '#92400e',
+                                                width: 'fit-content'
+                                            }}>
+                                                {getCustomerType(f.totalOrders)}
+                                            </span>
                                         </div>
                                     </Td>
                                     <Td>{formatDate(f.lastOrder)}</Td>
@@ -451,6 +568,17 @@ export default function Followups() {
                     </table>
                 </div>
             </div>
+            {showCustomerProfile && selectedCustomerPhone && (
+                <CustomerProfileModal 
+                    customerPhone={selectedCustomerPhone} 
+                    orders={orders}
+                    ordersByCustomer={ordersByCustomer}
+                    onClose={() => {
+                        setShowCustomerProfile(false);
+                        setSelectedCustomerPhone(null);
+                    }} 
+                />
+            )}
             <ToastContainer toasts={toasts} />
         </section>
     );
@@ -464,7 +592,7 @@ function Td({ children, style }: { children: React.ReactNode; style?: React.CSSP
     return <td style={{ padding: '12px', ...style }}>{children}</td>;
 }
 
-function StatusFilter<T extends string>({ label, value, onChange, options }: { label: string; value: T | ''; onChange: (val: T | '') => void; options: T[] }) {
+function StatusFilter<T extends string>({ label, value, onChange, options, optionValues }: { label: string; value: T | ''; onChange: (val: T | '') => void; options: T[]; optionValues?: string[] }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <label className="label" style={{ fontSize: 11, margin: 0, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</label>
@@ -475,8 +603,8 @@ function StatusFilter<T extends string>({ label, value, onChange, options }: { l
                 style={{ height: 32, minWidth: 120, cursor: 'pointer', fontSize: 13 }}
             >
                 <option value="">All</option>
-                {options.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
+                {options.map((opt, index) => (
+                    <option key={opt} value={optionValues ? optionValues[index] : opt}>{opt}</option>
                 ))}
             </select>
         </div>
@@ -787,6 +915,199 @@ function DateInput({ value, onChange }: { value: string | null; onChange: (value
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function StatusTag({ kind, type }: { kind: string; type: 'payment' | 'delivery' }) {
+    let cls = 'tag info';
+    if (type === 'payment') {
+        if (kind === 'PAID') cls = 'tag success';
+        else if (kind === 'COD') cls = 'tag warning';
+        else cls = 'tag info';
+    } else {
+        if (kind === 'Delivered') cls = 'tag success';
+        else if (kind === 'In Transit') cls = 'tag info';
+        else if (kind === 'Pending Pickup') cls = 'tag warning';
+        else if (kind === 'RTO') cls = 'tag danger';
+    }
+    return <span className={cls}>{kind}</span>;
+}
+
+function CustomerProfileModal({ customerPhone, orders, ordersByCustomer, onClose }: { customerPhone: string; orders: Order[]; ordersByCustomer: Map<string, Order[]>; onClose: () => void }) {
+    // Get all orders for this customer using the pre-grouped map
+    const customerOrders = useMemo(() => {
+        // First try to get from the pre-grouped map (exact match)
+        let customerOrdersList = ordersByCustomer.get(customerPhone) || [];
+        
+        // If no exact match, try normalized matching
+        if (customerOrdersList.length === 0) {
+            const normalizePhone = (phone: string) => {
+                if (!phone) return '';
+                return phone.replace(/\D/g, '').trim();
+            };
+            const normalizedCustomerPhone = normalizePhone(customerPhone);
+            
+            // Try to find matching phone in the map
+            for (const [phone, orderList] of ordersByCustomer.entries()) {
+                if (normalizePhone(phone) === normalizedCustomerPhone && normalizedCustomerPhone.length > 0) {
+                    customerOrdersList = orderList;
+                    break;
+                }
+            }
+            
+            // Fallback: filter from all orders if still not found
+            if (customerOrdersList.length === 0 && normalizedCustomerPhone.length > 0) {
+                customerOrdersList = orders.filter(o => {
+                    const orderPhone = normalizePhone(o.customerPhone);
+                    return orderPhone === normalizedCustomerPhone && orderPhone.length > 0;
+                });
+            }
+        }
+        
+        return customerOrdersList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }, [orders, ordersByCustomer, customerPhone]);
+
+    // Get customer profile from the most recent order
+    const customerProfile = useMemo(() => {
+        if (customerOrders.length === 0) {
+            // Return default profile if no orders found
+            return {
+                name: 'Unknown Customer',
+                phone: customerPhone,
+                address: '—',
+                state: '—',
+                pincode: '—',
+            };
+        }
+        const latestOrder = customerOrders[0];
+        return {
+            name: latestOrder.customer,
+            phone: latestOrder.customerPhone,
+            address: latestOrder.customerAddress,
+            state: latestOrder.state,
+            pincode: latestOrder.pincode || '—',
+        };
+    }, [customerOrders, customerPhone]);
+
+    const totalOrders = customerOrders.length;
+    const totalAmount = customerOrders.reduce((sum, o) => sum + o.amount, 0);
+
+    useEffect(() => {
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = prev; };
+    }, []);
+
+    return (
+        <div
+            role="dialog"
+            aria-modal="true"
+            onClick={onClose}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.45)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', zIndex: 60 }}
+        >
+            <div
+                className="card"
+                onClick={(e) => e.stopPropagation()}
+                style={{ width: '100%', maxWidth: 1200, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+            >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: '1px solid var(--border)' }}>
+                    <h3 style={{ margin: 0 }}>Customer Profile</h3>
+                    <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+                </div>
+                
+                <div style={{ padding: 20, overflow: 'auto', flex: 1 }}>
+                    {/* Customer Information */}
+                    <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-elev)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                        <h4 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Customer Information</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            {/* First Row: Name and Phone */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                                <div>
+                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Name</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.name}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Phone</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>
+                                        <a className="link" href={`tel:${customerProfile.phone}`} style={{ textDecoration: 'none' }}>{customerProfile.phone}</a>
+                                    </div>
+                                </div>
+                            </div>
+                            {/* Second Row: Address (full width) */}
+                            <div>
+                                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Address</div>
+                                <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.address}</div>
+                            </div>
+                            {/* Third Row: State and Pincode */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                                <div>
+                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>State</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.state}</div>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Pincode</div>
+                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.pincode}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', gap: 24 }}>
+                            <div>
+                                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Total Orders</div>
+                                <div style={{ fontSize: 18, color: 'var(--text)', fontWeight: 700 }}>{totalOrders}</div>
+                            </div>
+                            <div>
+                                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Total Amount</div>
+                                <div style={{ fontSize: 18, color: 'var(--text)', fontWeight: 700 }}>{formatCurrency(totalAmount)}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Orders Table */}
+                    <div>
+                        <h4 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Order History</h4>
+                        <div className="table-scroll-wrapper" style={{ maxHeight: '400px', overflow: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+                                <thead>
+                                    <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
+                                        <Th>Date</Th>
+                                        <Th>Items</Th>
+                                        <Th>Amount</Th>
+                                        <Th>Payment</Th>
+                                        <Th>Delivery</Th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {customerOrders.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                                                {orders.length === 0 ? 'No orders loaded' : 'No orders found for this customer'}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        customerOrders.map((order) => (
+                                            <tr key={order.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                <Td>{formatDate(order.date)}</Td>
+                                                <Td>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                        {(order.items ?? []).length === 0 ? <span>—</span> : null}
+                                                        {(order.items ?? []).map((it: OrderItem, idx: number) => (
+                                                            <div key={idx} style={{ fontSize: 12 }}>{it.variant} × {it.quantity}</div>
+                                                        ))}
+                                                    </div>
+                                                </Td>
+                                                <Td style={{ fontWeight: 600 }}>{formatCurrency(order.amount)}</Td>
+                                                <Td><StatusTag kind={order.paymentStatus} type="payment" /></Td>
+                                                <Td><StatusTag kind={order.deliveryStatus} type="delivery" /></Td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
