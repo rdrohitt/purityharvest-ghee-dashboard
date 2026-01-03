@@ -5,5 +5,19 @@
     "amount": 10000,
     "where": "",
     "note": "Sachin Social Media Payment"
+  },
+  {
+    "id": "Miscellaneous-1767425372480",
+    "date": "2025-11-07",
+    "amount": 55000,
+    "where": "",
+    "note": "Thinkwhy Fees"
+  },
+  {
+    "id": "Miscellaneous-1767425684057",
+    "date": "2025-10-29",
+    "amount": 40000,
+    "where": "",
+    "note": "Multiply Mavericks fee"
   }
 ]

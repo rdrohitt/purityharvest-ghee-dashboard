@@ -12016,7 +12016,7 @@
     "amount": 9310,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "182301",
     "shippingCharges": 605,
     "discountAmount": 140,
@@ -12040,7 +12040,7 @@
     "amount": 9250,
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "160047",
     "codCharges": 0,
     "shippingCharges": 290,
@@ -12257,7 +12257,7 @@
     "amount": 1150,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "RTO",
     "pincode": "828104",
     "codCharges": 60,
     "shippingCharges": 168,
@@ -12282,7 +12282,7 @@
     "amount": 1150,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "411044",
     "codCharges": 60,
     "shippingCharges": 156,
@@ -12693,6 +12693,29 @@
     "shippingCharges": 596,
     "discountAmount": 400,
     "state": "Maharashtra",
+    "platform": "Abandoned",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260103-1504",
+    "date": "2026-01-03T00:00:00.000Z",
+    "customer": "Mukesh Kumar Shrivastava ",
+    "customerPhone": "9639919443",
+    "customerAddress": "A1- 303, ELDECO ELEGANCE VIBHUTI Khand Gomti Nagar Lucknow",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 2280
+      }
+    ],
+    "amount": 2280,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "226010",
+    "shippingCharges": 234,
+    "state": "Uttar Pradesh",
     "platform": "Abandoned",
     "type": "New"
   }
