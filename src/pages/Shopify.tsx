@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadOrders, addOrder, updateOrder, deleteOrder, type Order, type OrderItem, type PaymentStatus, type FulfillmentStatus, type DeliveryStatus, type Platform, type OrderType } from '../utils/orders';
 import { loadProducts, type Product } from '../utils/products';
-import { loadMarketingSpend, type SpendRecord } from '../utils/marketing-spend';
+import { loadMarketingSpend, type SpendRecord, type MiscRecord } from '../utils/marketing-spend';
 
 function formatCurrency(n: number): string { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); }
 
@@ -117,6 +117,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const [orders, setOrders] = useState<Order[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [marketingSpend, setMarketingSpend] = useState<SpendRecord[]>([]);
+    const [miscSpend, setMiscSpend] = useState<MiscRecord[]>([]);
     const [loading, setLoading] = useState(true);
     
     // Toast notifications
@@ -141,13 +142,15 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         Promise.all([
             loadOrders(), 
             loadProducts(),
-            loadMarketingSpend('meta-spend')
+            loadMarketingSpend('meta-spend'),
+            loadMarketingSpend('misc-spend')
         ])
-            .then(([ordersData, productsData, metaData]) => {
+            .then(([ordersData, productsData, metaData, miscData]) => {
                 if (cancelled) return;
                 setOrders(ordersData);
                 setProducts(productsData);
                 setMarketingSpend(metaData as SpendRecord[]);
+                setMiscSpend(miscData as MiscRecord[]);
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -333,6 +336,13 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             '5ltr': 0
         };
         
+        // Calculate In Transit quantities by size
+        const inTransitQuantityBySize: { [key: string]: number } = {
+            '500ml': 0,
+            '1ltr': 0,
+            '5ltr': 0
+        };
+        
         filtered.forEach(o => {
             o.items.forEach(item => {
                 // Extract size from variant (e.g., "A2 Desi Cow Ghee - 500ml" -> "500ml")
@@ -376,6 +386,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         if (o.deliveryStatus === 'RTO') {
                             rtoQuantityBySize[sizeKey] += item.quantity;
                         }
+                        
+                        // Also add to In Transit quantity if order is in transit
+                        if (o.deliveryStatus === 'In Transit') {
+                            inTransitQuantityBySize[sizeKey] += item.quantity;
+                        }
                     }
                 }
             });
@@ -389,12 +404,43 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         const inTransit = inTransitOrders.length;
         const inTransitAmount = inTransitOrders.reduce((s, o) => s + o.amount, 0);
         
+        // Calculate total quantity in liters for manufacturing cost (only for delivered orders)
+        // 500ml = 0.5 liters, 1ltr = 1 liter, 5ltr = 5 liters
+        const deliveredLiters = (deliveredQuantityBySize['500ml'] || 0) * 0.5 + 
+                                (deliveredQuantityBySize['1ltr'] || 0) * 1 + 
+                                (deliveredQuantityBySize['5ltr'] || 0) * 5;
+        
+        // Manufacturing cost: 1 liter = Rs 860 (only for delivered orders)
+        const manufacturingCost = deliveredLiters * 860;
+        
+        // Calculate miscellaneous costs from misc-spend.json for the same date range
+        let totalMiscCost = 0;
+        if (filtered.length > 0) {
+            // Get date range from filtered orders
+            const orderDates = filtered.map(o => getDateStringFromISO(o.date));
+            const minDate = orderDates.sort()[0];
+            const maxDate = orderDates.sort().reverse()[0];
+            
+            // Filter misc-spend by date range
+            totalMiscCost = miscSpend
+                .filter(spend => {
+                    const spendDate = spend.date.split('T')[0]; // Handle both formats
+                    return spendDate >= minDate && spendDate <= maxDate;
+                })
+                .reduce((sum, spend) => sum + spend.amount, 0);
+        }
+        
+        // Calculate EBITA on delivered orders only = Delivered Sales - (Manufacturing Cost + Total Shipping Cost + Miscellaneous Cost + Meta Spend)
+        // Note: Shipping cost includes all orders (delivered, RTO, in transit)
+        const ebita = deliveredAmount - (manufacturingCost + shippingCharges + totalMiscCost + totalMarketingSpend);
+        
         return {
             totalSales,
             quantity,
             quantityBySize,
             deliveredQuantityBySize,
             rtoQuantityBySize,
+            inTransitQuantityBySize,
             codCharges,
             shippingCharges,
             roas,
@@ -404,9 +450,13 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             rtoAmount,
             inTransit,
             inTransitAmount,
-            totalOrders: filtered.length
+            totalOrders: filtered.length,
+            ebita,
+            manufacturingCost,
+            totalMiscCost,
+            totalMarketingSpend
         };
-    }, [filtered, marketingSpend]);
+    }, [filtered, marketingSpend, miscSpend]);
 
     useEffect(() => {
         function onDocClick(e: MouseEvent) {
@@ -525,10 +575,13 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     marginTop: 12,
                     background: 'var(--bg-elev)',
                 }}>
-                    <ModernMetricItem 
-                        icon="💰" 
-                        label="Total Sales" 
-                        value={formatCurrency(metrics.totalSales)} 
+                    <ModernSalesWithEBITAMetric 
+                        totalSales={metrics.totalSales}
+                        ebita={metrics.ebita}
+                        manufacturingCost={metrics.manufacturingCost}
+                        metaSpend={metrics.totalMarketingSpend}
+                        miscCost={metrics.totalMiscCost}
+                        shippingCost={metrics.shippingCharges}
                         iconColor="#16a34a"
                         isLast={false}
                         isEven={false}
@@ -537,34 +590,18 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         quantityBySize={metrics.quantityBySize}
                         deliveredQuantityBySize={metrics.deliveredQuantityBySize}
                         rtoQuantityBySize={metrics.rtoQuantityBySize}
+                        inTransitQuantityBySize={metrics.inTransitQuantityBySize}
                         iconColor="#3b82f6"
                         isLast={false}
                         isEven={true}
                     />
-                    <ModernMetricItemWithAmount 
-                        icon="✅" 
-                        label="Delivered" 
-                        count={metrics.delivered} 
-                        amount={metrics.deliveredAmount}
-                        iconColor="#10b981"
-                        isLast={false}
-                        isEven={false}
-                    />
-                    <ModernMetricItemWithAmount 
-                        icon="↩️" 
-                        label="RTO" 
-                        count={metrics.rto} 
-                        amount={metrics.rtoAmount}
-                        iconColor="#f59e0b"
-                        isLast={false}
-                        isEven={true}
-                    />
-                    <ModernMetricItemWithAmount 
-                        icon="🚚" 
-                        label="In Transit" 
-                        count={metrics.inTransit} 
-                        amount={metrics.inTransitAmount}
-                        iconColor="#06b6d4"
+                    <ModernDeliveryStatusMetric 
+                        delivered={metrics.delivered}
+                        deliveredAmount={metrics.deliveredAmount}
+                        rto={metrics.rto}
+                        rtoAmount={metrics.rtoAmount}
+                        inTransit={metrics.inTransit}
+                        inTransitAmount={metrics.inTransitAmount}
                         isLast={false}
                         isEven={false}
                     />
@@ -582,7 +619,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         value={metrics.roas > 0 ? metrics.roas.toFixed(2) : '—'} 
                         iconColor="#ec4899"
                         isLast={true}
-                        isEven={false}
+                        isEven={true}
                     />
                 </div>
 
@@ -1298,8 +1335,171 @@ function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { i
     );
 }
 
-function ModernQuantityMetric({ quantityBySize, deliveredQuantityBySize, rtoQuantityBySize, iconColor, isLast, isEven }: { quantityBySize: { [key: string]: number }; deliveredQuantityBySize: { [key: string]: number }; rtoQuantityBySize: { [key: string]: number }; iconColor: string; isLast: boolean; isEven: boolean }) {
-    const totalQuantity = (quantityBySize['500ml'] || 0) + (quantityBySize['1ltr'] || 0) + (quantityBySize['5ltr'] || 0);
+function ModernSalesWithEBITAMetric({ totalSales, ebita, manufacturingCost, metaSpend, miscCost, shippingCost, iconColor, isLast, isEven }: { totalSales: number; ebita: number; manufacturingCost: number; metaSpend: number; miscCost: number; shippingCost: number; iconColor: string; isLast: boolean; isEven: boolean }) {
+    return (
+        <div style={{ 
+            background: isEven ? '#f8f9fa' : 'transparent',
+            flex: 1,
+            padding: '12px 10px',
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 6,
+            borderRight: isLast ? 'none' : '1px solid var(--border)',
+            transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg)';
+        }}
+        onMouseLeave={(e) => {
+            e.currentTarget.style.background = isEven ? '#f8f9fa' : 'transparent';
+        }}
+        >
+            <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 2
+            }}>
+                <span style={{ fontSize: 16, opacity: 0.8 }}>💰</span>
+            <div style={{ 
+                fontSize: 10, 
+                color: 'var(--muted)', 
+                fontWeight: 600, 
+                textTransform: 'uppercase', 
+                    letterSpacing: '0.4px',
+            }}>
+                Total Sales / EBITA
+                </div>
+            </div>
+            <div style={{ 
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 3
+            }}>
+                <div style={{ 
+                    fontSize: 16, 
+                    fontWeight: 700, 
+                    color: 'var(--text)',
+                    lineHeight: 1.2,
+                    letterSpacing: '-0.2px'
+                }}>
+                    {formatCurrency(totalSales)}
+                </div>
+                <div style={{ 
+                    fontSize: 12, 
+                    fontWeight: 500, 
+                    color: ebita >= 0 ? '#10b981' : '#ef4444',
+                    lineHeight: 1.2
+                }}>
+                    EBITA: {formatCurrency(ebita)}
+                </div>
+                <div style={{ 
+                    marginTop: 4,
+                    paddingTop: 4,
+                    borderTop: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2
+                }}>
+                    <div style={{ fontSize: 10, marginBottom: 2, fontWeight: 500, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Manufacturing:</span>
+                        <span>{formatCurrency(manufacturingCost)}</span>
+                    </div>
+                    <div style={{ fontSize: 10, marginBottom: 2, fontWeight: 500, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Meta:</span>
+                        <span>{formatCurrency(metaSpend)}</span>
+                    </div>
+                    <div style={{ fontSize: 10, marginBottom: 2, fontWeight: 500, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Misc:</span>
+                        <span>{formatCurrency(miscCost)}</span>
+                    </div>
+                    <div style={{ fontSize: 10, marginBottom: 2, fontWeight: 500, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Shipping:</span>
+                        <span>{formatCurrency(shippingCost)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ModernDeliveryStatusMetric({ delivered, deliveredAmount, rto, rtoAmount, inTransit, inTransitAmount, isLast, isEven }: { delivered: number; deliveredAmount: number; rto: number; rtoAmount: number; inTransit: number; inTransitAmount: number; isLast: boolean; isEven: boolean }) {
+    return (
+        <div style={{ 
+            background: isEven ? '#f8f9fa' : 'transparent',
+            flex: 1,
+            padding: '12px 10px',
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 6,
+            borderRight: isLast ? 'none' : '1px solid var(--border)',
+            transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--bg)';
+        }}
+        onMouseLeave={(e) => {
+            e.currentTarget.style.background = isEven ? '#f8f9fa' : 'transparent';
+        }}
+        >
+            <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 2
+            }}>
+                <span style={{ fontSize: 16, opacity: 0.8 }}>📦</span>
+            <div style={{ 
+                fontSize: 10, 
+                color: 'var(--muted)', 
+                fontWeight: 600, 
+                textTransform: 'uppercase', 
+                    letterSpacing: '0.4px',
+            }}>
+                Delivery Status
+                </div>
+            </div>
+            <div style={{ 
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 3,
+                width: '100%'
+            }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#10b981' }}>✅ Delivered</span>
+                    <span>{delivered} - {formatCurrency(deliveredAmount)}</span>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#f59e0b' }}>↩️ RTO</span>
+                    <span>{rto} - {formatCurrency(rtoAmount)}</span>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#06b6d4' }}>🚚 In Transit</span>
+                    <span>{inTransit} - {formatCurrency(inTransitAmount)}</span>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function ModernQuantityMetric({ quantityBySize, deliveredQuantityBySize, rtoQuantityBySize, inTransitQuantityBySize, iconColor, isLast, isEven }: { quantityBySize: { [key: string]: number }; deliveredQuantityBySize: { [key: string]: number }; rtoQuantityBySize: { [key: string]: number }; inTransitQuantityBySize: { [key: string]: number }; iconColor: string; isLast: boolean; isEven: boolean }) {
+    // Calculate total quantity in liters: 500ml = 0.5L, 1ltr = 1L, 5ltr = 5L
+    const totalQuantityInLiters = (quantityBySize['500ml'] || 0) * 0.5 + 
+                                   (quantityBySize['1ltr'] || 0) * 1 + 
+                                   (quantityBySize['5ltr'] || 0) * 5;
+    
+    // Calculate total delivered quantity in liters
+    const totalDeliveredInLiters = (deliveredQuantityBySize['500ml'] || 0) * 0.5 + 
+                                   (deliveredQuantityBySize['1ltr'] || 0) * 1 + 
+                                   (deliveredQuantityBySize['5ltr'] || 0) * 5;
+    
+    const formatLiters = (liters: number): string => {
+        if (liters % 1 === 0) {
+            return liters.toLocaleString() + ' L';
+        }
+        return liters.toFixed(1).replace(/\.?0+$/, '') + ' L';
+    };
+    
     return (
         <div style={{ 
             background: isEven ? '#f8f9fa' : 'transparent',
@@ -1330,7 +1530,7 @@ function ModernQuantityMetric({ quantityBySize, deliveredQuantityBySize, rtoQuan
                 color: 'var(--muted)', 
                 fontWeight: 600, 
                 textTransform: 'uppercase', 
-                    letterSpacing: '0.4px',
+                letterSpacing: '0.4px',
             }}>
                 Quantity
                 </div>
@@ -1338,47 +1538,85 @@ function ModernQuantityMetric({ quantityBySize, deliveredQuantityBySize, rtoQuan
             <div style={{ 
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 3,
-                width: '100%'
+                gap: 3
             }}>
-                {quantityBySize['500ml'] > 0 && (
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>500ml</span>
-                        <span>
-                            <span style={{ color: '#3b82f6' }}>{quantityBySize['500ml'].toLocaleString()}</span>
-                            {' → '}
-                            <span style={{ color: '#10b981' }}>{(deliveredQuantityBySize['500ml'] || 0).toLocaleString()}</span>
-                            {' → '}
-                            <span style={{ color: '#ef4444' }}>{(rtoQuantityBySize['500ml'] || 0).toLocaleString()}</span>
-                        </span>
-                    </div>
-                )}
-                {quantityBySize['1ltr'] > 0 && (
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>1ltr</span>
-                        <span>
-                            <span style={{ color: '#3b82f6' }}>{quantityBySize['1ltr'].toLocaleString()}</span>
-                            {' → '}
-                            <span style={{ color: '#10b981' }}>{(deliveredQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
-                            {' → '}
-                            <span style={{ color: '#ef4444' }}>{(rtoQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
-                        </span>
-                    </div>
-                )}
-                {quantityBySize['5ltr'] > 0 && (
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>5ltr</span>
-                        <span>
-                            <span style={{ color: '#3b82f6' }}>{quantityBySize['5ltr'].toLocaleString()}</span>
-                            {' → '}
-                            <span style={{ color: '#10b981' }}>{(deliveredQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
-                            {' → '}
-                            <span style={{ color: '#ef4444' }}>{(rtoQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
-                        </span>
-                    </div>
-                )}
-                {totalQuantity === 0 && (
-                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>0</div>
+                {/* Total Quantity - Big and Bold */}
+                <div style={{ 
+                    fontSize: 16, 
+                    fontWeight: 700, 
+                    color: '#3b82f6',
+                    lineHeight: 1.2,
+                    letterSpacing: '-0.2px'
+                }}>
+                    {formatLiters(totalQuantityInLiters)}
+                </div>
+                
+                {/* Total Delivered */}
+                <div style={{ 
+                    fontSize: 12, 
+                    fontWeight: 500, 
+                    color: '#10b981',
+                    lineHeight: 1.2
+                }}>
+                    Delivered: {formatLiters(totalDeliveredInLiters)}
+                </div>
+                
+                {/* Separator and Breakdown */}
+                <div style={{ 
+                    marginTop: 4,
+                    paddingTop: 4,
+                    borderTop: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 3
+                }}>
+                    {/* Size Breakdown */}
+                    {quantityBySize['500ml'] > 0 && (
+                        <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 18 }}>
+                            <span style={{ fontSize: 10, minWidth: 35 }}>500ml</span>
+                            <span style={{ fontSize: 11, display: 'flex', gap: 3, alignItems: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                                <span style={{ color: '#3b82f6', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{quantityBySize['500ml'].toLocaleString()}</span>
+                                <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
+                                <span style={{ color: '#10b981', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(deliveredQuantityBySize['500ml'] || 0).toLocaleString()}</span>
+                                <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
+                                <span style={{ color: '#ef4444', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(rtoQuantityBySize['500ml'] || 0).toLocaleString()}</span>
+                                <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
+                                <span style={{ color: '#06b6d4', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(inTransitQuantityBySize['500ml'] || 0).toLocaleString()}</span>
+                            </span>
+                        </div>
+                    )}
+                    {quantityBySize['1ltr'] > 0 && (
+                        <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 18 }}>
+                            <span style={{ fontSize: 10, minWidth: 35 }}>1ltr</span>
+                            <span style={{ fontSize: 11, display: 'flex', gap: 3, alignItems: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                                <span style={{ color: '#3b82f6', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{quantityBySize['1ltr'].toLocaleString()}</span>
+                                <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
+                                <span style={{ color: '#10b981', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(deliveredQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
+                                <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
+                                <span style={{ color: '#ef4444', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(rtoQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
+                                <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
+                                <span style={{ color: '#06b6d4', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(inTransitQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
+                            </span>
+                        </div>
+                    )}
+                    {quantityBySize['5ltr'] > 0 && (
+                        <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 18 }}>
+                            <span style={{ fontSize: 10, minWidth: 35 }}>5ltr</span>
+                            <span style={{ fontSize: 11, display: 'flex', gap: 3, alignItems: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                                <span style={{ color: '#3b82f6', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{quantityBySize['5ltr'].toLocaleString()}</span>
+                                <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
+                                <span style={{ color: '#10b981', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(deliveredQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
+                                <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
+                                <span style={{ color: '#ef4444', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(rtoQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
+                                <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
+                                <span style={{ color: '#06b6d4', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(inTransitQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
+                            </span>
+                        </div>
+                    )}
+                </div>
+                
+                {totalQuantityInLiters === 0 && (
+                    <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>0 L</div>
                 )}
             </div>
         </div>

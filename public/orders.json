@@ -12671,5 +12671,29 @@
     "state": "Haryana",
     "platform": "Abandoned",
     "type": "New"
+  },
+  {
+    "id": "PH-20260103-1503",
+    "date": "2026-01-03T00:00:00.000Z",
+    "customer": "Rajesh Raj",
+    "customerPhone": "9769362448",
+    "customerAddress": "Jp north GARDEN EUPHORIYA, 1005 Vinay nagar Miraroad e  Thana ",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 5 ltr",
+        "quantity": 1,
+        "lineAmount": 11400
+      }
+    ],
+    "amount": 11000,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "401107",
+    "shippingCharges": 596,
+    "discountAmount": 400,
+    "state": "Maharashtra",
+    "platform": "Abandoned",
+    "type": "New"
   }
 ]
