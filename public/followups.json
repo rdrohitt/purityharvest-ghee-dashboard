@@ -1,3 +1,370 @@
 [
- 
+  {
+    "customerPhone": "7597491006",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "average ghee\n",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9479462000",
+    "feedback": "Excellent ghee",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "he is busy\n",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9826141314",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering\n",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9435846584",
+    "feedback": "Excellent ghee",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "no need\n",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9664811236",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8837658565",
+    "feedback": "Excellent ghee",
+    "callingDate": "2025-12-27T09:48:50.710Z",
+    "callerName": "",
+    "callingDetail": "very good ghee and order placed ",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9001199756",
+    "feedback": "Excellent ghee",
+    "callingDate": "2025-12-27T09:48:43.078Z",
+    "callerName": "",
+    "callingDetail": "excellent ghee\n",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9207198461",
+    "feedback": "",
+    "callingDate": "2025-12-27T09:49:03.448Z",
+    "callerName": "",
+    "callingDetail": "Not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7982881006",
+    "feedback": "Excellent ghee",
+    "callingDate": "2025-12-27T09:55:05.297Z",
+    "callerName": "",
+    "callingDetail": "excellent ghee\n",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9452986611",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "Not answerinh",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9830188841",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "Not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8427774411",
+    "feedback": "Excellent ghee",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "call back adn she is interested for 5 ltr ",
+    "callAgainDate": "2026-01-11T18:30:00.000Z"
+  },
+  {
+    "customerPhone": "9568807609",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "customer denied and do not call",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9853460660",
+    "feedback": "Excellent ghee",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee ",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9580077142",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "Not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9654577696",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "Not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9425136562",
+    "feedback": "Excellent ghee",
+    "callingDate": "2025-12-26T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "call back 2 jan",
+    "callAgainDate": "2026-01-01T18:30:00.000Z"
+  },
+  {
+    "customerPhone": "7757999722",
+    "feedback": "",
+    "callingDate": "2025-12-26T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "gheee not taste ",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9839019538",
+    "feedback": "",
+    "callingDate": "2025-12-26T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9867023983",
+    "feedback": "",
+    "callingDate": "2025-12-26T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8171330053",
+    "feedback": "Excellent ghee",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "good ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8368688073",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "ghee not taste yet\n",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9833149631",
+    "feedback": "",
+    "callingDate": "2025-12-26T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "ghee not used yet",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9719230805",
+    "feedback": "",
+    "callingDate": "2025-12-26T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9459462626",
+    "feedback": "Excellent ghee",
+    "callingDate": "2025-12-26T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": "2026-01-07T18:30:00.000Z"
+  },
+  {
+    "customerPhone": "9335624138",
+    "feedback": "",
+    "callingDate": "2025-12-27T10:43:30.368Z",
+    "callerName": "",
+    "callingDetail": "switch off",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7029482955",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "ghee not taste yet but he isi nterested for 5 ltr  ",
+    "callAgainDate": "2025-12-30T18:30:00.000Z"
+  },
+  {
+    "customerPhone": "9944186113",
+    "feedback": "Excellent ghee",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "good ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7009528405",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9792044448",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "busy now",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9818557013",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8238666679",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "ghee not used yet",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9967466788",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9415292480",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "ghee not used yet",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9877248198",
+    "feedback": "Excellent ghee",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "call back 7 pm",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9435380416",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "ghee not used yet",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9872661576",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "no need",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8168753566",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "switch off",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9206108108",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "ghee not taste",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7879394951",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "ghee not used yet",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9855820000",
+    "feedback": "Excellent ghee",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "call back 28 dec\n",
+    "callAgainDate": "2025-12-27T18:30:00.000Z"
+  },
+  {
+    "customerPhone": "9851239208",
+    "feedback": "Excellent ghee",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7008652962",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9179070242",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9640339648",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "smell isssue",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9810578443",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  }
 ]

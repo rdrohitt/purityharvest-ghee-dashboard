@@ -89,5 +89,18 @@
       "length": 15
     },
     "weight": 1800
+  },
+  {
+    "name": "A2 Buffalo Ghee",
+    "category": "Ghee",
+    "size": "5 ltr",
+    "price": 7090,
+    "dimension": {
+      "height": 32,
+      "width": 26,
+      "length": 26
+    },
+    "weight": 6800,
+    "id": "PROD-1008"
   }
 ]
