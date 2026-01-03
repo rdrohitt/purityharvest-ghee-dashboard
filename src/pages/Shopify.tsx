@@ -319,6 +319,20 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             '5ltr': 0
         };
         
+        // Calculate delivered quantities by size
+        const deliveredQuantityBySize: { [key: string]: number } = {
+            '500ml': 0,
+            '1ltr': 0,
+            '5ltr': 0
+        };
+        
+        // Calculate RTO quantities by size
+        const rtoQuantityBySize: { [key: string]: number } = {
+            '500ml': 0,
+            '1ltr': 0,
+            '5ltr': 0
+        };
+        
         filtered.forEach(o => {
             o.items.forEach(item => {
                 // Extract size from variant (e.g., "A2 Desi Cow Ghee - 500ml" -> "500ml")
@@ -352,6 +366,16 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     
                     if (sizeKey && quantityBySize.hasOwnProperty(sizeKey)) {
                         quantityBySize[sizeKey] += item.quantity;
+                        
+                        // Also add to delivered quantity if order is delivered
+                        if (o.deliveryStatus === 'Delivered') {
+                            deliveredQuantityBySize[sizeKey] += item.quantity;
+                        }
+                        
+                        // Also add to RTO quantity if order is RTO
+                        if (o.deliveryStatus === 'RTO') {
+                            rtoQuantityBySize[sizeKey] += item.quantity;
+                        }
                     }
                 }
             });
@@ -369,6 +393,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             totalSales,
             quantity,
             quantityBySize,
+            deliveredQuantityBySize,
+            rtoQuantityBySize,
             codCharges,
             shippingCharges,
             roas,
@@ -509,6 +535,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     />
                     <ModernQuantityMetric 
                         quantityBySize={metrics.quantityBySize}
+                        deliveredQuantityBySize={metrics.deliveredQuantityBySize}
+                        rtoQuantityBySize={metrics.rtoQuantityBySize}
                         iconColor="#3b82f6"
                         isLast={false}
                         isEven={true}
@@ -1270,7 +1298,7 @@ function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { i
     );
 }
 
-function ModernQuantityMetric({ quantityBySize, iconColor, isLast, isEven }: { quantityBySize: { [key: string]: number }; iconColor: string; isLast: boolean; isEven: boolean }) {
+function ModernQuantityMetric({ quantityBySize, deliveredQuantityBySize, rtoQuantityBySize, iconColor, isLast, isEven }: { quantityBySize: { [key: string]: number }; deliveredQuantityBySize: { [key: string]: number }; rtoQuantityBySize: { [key: string]: number }; iconColor: string; isLast: boolean; isEven: boolean }) {
     const totalQuantity = (quantityBySize['500ml'] || 0) + (quantityBySize['1ltr'] || 0) + (quantityBySize['5ltr'] || 0);
     return (
         <div style={{ 
@@ -1316,19 +1344,37 @@ function ModernQuantityMetric({ quantityBySize, iconColor, isLast, isEven }: { q
                 {quantityBySize['500ml'] > 0 && (
                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
                         <span>500ml</span>
-                        <span>{quantityBySize['500ml'].toLocaleString()}</span>
+                        <span>
+                            <span style={{ color: '#3b82f6' }}>{quantityBySize['500ml'].toLocaleString()}</span>
+                            {' → '}
+                            <span style={{ color: '#10b981' }}>{(deliveredQuantityBySize['500ml'] || 0).toLocaleString()}</span>
+                            {' → '}
+                            <span style={{ color: '#ef4444' }}>{(rtoQuantityBySize['500ml'] || 0).toLocaleString()}</span>
+                        </span>
                     </div>
                 )}
                 {quantityBySize['1ltr'] > 0 && (
                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
                         <span>1ltr</span>
-                        <span>{quantityBySize['1ltr'].toLocaleString()}</span>
+                        <span>
+                            <span style={{ color: '#3b82f6' }}>{quantityBySize['1ltr'].toLocaleString()}</span>
+                            {' → '}
+                            <span style={{ color: '#10b981' }}>{(deliveredQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
+                            {' → '}
+                            <span style={{ color: '#ef4444' }}>{(rtoQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
+                        </span>
                     </div>
                 )}
                 {quantityBySize['5ltr'] > 0 && (
                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', justifyContent: 'space-between' }}>
                         <span>5ltr</span>
-                        <span>{quantityBySize['5ltr'].toLocaleString()}</span>
+                        <span>
+                            <span style={{ color: '#3b82f6' }}>{quantityBySize['5ltr'].toLocaleString()}</span>
+                            {' → '}
+                            <span style={{ color: '#10b981' }}>{(deliveredQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
+                            {' → '}
+                            <span style={{ color: '#ef4444' }}>{(rtoQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
+                        </span>
                     </div>
                 )}
                 {totalQuantity === 0 && (
