@@ -549,6 +549,53 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             onChange={setTypeFilter}
                             options={['New', 'Repeat', 'Reference'] as OrderType[]}
                         />
+                        <button 
+                            className="filter-btn" 
+                            onClick={() => {
+                                // Export to CSV
+                                const headers = ['S.no', 'Name', 'Quantity', 'Amount', 'Delivery Status', 'State'];
+                                const rows = filtered.map((order, index) => {
+                                    const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                                    return [
+                                        index + 1,
+                                        order.customer,
+                                        totalQuantity,
+                                        order.amount,
+                                        order.deliveryStatus || '',
+                                        order.state || ''
+                                    ];
+                                });
+                                
+                                // Create CSV content
+                                const csvContent = [
+                                    headers.join(','),
+                                    ...rows.map(row => row.map(cell => {
+                                        // Escape commas and quotes in CSV
+                                        const cellStr = String(cell);
+                                        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                                            return `"${cellStr.replace(/"/g, '""')}"`;
+                                        }
+                                        return cellStr;
+                                    }).join(','))
+                                ].join('\n');
+                                
+                                // Create blob and download
+                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                const link = document.createElement('a');
+                                const url = URL.createObjectURL(blob);
+                                link.setAttribute('href', url);
+                                link.setAttribute('download', `orders_export_${new Date().toISOString().split('T')[0]}.csv`);
+                                link.style.visibility = 'hidden';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                showToast('Orders exported successfully!', 'success');
+                            }}
+                            style={{ fontSize: 12, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
+                        >
+                            <span>📥</span>
+                            Export CSV
+                        </button>
                         {(paymentStatusFilter || fulfillmentStatusFilter || deliveryStatusFilter || platformFilter || typeFilter) ? (
                             <button 
                                 className="filter-btn" 
@@ -1583,9 +1630,9 @@ function ModernQuantityMetric({ quantityBySize, deliveredQuantityBySize, rtoQuan
                                 <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
                                 <span style={{ color: '#06b6d4', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(inTransitQuantityBySize['500ml'] || 0).toLocaleString()}</span>
                             </span>
-                        </div>
-                    )}
-                    {quantityBySize['1ltr'] > 0 && (
+                    </div>
+                )}
+                {quantityBySize['1ltr'] > 0 && (
                         <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 18 }}>
                             <span style={{ fontSize: 10, minWidth: 35 }}>1ltr</span>
                             <span style={{ fontSize: 11, display: 'flex', gap: 3, alignItems: 'center', fontVariantNumeric: 'tabular-nums' }}>
@@ -1597,9 +1644,9 @@ function ModernQuantityMetric({ quantityBySize, deliveredQuantityBySize, rtoQuan
                                 <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
                                 <span style={{ color: '#06b6d4', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(inTransitQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
                             </span>
-                        </div>
-                    )}
-                    {quantityBySize['5ltr'] > 0 && (
+                    </div>
+                )}
+                {quantityBySize['5ltr'] > 0 && (
                         <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 18 }}>
                             <span style={{ fontSize: 10, minWidth: 35 }}>5ltr</span>
                             <span style={{ fontSize: 11, display: 'flex', gap: 3, alignItems: 'center', fontVariantNumeric: 'tabular-nums' }}>
@@ -1611,8 +1658,8 @@ function ModernQuantityMetric({ quantityBySize, deliveredQuantityBySize, rtoQuan
                                 <span style={{ color: '#6b7280', fontSize: 10, lineHeight: 1 }}>→</span>
                                 <span style={{ color: '#06b6d4', fontWeight: 600, minWidth: 28, textAlign: 'right', display: 'inline-block' }}>{(inTransitQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
                             </span>
-                        </div>
-                    )}
+                    </div>
+                )}
                 </div>
                 
                 {totalQuantityInLiters === 0 && (
