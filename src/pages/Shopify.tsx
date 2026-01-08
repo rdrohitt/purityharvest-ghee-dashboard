@@ -541,7 +541,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             label="Platform"
                             value={platformFilter}
                             onChange={setPlatformFilter}
-                            options={['Shopify', 'Abandoned', 'Whatsapp'] as Platform[]}
+                            options={['Shopify', 'Abandoned', 'Whatsapp', 'Amazon', 'Flipkart'] as Platform[]}
                         />
                         <StatusFilter
                             label="Type"
@@ -2300,7 +2300,7 @@ function AddOrderModal({
                             <label className="label">Platform</label>
                             <select className="input" style={{ width: '100%', marginTop: 6 }} value={platform} onChange={(e)=>setPlatform(e.target.value as Platform | '')} required>
                                 <option value="">Select Platform</option>
-                                {(['Shopify','Abandoned','Whatsapp'] as Platform[]).map((p)=> <option key={p} value={p}>{p}</option>)}
+                                {(['Shopify','Abandoned','Whatsapp','Amazon','Flipkart'] as Platform[]).map((p)=> <option key={p} value={p}>{p}</option>)}
                             </select>
                         </div>
                         <div>

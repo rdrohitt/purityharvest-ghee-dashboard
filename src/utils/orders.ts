@@ -1,7 +1,7 @@
 export type PaymentStatus = 'COD' | 'PAID';
 export type FulfillmentStatus = 'Unfulfilled' | 'Fulfilled' | 'Partial';
 export type DeliveryStatus = 'In Transit' | 'Delivered' | 'RTO' | 'Pending Pickup';
-export type Platform = 'Shopify' | 'Abandoned' | 'Whatsapp';
+export type Platform = 'Shopify' | 'Abandoned' | 'Whatsapp' | 'Amazon' | 'Flipkart';
 export type OrderType = 'New' | 'Repeat' | 'Reference';
 
 export type OrderItem = { variant: string; quantity: number; lineAmount: number };
