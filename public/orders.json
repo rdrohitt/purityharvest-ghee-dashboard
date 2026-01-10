@@ -1119,7 +1119,7 @@
     "date": "2025-11-21T00:00:00.000Z",
     "customer": "Subhash Chaudhary",
     "customerPhone": "8510055590",
-    "customerAddress": "-",
+    "customerAddress": "A - 71 Nagal dewat top floor vasnat kunj, Near kendriya vidyalaya school, New delhi",
     "items": [
       {
         "variant": "A2 Gir Cow Ghee - 1000 ml",
@@ -1136,7 +1136,7 @@
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
     "deliveryStatus": "Delivered",
-    "pincode": "000000",
+    "pincode": "110070",
     "codCharges": 0,
     "shippingCharges": 240,
     "discountAmount": 490,
@@ -6937,9 +6937,9 @@
   {
     "id": "PH-20251122-1174",
     "date": "2025-11-22T00:00:00.000Z",
-    "customer": "Subhah",
+    "customer": "Subhash Chaudhary",
     "customerPhone": "8510055590",
-    "customerAddress": "-",
+    "customerAddress": "A - 71 Nagal dewat top floor vasnat kunj, Near kendriya vidyalaya school, New delhi",
     "items": [
       {
         "variant": "A2 Buffalo Ghee - 1000 ml",
@@ -6951,11 +6951,11 @@
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
     "deliveryStatus": "Delivered",
-    "pincode": "000000",
+    "pincode": "110070",
     "codCharges": 0,
     "shippingCharges": 117,
     "discountAmount": 0,
-    "state": "-",
+    "state": "Delhi",
     "platform": "Abandoned",
     "type": "New"
   },
@@ -12925,7 +12925,7 @@
     "amount": 2280,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "208024",
     "shippingCharges": 176,
     "state": "Uttar Pradesh",
@@ -13187,7 +13187,7 @@
     "amount": 1150,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "184121",
     "codCharges": 60,
     "shippingCharges": 197,
@@ -13211,7 +13211,7 @@
     "amount": 35000,
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "141008",
     "shippingCharges": 740,
     "discountAmount": 10600,
@@ -13235,7 +13235,7 @@
     "amount": 8880,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "132001",
     "shippingCharges": 471,
     "discountAmount": 570,
@@ -13259,7 +13259,7 @@
     "amount": 2280,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "281121",
     "shippingCharges": 176,
     "state": "UP",
@@ -13603,5 +13603,77 @@
     "state": "Karnataka",
     "platform": "Shopify",
     "type": "New"
+  },
+  {
+    "id": "PH-20260108-1542",
+    "date": "2026-01-08T00:00:00.000Z",
+    "customer": "Ajay Das",
+    "customerPhone": "9335624138",
+    "customerAddress": "Rti collage, Near Mahadev Dairy, Chamu Jodhpur, Cherai",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1800,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "342306",
+    "shippingCharges": 199,
+    "discountAmount": 90,
+    "state": "Rajasthan",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260110-1543",
+    "date": "2026-01-09T00:00:00.000Z",
+    "customer": "Subhash Chaudhary",
+    "customerPhone": "8510055590",
+    "customerAddress": "A - 71 Nagal dewat top floor vasnat kunj, Near kendriya vidyalaya school, New delhi",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 5 ltr",
+        "quantity": 1,
+        "lineAmount": 11400
+      }
+    ],
+    "amount": 10500,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "110070",
+    "shippingCharges": 273,
+    "discountAmount": 900,
+    "state": "Delhi",
+    "platform": "Abandoned",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260110-1544",
+    "date": "2026-01-08T00:00:00.000Z",
+    "customer": "Bector Siddharth",
+    "customerPhone": "9971377915",
+    "customerAddress": "Natural Animal diets G.T road Doraha (doraha village) Opposite 3J dhabha Near HP, fuel station, Ludhiana",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 5 ltr",
+        "quantity": 2,
+        "lineAmount": 22800
+      }
+    ],
+    "amount": 21000,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "141421",
+    "shippingCharges": 370,
+    "discountAmount": 1800,
+    "state": "Punjab",
+    "platform": "Whatsapp",
+    "type": "Repeat"
   }
 ]
