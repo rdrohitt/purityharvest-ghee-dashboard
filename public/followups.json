@@ -566,5 +566,101 @@
     "callerName": "",
     "callingDetail": " ",
     "callAgainDate": null
+  },
+  {
+    "customerPhone": "9545759590",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9136059159",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "ghee not taste",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7795409477",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "order placed 2 ltr gir cow",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9819055949",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "excelent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9103144721",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9939186548",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "1 ltr order placed",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9934007836",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "good ghee and call back 18 jan",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9848481043",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9086098754",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7291925102",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "excellent ghee and customer is very happy with the profuct call back afetr 20 jan",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7206113904",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "average ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9006060462",
+    "feedback": "",
+    "callingDate": "2026-01-10T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
   }
 ]
