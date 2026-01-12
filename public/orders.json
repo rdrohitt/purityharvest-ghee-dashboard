@@ -6037,9 +6037,9 @@
   {
     "id": "PH-20250831-1120",
     "date": "2025-08-31T00:00:00.000Z",
-    "customer": "Ghulam Mohammad",
+    "customer": "Ghulam Dar",
     "customerPhone": "9906646225",
-    "customerAddress": "-",
+    "customerAddress": "Mohalla bagandhar narkara budgamm j&k Musjid billali hunfia Baghandar, Narkara Budgam, Srinagar, Jammu and Kashmir",
     "items": [
       {
         "variant": "A2 Desi Cow Ghee - 1000 ml",
@@ -6051,11 +6051,11 @@
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
     "deliveryStatus": "Delivered",
-    "pincode": "000000",
+    "pincode": "190018",
     "codCharges": 0,
     "shippingCharges": 0,
     "discountAmount": 0,
-    "state": "-",
+    "state": "Jammu and Kashmir",
     "platform": "Shopify",
     "type": "New"
   },
@@ -10537,9 +10537,9 @@
   {
     "id": "PH-20251123-1304",
     "date": "2025-11-23T00:00:00.000Z",
-    "customer": "Ghulam",
+    "customer": "Ghulam Dar",
     "customerPhone": "9906646225",
-    "customerAddress": "-",
+    "customerAddress": "Mohalla bagandhar narkara budgamm j&k Musjid billali hunfia Baghandar, Narkara Budgam, Srinagar, Jammu and Kashmir",
     "items": [
       {
         "variant": "A2 Gir Cow Ghee - 1000 ml",
@@ -10551,11 +10551,11 @@
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
     "deliveryStatus": "Delivered",
-    "pincode": "000000",
+    "pincode": "190018",
     "codCharges": 0,
     "shippingCharges": 330,
     "discountAmount": 0,
-    "state": "-",
+    "state": "Jammu and Kashmir",
     "platform": "Shopify",
     "type": "Repeat"
   },
@@ -14215,6 +14215,102 @@
     "pincode": "846001",
     "shippingCharges": 168,
     "state": "Bihar",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260111-1568",
+    "date": "2026-01-11T00:00:00.000Z",
+    "customer": "Ghulam Dar",
+    "customerPhone": "9906646225",
+    "customerAddress": "Mohalla bagandhar narkara budgamm j&k Musjid billali hunfia Baghandar, Narkara Budgam, Srinagar, Jammu and Kashmir",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1950,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "190018",
+    "codCharges": 60,
+    "shippingCharges": 323,
+    "state": "Jammu and Kashmir",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260111-1569",
+    "date": "2026-01-11T00:00:00.000Z",
+    "customer": "Sahidur Rahman",
+    "customerPhone": "7002696168",
+    "customerAddress": "Department of Entomology Assam Agricultural University, University, Jorhat Assam",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1090
+      }
+    ],
+    "amount": 1150,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "785013",
+    "codCharges": 60,
+    "shippingCharges": 168,
+    "state": "Assam",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260111-1570",
+    "date": "2026-01-11T00:00:00.000Z",
+    "customer": "Prakash",
+    "customerPhone": "7795409477",
+    "customerAddress": "Flat number 304 b 3, Today Cloud City, Rohinjan, Gazebo dhaba Kharghar Maharashtra India",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 2,
+        "lineAmount": 4560
+      }
+    ],
+    "amount": 4500,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "410208",
+    "shippingCharges": 325,
+    "discountAmount": 60,
+    "state": "Maharashtra",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260111-1571",
+    "date": "2026-01-11T00:00:00.000Z",
+    "customer": "Rajesh Agarwal",
+    "customerPhone": "8979560445",
+    "customerAddress": " 780/a, Shree Ram Traders, Shiv Lok behind Kailash hospital, Devkinandan wali gali, near mandir, Baghpat Road, Near mandir, Meerut Uttar Pradesh",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1774,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "250002",
+    "shippingCharges": 128,
+    "discountAmount": 116,
+    "state": "Uttar Pradesh",
     "platform": "Shopify",
     "type": "New"
   }
