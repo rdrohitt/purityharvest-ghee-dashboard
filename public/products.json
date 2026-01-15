@@ -102,5 +102,18 @@
     },
     "weight": 6800,
     "id": "PROD-1008"
+  },
+  {
+    "name": "A2 Buffalo Ghee",
+    "category": "Ghee",
+    "size": "500 ml",
+    "price": 840,
+    "dimension": {
+      "height": 19,
+      "width": 14,
+      "length": 14
+    },
+    "weight": 900,
+    "id": "PROD-1009"
   }
 ]
