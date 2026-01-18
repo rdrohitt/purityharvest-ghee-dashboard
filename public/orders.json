@@ -15034,5 +15034,146 @@
     "state": "GOA",
     "platform": "Shopify",
     "type": "Repeat"
+  },
+  {
+    "id": "PH-20260117-1602",
+    "date": "2026-01-17T00:00:00.000Z",
+    "customer": "Farhat ",
+    "customerPhone": "8051123543",
+    "customerAddress": "Solra house ,swarajpuri road near Bharat shiv ashram and royal, guest house, Gaya Bihar, India",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 2280
+      }
+    ],
+    "amount": 2280,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "823001",
+    "shippingCharges": 253,
+    "state": "Bihar",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260117-1603",
+    "date": "2026-01-17T00:00:00.000Z",
+    "customer": "Hasnain Alam",
+    "customerPhone": "9810578443",
+    "customerAddress": "Iqbal colony rediant hospital Paschim pali chowk kishanganj Bihar Paschim, pali Chowk, Kishanganj Bihar",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1890,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "855107",
+    "shippingCharges": 253,
+    "state": "Bihar",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260117-1604",
+    "date": "2026-01-17T00:00:00.000Z",
+    "customer": "Raju Varghese",
+    "customerPhone": "9086098754",
+    "customerAddress": "Jammu Akhnoor Road, Muthi, road Muthi, Jammu Jammu and Kashmir",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 2280
+      }
+    ],
+    "amount": 2280,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "181205",
+    "shippingCharges": 288,
+    "state": "Jammu and Kashmir",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260117-1605",
+    "date": "2026-01-17T00:00:00.000Z",
+    "customer": "Anureet S Sandhu",
+    "customerPhone": "9217791660",
+    "customerAddress": "Kothi no 410, Phase-4, Sector 59, Mohali",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1850,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "160059",
+    "shippingCharges": 128,
+    "discountAmount": 40,
+    "state": "Punjab",
+    "platform": "Abandoned",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260117-1606",
+    "date": "2026-01-17T00:00:00.000Z",
+    "customer": "Cherry",
+    "customerPhone": "9958115097",
+    "customerAddress": "B 302, Amrapali sapphire, Sector 45 Noida, Gautam Buddha Nagar ",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 2280
+      }
+    ],
+    "amount": 2000,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "201303",
+    "shippingCharges": 163,
+    "discountAmount": 280,
+    "state": "Uttar Pradesh",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260117-1607",
+    "date": "2026-01-17T00:00:00.000Z",
+    "customer": "SUNIL",
+    "customerPhone": "9110319355",
+    "customerAddress": "401 Anand Enclave, Near Mega Cube, Sathnur Village, State highway 104, Near country club yelahanka",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 5 ltr",
+        "quantity": 1,
+        "lineAmount": 9450
+      }
+    ],
+    "amount": 9310,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "562149",
+    "shippingCharges": 546,
+    "discountAmount": 140,
+    "state": "Karnataka",
+    "platform": "Shopify",
+    "type": "New"
   }
 ]
