@@ -4559,19 +4559,19 @@
     "date": "2025-09-25T00:00:00.000Z",
     "customer": "Narender Arya",
     "customerPhone": "9625214435",
-    "customerAddress": "-",
+    "customerAddress": "3/4th FloorB 9,double storey, ramesh nagar, New Delhi Delhi",
     "items": [
       {
         "variant": "A2 Desi Cow Ghee - 1000 ml",
         "quantity": 6,
-        "lineAmount": 8870
+        "lineAmount": 8868
       }
     ],
-    "amount": 8870,
+    "amount": 8868,
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
     "deliveryStatus": "Delivered",
-    "pincode": "000000",
+    "pincode": "110015",
     "codCharges": 0,
     "shippingCharges": 300,
     "discountAmount": 0,
@@ -8659,7 +8659,7 @@
     "date": "2025-10-11T00:00:00.000Z",
     "customer": "Amar Burman",
     "customerPhone": "9340367680",
-    "customerAddress": "-",
+    "customerAddress": "H.NO-B 2, ALKA AVENUE, Post Office: BIL ASPUR, LANDMARK NEAR-USLAPUR RAILWAY STATION, BILASPUR-CGH,CITY-BILASPUR",
     "items": [
       {
         "variant": "A2 Desi Cow Ghee - 1000 ml",
@@ -8671,11 +8671,11 @@
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
     "deliveryStatus": "Delivered",
-    "pincode": "000000",
+    "pincode": "495001",
     "codCharges": 0,
     "shippingCharges": 560,
     "discountAmount": 0,
-    "state": "-",
+    "state": "Chhattisgarh",
     "platform": "Abandoned",
     "type": "New"
   },
@@ -13244,29 +13244,6 @@
     "type": "New"
   },
   {
-    "id": "PH-20260107-1527",
-    "date": "2026-01-07T00:00:00.000Z",
-    "customer": "Brajraj Tiwari",
-    "customerPhone": "8171330053",
-    "customerAddress": "335, Gurukul road Vrindavan Ramkrishna mission hospital Mathura",
-    "items": [
-      {
-        "variant": "A2 Gir Cow Ghee - 1000 ml",
-        "quantity": 1,
-        "lineAmount": 2280
-      }
-    ],
-    "amount": 2280,
-    "paymentStatus": "COD",
-    "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "Delivered",
-    "pincode": "281121",
-    "shippingCharges": 176,
-    "state": "UP",
-    "platform": "Shopify",
-    "type": "Repeat"
-  },
-  {
     "id": "PH-20260107-1528",
     "date": "2026-01-07T00:00:00.000Z",
     "customer": "Brajraj Tiwari",
@@ -13282,7 +13259,7 @@
     "amount": 940,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "281121",
     "shippingCharges": 0,
     "discountAmount": 290,
@@ -14116,7 +14093,7 @@
     "amount": 2842,
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "380051",
     "shippingCharges": 262,
     "discountAmount": 256,
@@ -14307,7 +14284,7 @@
     "amount": 1950,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "RTO",
     "pincode": "799101",
     "codCharges": 60,
     "shippingCharges": 281,
@@ -14573,7 +14550,7 @@
     "amount": 1230,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "788005",
     "shippingCharges": 196,
     "state": "Assam",
@@ -14740,7 +14717,7 @@
     "amount": 1950,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "456010",
     "codCharges": 60,
     "shippingCharges": 246,
@@ -14788,7 +14765,7 @@
     "amount": 1150,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "RTO",
     "pincode": "784502",
     "codCharges": 60,
     "shippingCharges": 197,
@@ -14907,7 +14884,7 @@
     "amount": 2156,
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "786003",
     "shippingCharges": 234,
     "discountAmount": 124,
@@ -14931,7 +14908,7 @@
     "amount": 1950,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "249193",
     "codCharges": 60,
     "shippingCharges": 170,
@@ -14955,7 +14932,7 @@
     "amount": 1068,
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "823001",
     "shippingCharges": 121,
     "discountAmount": 22,
@@ -15003,7 +14980,7 @@
     "amount": 10500,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "403501",
     "shippingCharges": 615,
     "discountAmount": 900,
@@ -15027,7 +15004,7 @@
     "amount": 1598,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "403501",
     "shippingCharges": 349,
     "discountAmount": 1500,
@@ -15051,7 +15028,7 @@
     "amount": 2280,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "823001",
     "shippingCharges": 253,
     "state": "Bihar",
@@ -15074,7 +15051,7 @@
     "amount": 1890,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "855107",
     "shippingCharges": 253,
     "state": "Bihar",
@@ -15168,7 +15145,7 @@
     "amount": 9310,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "RTO",
     "pincode": "562149",
     "shippingCharges": 546,
     "discountAmount": 140,
@@ -15192,7 +15169,7 @@
     "amount": 950,
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "141001",
     "shippingCharges": 78,
     "discountAmount": 140,
@@ -15216,7 +15193,7 @@
     "amount": 2280,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "411044",
     "shippingCharges": 229,
     "state": "Maharashtra",
@@ -15262,7 +15239,7 @@
     "amount": 2000,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "500018",
     "shippingCharges": 222,
     "discountAmount": 280,
@@ -15310,7 +15287,7 @@
     "amount": 11200,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "826004",
     "shippingCharges": 602,
     "discountAmount": 200,
@@ -15405,7 +15382,7 @@
     "amount": 1950,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "RTO",
     "pincode": "383315",
     "codCharges": 60,
     "shippingCharges": 246,
@@ -15434,7 +15411,7 @@
     "amount": 2320,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "RTO",
     "pincode": "683503",
     "shippingCharges": 235,
     "state": "Kerala",
@@ -15508,7 +15485,7 @@
     "amount": 1852,
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "854105",
     "shippingCharges": 199,
     "discountAmount": 38,
@@ -15532,7 +15509,7 @@
     "amount": 2234,
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "462022",
     "shippingCharges": 290,
     "discountAmount": 46,
@@ -15556,7 +15533,7 @@
     "amount": 1950,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "785634",
     "codCharges": 60,
     "shippingCharges": 281,
@@ -15580,7 +15557,7 @@
     "amount": 2280,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "400104",
     "shippingCharges": 229,
     "state": "Maharashtra",
@@ -15626,7 +15603,7 @@
     "amount": 9065,
     "paymentStatus": "PAID",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "263139",
     "codCharges": 6,
     "shippingCharges": 261,
@@ -15651,7 +15628,7 @@
     "amount": 1067,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "400703",
     "shippingCharges": 109,
     "discountAmount": 23,
@@ -15675,12 +15652,616 @@
     "amount": 1950,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "211002",
     "codCharges": 60,
     "shippingCharges": 246,
     "state": "Uttar Pradesh",
     "platform": "Shopify",
     "type": "Repeat"
+  },
+  {
+    "id": "PH-20260122-1629",
+    "date": "2026-01-20T00:00:00.000Z",
+    "customer": "SHIV",
+    "customerPhone": "9838158966",
+    "customerAddress": "SHIV TELECOM NEAR TELEPHONE EXCHANGE GANDHI NAGAR AKBARPUR, VILLAGE AKBARPUR, POST OFFICE AKBARPUR, DISTRICT AMBEDKAR NAGAR, UP, ,, Ambedkar Nagar Uttar Pradesh",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1950,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "Delivered",
+    "pincode": "224122",
+    "codCharges": 60,
+    "shippingCharges": 246,
+    "state": "Uttar Pradesh",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1630",
+    "date": "2026-01-21T00:00:00.000Z",
+    "customer": "Vinayak Bilawar",
+    "customerPhone": "9724068915",
+    "customerAddress": "Vaibhav Nagar, Belgaum Ganpati mandir, Vaibhav Nagar Belgaum Karnataka, Belgaum Karnataka",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 5 ltr",
+        "quantity": 1,
+        "lineAmount": 9450
+      }
+    ],
+    "amount": 9310,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "590010",
+    "shippingCharges": 558,
+    "discountAmount": 140,
+    "state": "Karnataka",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1631",
+    "date": "2026-01-14T00:00:00.000Z",
+    "customer": "Surendra Mallick",
+    "customerPhone": "7008628180",
+    "customerAddress": "SBI KIOSK, RAMGIRI, KORAPUT ODISHAKORAPUT ODISHAKoraput, Odisha",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1950,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "Delivered",
+    "pincode": "764043",
+    "codCharges": 60,
+    "shippingCharges": 246,
+    "state": "Odisha",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1632",
+    "date": "2026-01-21T00:00:00.000Z",
+    "customer": "Sanju",
+    "customerPhone": "8988252000",
+    "customerAddress": "Meena negi c/o kilba house near pinewood school govt colony Reckong peo, Kinnaur, Himachal Pradesh",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1090
+      }
+    ],
+    "amount": 1150,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "172107",
+    "codCharges": 60,
+    "shippingCharges": 197,
+    "state": "Himachal Pradesh",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1633",
+    "date": "2026-01-21T00:00:00.000Z",
+    "customer": "Mamta Sin",
+    "customerPhone": "7618267441",
+    "customerAddress": "Gaytri nager airforce gate nanital road 11 number gali, nanital road nanital road, Bareilly, Uttar Pradesh",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1090
+      }
+    ],
+    "amount": 1150,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "RTO",
+    "pincode": "243502",
+    "codCharges": 60,
+    "shippingCharges": 125,
+    "state": "Uttar Pradesh",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1634",
+    "date": "2026-01-21T00:00:00.000Z",
+    "customer": "Sandeep Yadav",
+    "customerPhone": "9149910916",
+    "customerAddress": "Mawaiya tiraha Rpf barrack, Lucknow, Uttar Pradesh",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1090
+      }
+    ],
+    "amount": 1015,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "226004",
+    "shippingCharges": 121,
+    "discountAmount": 75,
+    "state": "Uttar Pradesh",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1635",
+    "date": "2026-01-20T00:00:00.000Z",
+    "customer": "Pathan Shamim Khan ",
+    "customerPhone": "8849761145",
+    "customerAddress": "Jethalal kumbhar ki chawl near Gulshan Bakery cross road, Rakhiyal road Ahmedabad.23 ",
+    "items": [
+      {
+        "variant": "A2 Buffalo Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1549
+      }
+    ],
+    "amount": 1549,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "380023",
+    "shippingCharges": 222,
+    "state": "Gujarat",
+    "platform": "Abandoned",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1636",
+    "date": "2026-01-21T00:00:00.000Z",
+    "customer": "Ramchandra barod",
+    "customerPhone": "9926086522",
+    "customerAddress": "M.I.G- A 18/14 Ved nagar, indore road, Ujjain Madhya Pradesh",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 2280
+      }
+    ],
+    "amount": 2280,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "456010",
+    "shippingCharges": 175,
+    "state": "Madhya Pradesh",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260122-1637",
+    "date": "2026-01-22T00:00:00.000Z",
+    "customer": "Pawan",
+    "customerPhone": "9434109911",
+    "customerAddress": "Clubtown Apartment B Block 3rd floor Flat no 304 Sevoke Road. Siliguri Clubtown Apartment B Block 3rd floor, Siliguri West Bengal",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 5 ltr",
+        "quantity": 1,
+        "lineAmount": 9450
+      }
+    ],
+    "amount": 8643,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "734001",
+    "shippingCharges": 338,
+    "discountAmount": 807,
+    "state": "West Bengal",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1638",
+    "date": "2026-01-21T00:00:00.000Z",
+    "customer": "Rajvinder singh ",
+    "customerPhone": "9876127515",
+    "customerAddress": "234- S.G.Enclave,phase-1, Majitha road, Amritsar ( Punjab)",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 2280
+      }
+    ],
+    "amount": 2280,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "143001",
+    "shippingCharges": 176,
+    "state": "Punjab",
+    "platform": "Abandoned",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1639",
+    "date": "2026-01-21T00:00:00.000Z",
+    "customer": "Kailas Devidasrao Borade",
+    "customerPhone": "7972240717",
+    "customerAddress": "Sugandha Nagar, Ward No. 15, Mantha, Taluka Mantha, District Jalna Mantha _ SugandhaNgr1 _ DPP (Maharashtra)",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 2280
+      }
+    ],
+    "amount": 2280,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "431504",
+    "shippingCharges": 253,
+    "state": "Maharashtra",
+    "platform": "Abandoned",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1640",
+    "date": "2026-01-21T00:00:00.000Z",
+    "customer": "Poonam Chand",
+    "customerPhone": "7597491006",
+    "customerAddress": "Mkan.no, E-490, E block mandir Marg vaishali Nagar Jaipur -  Alternate No: 9602361857",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 2,
+        "lineAmount": 3780
+      }
+    ],
+    "amount": 3300,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Unfulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "302021",
+    "shippingCharges": 272,
+    "discountAmount": 480,
+    "state": "Rajasthan",
+    "platform": "Whatsapp",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260122-1641",
+    "date": "2026-01-21T00:00:00.000Z",
+    "customer": "Syed abdur Rawoof Advocate",
+    "customerPhone": "9490860439",
+    "customerAddress": "1/1190 kohinoor Mansion opp power house college road kadiri ",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      },
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 2280
+      },
+      {
+        "variant": "A2 Buffalo Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 840
+      }
+    ],
+    "amount": 5010,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "515591",
+    "shippingCharges": 408,
+    "state": "Andhra Pradesh",
+    "platform": "Abandoned",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260122-1642",
+    "date": "2026-01-22T00:00:00.000Z",
+    "customer": "Brajraj Tiwari",
+    "customerPhone": "8171330053",
+    "customerAddress": "335, Gurukul road Vrindavan Ramkrishna mission hospital Mathura",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1090
+      }
+    ],
+    "amount": 950,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Unfulfilled",
+    "deliveryStatus": "Delivered",
+    "pincode": "281121",
+    "shippingCharges": 78,
+    "discountAmount": 140,
+    "state": "UP",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260122-1643",
+    "date": "2026-01-20T00:00:00.000Z",
+    "customer": "Brajraj Tiwari",
+    "customerPhone": "8171330053",
+    "customerAddress": "335, Gurukul road Vrindavan Ramkrishna mission hospital Mathura",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1090
+      }
+    ],
+    "amount": 950,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "281121",
+    "shippingCharges": 170,
+    "discountAmount": 140,
+    "state": "UP",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260123-1644",
+    "date": "2026-01-22T00:00:00.000Z",
+    "customer": "Atul Kumar Maheshwari ",
+    "customerPhone": "9419045103",
+    "customerAddress": "C-4, NHPC Colony NNigalpani, Post office: Fultari, Tehsil:Dharchula, District: Pithoragarh",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 5 ltr",
+        "quantity": 1,
+        "lineAmount": 11400
+      }
+    ],
+    "amount": 10000,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "262545",
+    "shippingCharges": 338,
+    "discountAmount": 1400,
+    "state": "Uttarakhand",
+    "platform": "Abandoned",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260124-1644",
+    "date": "2026-01-22T00:00:00.000Z",
+    "customer": "Sanjay",
+    "customerPhone": "9433108209",
+    "customerAddress": "350 / A Roy Bahadur Road, Near Bandhu Milan Sangha, Club Kolkata, Kolkata West Bengal",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 2,
+        "lineAmount": 3780
+      }
+    ],
+    "amount": 3840,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "700053",
+    "codCharges": 60,
+    "shippingCharges": 353,
+    "state": "West Bengal",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260124-1645",
+    "date": "2026-01-23T00:00:00.000Z",
+    "customer": "Amar Burman",
+    "customerPhone": "9340367680",
+    "customerAddress": "H.NO-B 2, ALKA AVENUE, Post Office: BIL ASPUR, LANDMARK NEAR-USLAPUR RAILWAY STATION, BILASPUR-CGH,CITY-BILASPUR",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 5 ltr",
+        "quantity": 1,
+        "lineAmount": 11400
+      }
+    ],
+    "amount": 10200,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "495001",
+    "shippingCharges": 579,
+    "discountAmount": 1200,
+    "state": "Chhattisgarh",
+    "platform": "Abandoned",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260124-1646",
+    "date": "2026-01-23T00:00:00.000Z",
+    "customer": "Dilu Mahalik",
+    "customerPhone": "9556579912",
+    "customerAddress": "Dhanupali mla road bhatra Near bhatra, hospital road, Sambalpur Odisha",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 5 ltr",
+        "quantity": 1,
+        "lineAmount": 9450
+      }
+    ],
+    "amount": 9310,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "768005",
+    "shippingCharges": 558,
+    "discountAmount": 140,
+    "state": "Odisha",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260124-1647",
+    "date": "2026-01-24T00:00:00.000Z",
+    "customer": "Saleema bano",
+    "customerPhone": "7006915843",
+    "customerAddress": "52 munwara abad khayam road Srinagar opposite, hotel nigeena, Srinagar Jammu and Kashmir",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 5 ltr",
+        "quantity": 1,
+        "lineAmount": 9450
+      }
+    ],
+    "amount": 9310,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "190001",
+    "shippingCharges": 661,
+    "discountAmount": 140,
+    "state": "Jammu and Kashmir",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260124-1648",
+    "date": "2026-01-23T00:00:00.000Z",
+    "customer": "Narender Arya",
+    "customerPhone": "9625214435",
+    "customerAddress": "3/4th FloorB 9,double storey, ramesh nagar, New Delhi Delhi",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 5 ltr",
+        "quantity": 1,
+        "lineAmount": 11400
+      }
+    ],
+    "amount": 10000,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "110015",
+    "shippingCharges": 273,
+    "discountAmount": 1400,
+    "state": "New Delhi",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260124-1649",
+    "date": "2026-01-19T00:00:00.000Z",
+    "customer": " Robin Das",
+    "customerPhone": "9903464764",
+    "customerAddress": "Mohanpur paschim para, Barrackpore, Near Senpukur",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1230
+      }
+    ],
+    "amount": 1230,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "700121",
+    "shippingCharges": 192,
+    "state": "West Bengal",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260124-1650",
+    "date": "2026-01-23T00:00:00.000Z",
+    "customer": "Rakesh",
+    "customerPhone": "8920147954",
+    "customerAddress": "Sec 4 B Flat no 3180 Shiv ganga appartment post - Vasundhra S.O DIstt- Ghaz iabad, UTTAR PRADESH (Landmark:Near by Mewar, Institute ), Ghaziabad Uttar Pradesh",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1774,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "201012",
+    "shippingCharges": 116,
+    "discountAmount": 116,
+    "state": "Uttar Pradesh",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260124-1651",
+    "date": "2026-01-23T00:00:00.000Z",
+    "customer": "Satish sahu",
+    "customerPhone": "9755916755",
+    "customerAddress": "St 11 new aadarsh nagar durg, Near mohit traders, Landmark - Joyti Opticals, Durg Chhattisgarh",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1090
+      }
+    ],
+    "amount": 1014,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "491001",
+    "shippingCharges": 121,
+    "discountAmount": 76,
+    "state": "Chhattisgarh",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260124-1652",
+    "date": "2026-01-23T00:00:00.000Z",
+    "customer": "Ratnala kumar",
+    "customerPhone": "9833294875",
+    "customerAddress": "Branch Head, IDBI Bank limited, 1st floor, Crescent Tower, Plot No- 476/477 Bomikhal Cuttack Road, Bhubaneswar, Khorda Odisha",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 2280
+      }
+    ],
+    "amount": 2156,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "751010",
+    "shippingCharges": 199,
+    "discountAmount": 124,
+    "state": "Odisha",
+    "platform": "Shopify",
+    "type": "New"
   }
 ]
