@@ -20,7 +20,7 @@
     "feedback": "",
     "callingDate": null,
     "callerName": "",
-    "callingDetail": "not answering\n",
+    "callingDetail": "\n",
     "callAgainDate": null
   },
   {
@@ -52,7 +52,7 @@
     "feedback": "Excellent ghee",
     "callingDate": "2025-12-27T09:48:43.078Z",
     "callerName": "",
-    "callingDetail": "excellent ghee\n",
+    "callingDetail": "excellent ghee \n",
     "callAgainDate": null
   },
   {
@@ -132,7 +132,7 @@
     "feedback": "Excellent ghee",
     "callingDate": "2025-12-26T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "call back",
+    "callingDetail": "HE IS BUYING FROM LOCAL MARKETS",
     "callAgainDate": "2026-01-01T18:30:00.000Z"
   },
   {
@@ -180,7 +180,7 @@
     "feedback": "",
     "callingDate": "2026-01-09T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "ghee not used yet",
+    "callingDetail": "RTO",
     "callAgainDate": null
   },
   {
@@ -244,7 +244,7 @@
     "feedback": "",
     "callingDate": "2026-01-09T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -404,7 +404,7 @@
     "feedback": "",
     "callingDate": "2026-01-10T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee and 1 ltr order places",
     "callAgainDate": null
   },
   {
@@ -436,7 +436,7 @@
     "feedback": "",
     "callingDate": "2026-01-10T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "ghe not taste yet",
+    "callingDetail": "ghee not taste",
     "callAgainDate": null
   },
   {
@@ -701,6 +701,14 @@
     "callingDate": "2026-01-17T18:30:00.000Z",
     "callerName": "",
     "callingDetail": "excellent ghee and 1 ltr order placed",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9931545568",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "1 ltr gir cow order placed",
     "callAgainDate": null
   }
 ]
