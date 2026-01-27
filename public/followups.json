@@ -684,7 +684,7 @@
     "feedback": "",
     "callingDate": "2026-01-16T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "ghee not taste yet",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -709,6 +709,102 @@
     "callingDate": null,
     "callerName": "",
     "callingDetail": "1 ltr gir cow order placed",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9826199478",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7205048240",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "no need",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9325648447",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "6280205365",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9781873020",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9005974932",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9427614860",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7979865459",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "rto",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9023083979",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not satisfied",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7399277080",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "ghee not taste",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8368329380",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9639919443",
+    "feedback": "",
+    "callingDate": "2026-01-24T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   }
 ]
