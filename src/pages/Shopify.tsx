@@ -553,13 +553,32 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             className="filter-btn" 
                             onClick={() => {
                                 // Export to CSV
-                                const headers = ['S.no', 'Name', 'Quantity', 'Amount', 'Delivery Status', 'State'];
+                                const headers = ['S.no', 'Name', 'Quantity (L)', 'Amount', 'Delivery Status', 'State'];
                                 const rows = filtered.map((order, index) => {
-                                    const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
+                                    // Calculate total quantity in liters for this order
+                                    const totalQuantityLiters = order.items.reduce((sum, item) => {
+                                        // Extract size from variant (e.g., "A2 Desi Cow Ghee - 500ml" -> "500ml")
+                                        const sizeMatch = item.variant.match(/-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|L)/i);
+                                        if (!sizeMatch) return sum;
+                                        
+                                        const sizeValue = parseFloat(sizeMatch[1]);
+                                        const sizeUnit = sizeMatch[2].toLowerCase();
+                                        let litersPerUnit = 0;
+
+                                        if (sizeUnit === 'ml') {
+                                            // Convert ml to liters
+                                            litersPerUnit = sizeValue / 1000;
+                                        } else if (sizeUnit === 'l' || sizeUnit === 'ltr') {
+                                            litersPerUnit = sizeValue;
+                                        }
+
+                                        return sum + (litersPerUnit * item.quantity);
+                                    }, 0);
+
                                     return [
                                         index + 1,
                                         order.customer,
-                                        totalQuantity,
+                                        totalQuantityLiters,
                                         order.amount,
                                         order.deliveryStatus || '',
                                         order.state || ''
