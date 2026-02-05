@@ -554,7 +554,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             onClick={() => {
                                 // Export to CSV
                                 const headers = ['S.no', 'Name', 'Quantity (L)', 'Amount', 'Delivery Status', 'State'];
-                                const rows = filtered.map((order, index) => {
+                                // Exclude orders with delivery status RTO from CSV export
+                                const exportableOrders = filtered.filter(order => order.deliveryStatus !== 'RTO');
+                                const rows = exportableOrders.map((order, index) => {
                                     // Calculate total quantity in liters for this order
                                     const totalQuantityLiters = order.items.reduce((sum, item) => {
                                         // Extract size from variant (e.g., "A2 Desi Cow Ghee - 500ml" -> "500ml")
