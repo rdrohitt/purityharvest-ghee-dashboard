@@ -340,7 +340,7 @@
     "feedback": "",
     "callingDate": null,
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -420,7 +420,7 @@
     "feedback": "",
     "callingDate": "2026-01-10T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -1211,6 +1211,94 @@
     "customerPhone": "9824604605",
     "feedback": "",
     "callingDate": "2026-02-06T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9709299366",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "call back",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8638957949",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9897123426",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "ghee not taste yret",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7002491652",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9002957052",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9933613210",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9898885523",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee and he is also interested in gir cow ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7807548594",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee and also interested for gir cow",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "6901354258",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8109465987",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "7903900155",
+    "feedback": "",
+    "callingDate": null,
     "callerName": "",
     "callingDetail": "not answering",
     "callAgainDate": null
