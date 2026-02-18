@@ -148,7 +148,7 @@
     "feedback": "",
     "callingDate": "2025-12-26T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -212,7 +212,7 @@
     "feedback": "",
     "callingDate": "2026-01-09T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "ghee not taste yet but he isi nterested for 5 ltr  ",
+    "callingDetail": " excellent ghee",
     "callAgainDate": "2025-12-30T18:30:00.000Z"
   },
   {
@@ -860,7 +860,7 @@
     "feedback": "",
     "callingDate": "2026-01-31T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "nor=t answering",
+    "callingDetail": "1 ltr gir cow order placed",
     "callAgainDate": null
   },
   {
@@ -908,7 +908,7 @@
     "feedback": "",
     "callingDate": "2026-01-31T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -988,7 +988,7 @@
     "feedback": "",
     "callingDate": "2026-01-31T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "excellent ghee",
+    "callingDetail": "excellent ghee and 1 ltr desi cow order placed",
     "callAgainDate": null
   },
   {
@@ -1028,7 +1028,7 @@
     "feedback": "",
     "callingDate": "2026-01-31T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "1 ltr gir cow order placed",
     "callAgainDate": null
   },
   {
@@ -1068,7 +1068,7 @@
     "feedback": "",
     "callingDate": "2026-02-05T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -1132,7 +1132,7 @@
     "feedback": "",
     "callingDate": "2026-02-05T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "nice ghee",
     "callAgainDate": null
   },
   {
@@ -1156,7 +1156,7 @@
     "feedback": "",
     "callingDate": null,
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "ghee not taste",
     "callAgainDate": null
   },
   {
@@ -1284,7 +1284,7 @@
     "feedback": "",
     "callingDate": null,
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -1300,7 +1300,55 @@
     "feedback": "",
     "callingDate": null,
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "ghee not taste ",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9636907129",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9217791660",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "call back 6 pm\n",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9903464764",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8097380589",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8011660519",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "1 ltr gir cow order plavced",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9435951571",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "",
     "callAgainDate": null
   }
 ]
