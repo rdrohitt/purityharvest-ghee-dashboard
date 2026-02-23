@@ -115,5 +115,18 @@
     },
     "weight": 900,
     "id": "PROD-1009"
+  },
+  {
+    "name": "A2 Gir Cow Ghee",
+    "category": "Ghee",
+    "size": "100 ml",
+    "price": 250,
+    "dimension": {
+      "height": 9,
+      "width": 9,
+      "length": 9
+    },
+    "weight": 400,
+    "id": "PROD-1010"
   }
 ]
