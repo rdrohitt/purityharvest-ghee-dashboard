@@ -38,8 +38,85 @@ function formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); 
 }
 
-const FEEDBACK_OPTIONS = ['Excellent ghee', 'smell issue', 'high price'];
+const FEEDBACK_OPTIONS = [
+    'Excellent ghee',
+    'Average ghee',
+    'Smell issue',
+    'High price',
+    'Packaging issue',
+    'Delayed delivery',
+    'Other feedback',
+];
 const CALLER_OPTIONS = ['Monia', 'Sarita'];
+
+function getFeedbackStyle(feedback: string): { background: string; border: string; color: string } {
+    const value = (feedback || '').toLowerCase();
+    if (!value) {
+        return {
+            background: 'var(--bg)',
+            border: 'var(--border)',
+            color: 'var(--muted)',
+        };
+    }
+    if (value.includes('excellent')) {
+        return {
+            background: '#dcfce7',
+            border: '#4ade80',
+            color: '#166534',
+        };
+    }
+    if (value.includes('average')) {
+        return {
+            background: '#e0f2fe',
+            border: '#60a5fa',
+            color: '#1d4ed8',
+        };
+    }
+    if (value.includes('smell') || value.includes('issue') || value.includes('rancid')) {
+        return {
+            background: '#fee2e2',
+            border: '#f97373',
+            color: '#b91c1c',
+        };
+    }
+    if (value.includes('price') || value.includes('high')) {
+        return {
+            background: '#fef3c7',
+            border: '#facc15',
+            color: '#92400e',
+        };
+    }
+    if (value.includes('packaging')) {
+        return {
+            background: '#e0f2fe',
+            border: '#38bdf8',
+            color: '#0369a1',
+        };
+    }
+    if (value.includes('delay') || value.includes('delivery')) {
+        return {
+            background: '#eff6ff',
+            border: '#60a5fa',
+            color: '#1d4ed8',
+        };
+    }
+    return {
+        background: '#f3f4f6',
+        border: '#d1d5db',
+        color: '#374151',
+    };
+}
+
+function getFeedbackEmoji(feedback: string): string {
+    const value = (feedback || '').toLowerCase();
+    if (value.includes('excellent')) return '🌟';
+    if (value.includes('average')) return '🙂';
+    if (value.includes('smell')) return '👃';
+    if (value.includes('price')) return '💸';
+    if (value.includes('packaging')) return '📦';
+    if (value.includes('delay')) return '⏱️';
+    return '💬';
+}
 
 export default function Followups() {
     const [callerFilter, setCallerFilter] = useState<string>('');
@@ -489,19 +566,47 @@ export default function Followups() {
                                                 {f.customerPhone}
                                             </a>
                                             <span style={{
-                                                display: 'inline-block',
-                                                fontSize: 10,
-                                                fontWeight: 600,
-                                                textTransform: 'uppercase',
-                                                padding: '2px 6px',
-                                                borderRadius: 4,
-                                                backgroundColor: getCustomerType(f.totalOrders) === 'new' ? '#dbeafe' : 
-                                                               getCustomerType(f.totalOrders) === 'repeat' ? '#dcfce7' : '#fef3c7',
-                                                color: getCustomerType(f.totalOrders) === 'new' ? '#1e40af' : 
-                                                       getCustomerType(f.totalOrders) === 'repeat' ? '#166534' : '#92400e',
-                                                width: 'fit-content'
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 6,
+                                                width: 'fit-content',
                                             }}>
-                                                {getCustomerType(f.totalOrders)}
+                                                <span style={{
+                                                    display: 'inline-block',
+                                                    fontSize: 10,
+                                                    fontWeight: 600,
+                                                    textTransform: 'uppercase',
+                                                    padding: '2px 6px',
+                                                    borderRadius: 4,
+                                                    backgroundColor: getCustomerType(f.totalOrders) === 'new' ? '#dbeafe' : 
+                                                                   getCustomerType(f.totalOrders) === 'repeat' ? '#dcfce7' : '#fef3c7',
+                                                    color: getCustomerType(f.totalOrders) === 'new' ? '#1e40af' : 
+                                                           getCustomerType(f.totalOrders) === 'repeat' ? '#166534' : '#92400e',
+                                                }}>
+                                                    {getCustomerType(f.totalOrders)}
+                                                </span>
+                                                {(() => {
+                                                    const customerOrders = ordersByCustomer.get(f.customerPhone) || [];
+                                                    const hasRto = customerOrders.some(o => o.deliveryStatus === 'RTO');
+                                                    if (!hasRto) return null;
+                                                    return (
+                                                        <span
+                                                            style={{
+                                                                display: 'inline-block',
+                                                                fontSize: 10,
+                                                                fontWeight: 700,
+                                                                textTransform: 'uppercase',
+                                                                padding: '2px 6px',
+                                                                borderRadius: 999,
+                                                                backgroundColor: '#fee2e2',
+                                                                color: '#b91c1c',
+                                                                border: '1px solid #fecaca',
+                                                            }}
+                                                        >
+                                                            RTO
+                                                        </span>
+                                                    );
+                                                })()}
                                             </span>
                                         </div>
                                     </Td>
@@ -509,17 +614,37 @@ export default function Followups() {
                                     <Td>{f.totalOrders}</Td>
                                     <Td>{f.lastOrderDetail}</Td>
                                     <Td>
-                                        <select
-                                            className="input"
-                                            value={f.feedback}
-                                            onChange={(e) => updateFollowup(f.id, 'feedback', e.target.value)}
-                                            style={{ width: 'auto', minWidth: '140px', height: 32, fontSize: 13, padding: '4px 8px' }}
-                                        >
-                                            <option value="">Select feedback</option>
-                                            {FEEDBACK_OPTIONS.map((opt) => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
+                                        {(() => {
+                                            const style = getFeedbackStyle(f.feedback);
+                                            return (
+                                                <select
+                                                    className="input"
+                                                    value={f.feedback}
+                                                    onChange={(e) => updateFollowup(f.id, 'feedback', e.target.value)}
+                                                    style={{
+                                                        width: 'auto',
+                                                        minWidth: '160px',
+                                                        height: 32,
+                                                        fontSize: 13,
+                                                        padding: '4px 8px',
+                                                        backgroundColor: style.background,
+                                                        borderColor: style.border,
+                                                        color: style.color,
+                                                        fontWeight: f.feedback ? 600 : 400,
+                                                        cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    <option value="">
+                                                        {f.feedback ? 'Clear feedback' : 'Select feedback'}
+                                                    </option>
+                                                    {FEEDBACK_OPTIONS.map((opt) => (
+                                                        <option key={opt} value={opt}>
+                                                            {getFeedbackEmoji(opt)} {opt}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            );
+                                        })()}
                                     </Td>
                                     <Td>
                                         <DateInput
