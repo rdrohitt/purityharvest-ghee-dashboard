@@ -2536,6 +2536,14 @@ function ShippingTimeline({
     error: string | null;
 }) {
     const steps: DeliveryStatus[] = ['Pending Pickup', 'In Transit', 'Delivered', 'RTO'];
+    const [blinkOn, setBlinkOn] = useState(true);
+
+    useEffect(() => {
+        const id = setInterval(() => {
+            setBlinkOn((v) => !v);
+        }, 800);
+        return () => clearInterval(id);
+    }, []);
 
     function formatShortDate(input?: string) {
         if (!input) return '';
@@ -2549,16 +2557,33 @@ function ShippingTimeline({
         });
     }
 
+    const currentStepIndex = steps.indexOf(status);
+    const safeCurrentStep = currentStepIndex === -1 ? 0 : currentStepIndex;
+
+    const scans = tracking?.scans ?? [];
+    const sortedScans = [...scans].sort(
+        (a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+    );
+
     return (
-        <div style={{ background: 'var(--bg-elev)', borderRadius: 8, border: '1px solid var(--border)', padding: 12, display: 'grid', gap: 10 }}>
-            {/* Header card with AWB + key dates */}
+        <div
+            style={{
+                background: 'var(--bg-elev)',
+                borderRadius: 12,
+                border: '1px solid var(--border)',
+                padding: 12,
+                display: 'grid',
+                gap: 10,
+            }}
+        >
+            {/* Header with AWB + key dates */}
             <div
                 style={{
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 6,
                     padding: 8,
-                    borderRadius: 8,
+                    borderRadius: 10,
                     background:
                         tracking && tracking.statusText === 'Delivered'
                             ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
@@ -2567,8 +2592,16 @@ function ShippingTimeline({
                 }}
             >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#4b5563' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div
+                            style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                letterSpacing: '0.08em',
+                                textTransform: 'uppercase',
+                                color: '#4b5563',
+                            }}
+                        >
                             AWB
                         </div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>
@@ -2577,67 +2610,139 @@ function ShippingTimeline({
                     </div>
                     <div
                         style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
                             padding: '3px 8px',
                             borderRadius: 999,
                             fontSize: 10,
                             fontWeight: 600,
-                            background: '#111827',
+                            background: 'rgba(15, 23, 42, 0.9)',
                             color: '#f9fafb',
                             textTransform: 'uppercase',
                             letterSpacing: '0.08em',
                         }}
                     >
-                        Delhivery
+                        <span style={{ fontSize: 11 }}>🚚</span>
+                        <span>Delhivery</span>
                     </div>
                 </div>
+
                 {tracking && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, marginTop: 4 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                            <span style={{ color: '#4b5563' }}>Pickup</span>
-                            <span style={{ color: '#111827', fontWeight: 500 }}>
+                    <div
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                            gap: 8,
+                            marginTop: 6,
+                            fontSize: 11,
+                        }}
+                    >
+                        <div>
+                            <div
+                                style={{
+                                    fontSize: 10,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.08em',
+                                    color: '#4b5563',
+                                    marginBottom: 2,
+                                }}
+                            >
+                                Pickup
+                            </div>
+                            <div style={{ color: '#111827', fontWeight: 500 }}>
                                 {formatShortDate(tracking.pickupDate) || '—'}
-                            </span>
+                            </div>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                            <span style={{ color: '#4b5563' }}>Expected Delivery</span>
-                            <span style={{ color: '#111827', fontWeight: 500 }}>
+                        <div>
+                            <div
+                                style={{
+                                    fontSize: 10,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.08em',
+                                    color: '#4b5563',
+                                    marginBottom: 2,
+                                }}
+                            >
+                                Expected Delivery
+                            </div>
+                            <div style={{ color: '#111827', fontWeight: 500 }}>
                                 {formatShortDate(tracking.expectedDeliveryDate) || '—'}
-                            </span>
+                            </div>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* High-level delivery status steps */}
-            <div>
+            {/* Shipment status steps (vertical, no progress bar) */}
+            <div
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    marginTop: 2,
+                }}
+            >
                 {steps.map((step, index) => {
-                    const isActive = step === status;
+                    const isActive = index === safeCurrentStep;
+                    const isPast = index < safeCurrentStep;
+
+                    let activeColor = '#0f172a';
+                    let glowColor = 'rgba(15,23,42,0.15)';
+                    if (step === 'In Transit') {
+                        activeColor = '#2563eb'; // blue
+                        glowColor = 'rgba(37,99,235,0.20)';
+                    } else if (step === 'Delivered') {
+                        activeColor = '#16a34a'; // green
+                        glowColor = 'rgba(22,163,74,0.20)';
+                    } else if (step === 'RTO') {
+                        activeColor = '#b91c1c'; // red
+                        glowColor = 'rgba(185,28,28,0.25)';
+                    }
+
                     return (
-                        <div key={step} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 2 }}>
-                                <div
-                                    style={{
-                                        width: 10,
-                                        height: 10,
-                                        borderRadius: '999px',
-                                        background: isActive ? '#16a34a' : '#e5e7eb',
-                                        border: '2px solid',
-                                        borderColor: isActive ? '#16a34a' : '#d1d5db',
-                                    }}
-                                />
-                                {index < steps.length - 1 && (
-                                    <div
-                                        style={{
-                                            flex: 1,
-                                            width: 2,
-                                            background: '#e5e7eb',
-                                            marginTop: 2,
-                                            marginBottom: 2,
-                                        }}
-                                    />
-                                )}
-                            </div>
-                            <div style={{ fontSize: 12, color: isActive ? '#111827' : '#6b7280', fontWeight: isActive ? 600 : 400, paddingTop: 0 }}>
+                        <div
+                            key={step}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: 999,
+                                    border: '2px solid',
+                                    borderColor: isActive
+                                        ? activeColor
+                                        : isPast
+                                        ? '#4b5563'
+                                        : '#d1d5db',
+                                    background: isActive
+                                        ? activeColor
+                                        : isPast
+                                        ? '#4b5563'
+                                        : '#f9fafb',
+                                    opacity: isActive ? (blinkOn ? 1 : 0.25) : 1,
+                                    boxShadow: isActive
+                                        ? blinkOn
+                                            ? `0 0 0 4px ${glowColor}`
+                                            : 'none'
+                                        : 'none',
+                                    transition: 'opacity 0.2s ease-out, box-shadow 0.2s ease-out',
+                                }}
+                            />
+                            <div
+                                style={{
+                                    fontSize: 11,
+                                    fontWeight: isActive ? 700 : isPast ? 600 : 500,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.08em',
+                                    color: isActive ? activeColor : isPast ? '#4b5563' : '#9ca3af',
+                                }}
+                            >
                                 {step}
                             </div>
                         </div>
@@ -2645,6 +2750,7 @@ function ShippingTimeline({
                 })}
             </div>
 
+            {/* Status helper text */}
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>
                 {!awb && <div>Enter an AWB number above to view live Delhivery tracking.</div>}
                 {awb && loading && <div>Loading live tracking…</div>}
@@ -2654,7 +2760,8 @@ function ShippingTimeline({
                 )}
             </div>
 
-            {tracking && tracking.scans && tracking.scans.length > 0 && (
+            {/* All live events (latest first) */}
+            {tracking && sortedScans.length > 0 && (
                 <div
                     style={{
                         borderTop: '1px dashed var(--border)',
@@ -2663,38 +2770,42 @@ function ShippingTimeline({
                         overflowY: 'auto',
                     }}
                 >
-                    <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Live Events</div>
-                    {tracking.scans
-                        .slice()
-                        .reverse()
-                        .map((scan, idx) => {
-                            const d = scan.dateTime ? new Date(scan.dateTime) : null;
-                            const ts = d
-                                ? d.toLocaleString('en-IN', {
-                                      day: '2-digit',
-                                      month: 'short',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                  })
-                                : scan.dateTime;
-                            return (
-                                <div
-                                    key={`${scan.status}-${scan.dateTime}-${idx}`}
-                                    style={{ marginBottom: 8, fontSize: 11, lineHeight: 1.4 }}
-                                >
+                    <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Latest Updates</div>
+                    {[...sortedScans].reverse().map((scan, idx) => {
+                        const d = scan.dateTime ? new Date(scan.dateTime) : null;
+                        const ts = d
+                            ? d.toLocaleString('en-IN', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                              })
+                            : scan.dateTime;
+                        return (
+                            <div
+                                key={`${scan.status}-${scan.dateTime}-${idx}`}
+                                style={{
+                                    marginBottom: 8,
+                                    fontSize: 11,
+                                    lineHeight: 1.4,
+                                    padding: 6,
+                                    borderRadius: 8,
+                                    background: 'var(--bg)',
+                                }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                                     <div style={{ fontWeight: 600 }}>{scan.status}</div>
-                                    {scan.instructions && (
-                                        <div style={{ color: 'var(--muted)' }}>{scan.instructions}</div>
-                                    )}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-                                        {scan.location && (
-                                            <span style={{ color: 'var(--muted)' }}>{scan.location}</span>
-                                        )}
-                                        {ts && <span style={{ color: 'var(--muted)' }}>{ts}</span>}
-                                    </div>
+                                    {ts && <span style={{ color: 'var(--muted)' }}>{ts}</span>}
                                 </div>
-                            );
-                        })}
+                                {scan.instructions && (
+                                    <div style={{ color: 'var(--muted)', marginTop: 2 }}>{scan.instructions}</div>
+                                )}
+                                {scan.location && (
+                                    <div style={{ color: 'var(--muted)', marginTop: 2 }}>{scan.location}</div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>
