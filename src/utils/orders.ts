@@ -23,6 +23,7 @@ export type Order = {
     shippingCharges?: number;
     discountAmount?: number;
     awbNumber?: string;
+    notes?: string;
     state: string;
     platform?: Platform;
     type?: OrderType;

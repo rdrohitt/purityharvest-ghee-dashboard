@@ -2055,6 +2055,7 @@ function AddOrderModal({
     const [codCharges, setCodCharges] = useState<string>(initialOrder?.codCharges?.toString() || initialOrder?.shippingAmount?.toString() || '');
     const [shippingCharges, setShippingCharges] = useState<string>(initialOrder?.shippingCharges?.toString() || '');
     const [discount, setDiscount] = useState<string>(initialOrder?.discountAmount?.toString() || '');
+    const [notes, setNotes] = useState<string>(initialOrder?.notes || '');
     const [items, setItems] = useState<Array<{ variant: string; quantity: number; price: number }>>(
         initialOrder?.items && initialOrder.items.length > 0
             ? initialOrder.items.map((it) => {
@@ -2249,6 +2250,7 @@ function AddOrderModal({
             shippingCharges: shippingCharges ? Number(shippingCharges) : undefined,
             discountAmount: discount ? Number(discount) : undefined,
             awbNumber: awb || undefined,
+            notes: notes || undefined,
             state,
             platform: platform as Platform,
             type: type ? type as OrderType : undefined,
@@ -2278,8 +2280,18 @@ function AddOrderModal({
                     <h3 style={{ margin: 0 }}>{mode === 'edit' ? 'Edit Order' : 'Add Order'}</h3>
                     <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
                 </div>
-                <form onSubmit={submit} style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 4fr) minmax(260px, 1.4fr)', gap: 20, alignItems: 'flex-start' }}>
+                <form
+                    onSubmit={submit}
+                    style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+                >
+                    <div
+                        style={{
+                            padding: 20,
+                            overflowY: 'auto',
+                            flex: 1,
+                        }}
+                    >
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 4fr) minmax(260px, 1.4fr)', gap: 20, alignItems: 'flex-start' }}>
                         <div style={{ display: 'grid', gap: 20 }}>
                             {/* First Row: Phone and Customer Name */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
@@ -2468,6 +2480,17 @@ function AddOrderModal({
                                     />
                                 </div>
                             </div>
+
+                            <div style={{ paddingTop: 12 }}>
+                                <label className="label">Notes</label>
+                                <textarea
+                                    className="input"
+                                    style={{ width: '100%', marginTop: 8, minHeight: 80, resize: 'vertical', paddingTop: 10 }}
+                                    placeholder="Internal notes about this order (optional)"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                />
+                            </div>
                         </div>
 
                         <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -2493,9 +2516,20 @@ function AddOrderModal({
                                 />
                             </div>
                         </div>
+                        </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 20 }}>
+                    <div
+                        style={{
+                            display: 'flex',
+                            gap: 8,
+                            justifyContent: 'flex-end',
+                            borderTop: '1px solid var(--border)',
+                            padding: '12px 20px',
+                            flexShrink: 0,
+                            background: 'var(--bg-elev)',
+                        }}
+                    >
                         <button type="button" className="icon-btn" onClick={onClose}>Cancel</button>
                         <button type="submit" className="button" style={{ width: 'auto', padding: '0 16px' }}>
                             {mode === 'edit' ? 'Save Changes' : 'Create'}
