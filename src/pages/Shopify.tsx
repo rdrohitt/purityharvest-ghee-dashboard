@@ -2065,6 +2065,21 @@ function AddOrderModal({
             : [{ variant: '', quantity: 1, price: 0 }]
     );
     const [amount, setAmount] = useState<string>('');
+    const [awb, setAwb] = useState<string>(initialOrder?.awbNumber || '');
+    const [tracking, setTracking] = useState<{
+        awb: string;
+        statusText?: string;
+        statusLocation?: string;
+        statusDateTime?: string;
+        scans: Array<{
+            status: string;
+            instructions: string;
+            location: string;
+            dateTime: string;
+        }>;
+    } | null>(null);
+    const [trackingLoading, setTrackingLoading] = useState(false);
+    const [trackingError, setTrackingError] = useState<string | null>(null);
 
     // Extract unique customers from orders (grouped by phone number)
     const uniqueCustomers = useMemo(() => {
@@ -2105,6 +2120,77 @@ function AddOrderModal({
         const total = itemsTotal + codChargesAmount - discountAmount;
         setAmount(String(total));
     }, [items, codCharges, discount]);
+
+    // Live tracking for Delhivery AWB
+    useEffect(() => {
+        const trimmed = awb.trim();
+        if (!trimmed) {
+            setTracking(null);
+            setTrackingError(null);
+            return;
+        }
+
+        let cancelled = false;
+        setTrackingLoading(true);
+        setTrackingError(null);
+
+        fetch(`/api/delhivery-track?awb=${encodeURIComponent(trimmed)}`)
+            .then(async (res) => {
+                if (!res.ok) {
+                    const text = await res.text();
+                    throw new Error(text || `Request failed with ${res.status}`);
+                }
+                return res.json();
+            })
+            .then((data) => {
+                if (cancelled) return;
+                const shipment = data?.ShipmentData?.[0]?.Shipment;
+                if (!shipment) {
+                    setTracking(null);
+                    setTrackingError('No tracking information found for this AWB.');
+                    return;
+                }
+
+                const status = shipment.Status || {};
+                const scans = Array.isArray(shipment.Scans)
+                    ? shipment.Scans.map((s: any) => s.ScanDetail).filter(Boolean)
+                    : [];
+
+                const mappedScans =
+                    scans
+                        .map((scan: any) => ({
+                            status: scan.Scan || '',
+                            instructions: scan.Instructions || '',
+                            location: scan.ScannedLocation || '',
+                            dateTime: scan.ScanDateTime || '',
+                        }))
+                        // sort by datetime ascending
+                        .sort((a: any, b: any) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()) ?? [];
+
+                setTracking({
+                    awb: shipment.AWB,
+                    statusText: status.Status || '',
+                    statusLocation: status.StatusLocation || '',
+                    statusDateTime: status.StatusDateTime || '',
+                    scans: mappedScans,
+                });
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error('Failed to load Delhivery tracking', err);
+                setTracking(null);
+                setTrackingError('Failed to load tracking details. Please try again.');
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setTrackingLoading(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [awb]);
 
     function addItem() { setItems((prev) => [...prev, { variant: '', quantity: 1, price: 0 }]); }
     function removeItem(idx: number) { setItems((prev) => prev.filter((_, i) => i !== idx)); }
@@ -2154,6 +2240,7 @@ function AddOrderModal({
             codCharges: codCharges ? Number(codCharges) : undefined,
             shippingCharges: shippingCharges ? Number(shippingCharges) : undefined,
             discountAmount: discount ? Number(discount) : undefined,
+            awbNumber: awb || undefined,
             state,
             platform: platform as Platform,
             type: type ? type as OrderType : undefined,
@@ -2177,202 +2264,230 @@ function AddOrderModal({
             <div
                 className="card"
                 onClick={(e)=>e.stopPropagation()}
-                style={{ width: '100%', maxWidth: 1200, maxHeight: '90vh', padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                style={{ width: '100%', maxWidth: 1350, maxHeight: '90vh', padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
             >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
                     <h3 style={{ margin: 0 }}>{mode === 'edit' ? 'Edit Order' : 'Add Order'}</h3>
                     <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
                 </div>
-                <form onSubmit={submit} style={{ display: 'grid', gap: 20, padding: 20, overflowY: 'auto', flex: 1 }}>
-                    {/* First Row: Phone and Customer Name */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
-                        <div>
-                            <label className="label">Phone</label>
-                            <PhoneDropdown
-                                customers={uniqueCustomers}
-                                selectedPhone={phone}
-                                phone={phone}
-                                onSelect={(customer) => {
-                                    setName(customer.customer);
-                                    setPhone(customer.customerPhone);
-                                    setAddress(customer.customerAddress);
-                                    setState(customer.state);
-                                    setPincode(customer.pincode || '');
-                                }}
-                                onNewPhone={(newPhone) => {
-                                    setPhone(newPhone);
-                                    // Clear other fields when creating new customer
-                                    setName('');
-                                    setAddress('');
-                                    setState('');
-                                    setPincode('');
-                                }}
-                                required
-                            />
+                <form onSubmit={submit} style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 4fr) minmax(260px, 1.4fr)', gap: 20, alignItems: 'flex-start' }}>
+                        <div style={{ display: 'grid', gap: 20 }}>
+                            {/* First Row: Phone and Customer Name */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                                <div>
+                                    <label className="label">Phone</label>
+                                    <PhoneDropdown
+                                        customers={uniqueCustomers}
+                                        selectedPhone={phone}
+                                        phone={phone}
+                                        onSelect={(customer) => {
+                                            setName(customer.customer);
+                                            setPhone(customer.customerPhone);
+                                            setAddress(customer.customerAddress);
+                                            setState(customer.state);
+                                            setPincode(customer.pincode || '');
+                                        }}
+                                        onNewPhone={(newPhone) => {
+                                            setPhone(newPhone);
+                                            // Clear other fields when creating new customer
+                                            setName('');
+                                            setAddress('');
+                                            setState('');
+                                            setPincode('');
+                                        }}
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="label">Customer Name</label>
+                                    <input 
+                                        className="input" 
+                                        style={{ width: '100%', marginTop: 6 }} 
+                                        type="text"
+                                        value={name} 
+                                        onChange={(e) => setName(e.target.value)}
+                                        required 
+                                    />
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+                                <div>
+                                    <label className="label">Address</label>
+                                    <input className="input" style={{ width: '100%', marginTop: 6 }} value={address} onChange={(e)=>setAddress(e.target.value)} required />
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
+                                <div>
+                                    <label className="label">Date</label>
+                                    <DatePicker value={date} onChange={setDate} placeholder="Select date" />
+                                </div>
+                                <div>
+                                    <label className="label">State</label>
+                                    <input className="input" style={{ width: '100%', marginTop: 6 }} value={state} onChange={(e)=>setState(e.target.value)} required />
+                                </div>
+                                <div>
+                                    <label className="label">Pincode</label>
+                                    <input 
+                                        className="input" 
+                                        style={{ width: '100%', marginTop: 6 }} 
+                                        type="tel"
+                                        value={pincode} 
+                                        onChange={(e) => {
+                                            const value = e.target.value.replace(/\D/g, ''); // Remove non-numeric characters
+                                            if (value.length <= 6) {
+                                                setPincode(value);
+                                            }
+                                        }}
+                                        maxLength={6}
+                                        pattern="[0-9]{6}"
+                                        required 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="label">Type</label>
+                                    <select className="input" style={{ width: '100%', marginTop: 6 }} value={type} onChange={(e)=>setType(e.target.value as OrderType | '')} required>
+                                        <option value="">Select Type</option>
+                                        <option value="New">New</option>
+                                        <option value="Repeat">Repeat</option>
+                                        <option value="Reference">Reference</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style={{ display: 'grid', gap: 10 }}>
+                                    {items.map((it, idx) => {
+                                        const availableProducts = getAvailableProducts(idx);
+                                        return (
+                                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 140px 44px', gap: 10, alignItems: 'end', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                                                <div>
+                                                    <label className="label">Variant</label>
+                                                    <select 
+                                                        className="input" 
+                                                        style={{ width: '100%', marginTop: 6 }} 
+                                                        value={it.variant} 
+                                                        onChange={(e)=>updateItem(idx, 'variant', e.target.value)} 
+                                                        required
+                                                    >
+                                                        <option value="">Select product</option>
+                                                        {availableProducts.map((product) => (
+                                                            <option key={product.id} value={`${product.name} - ${product.size}`}>
+                                                                {product.name} - {product.size}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="label">Quantity</label>
+                                                    <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={1} value={it.quantity} onChange={(e)=>updateItem(idx, 'quantity', e.target.value)} required />
+                                                </div>
+                                                <div>
+                                                    <label className="label">Price (₹)</label>
+                                                    <input 
+                                                        className="input" 
+                                                        style={{ width: '100%', marginTop: 6 }} 
+                                                        type="number" 
+                                                        min={0} 
+                                                        value={it.price || ''} 
+                                                        onChange={(e)=>updateItem(idx, 'price', e.target.value)} 
+                                                        required 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="label" style={{ visibility: 'hidden' }}>Remove</label>
+                                                    <button type="button" className="icon-btn" onClick={()=>removeItem(idx)} aria-label="Remove item">–</button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    <button type="button" className="filter-btn" onClick={addItem} style={{ width: 'fit-content' }}>+ Add item</button>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 }}>
+                                <div>
+                                    <label className="label">Platform</label>
+                                    <select className="input" style={{ width: '100%', marginTop: 6 }} value={platform} onChange={(e)=>setPlatform(e.target.value as Platform | '')} required>
+                                        <option value="">Select Platform</option>
+                                        {(['Shopify','Abandoned','Whatsapp','Amazon','Flipkart'] as Platform[]).map((p)=> <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="label">Payment Mode</label>
+                                    <select className="input" style={{ width: '100%', marginTop: 6 }} value={payment} onChange={(e)=>setPayment(e.target.value as PaymentStatus | '')} required>
+                                        <option value="">Select Payment Mode</option>
+                                        {(['COD','PAID'] as PaymentStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="label">Fullfillment Status</label>
+                                    <select className="input" style={{ width: '100%', marginTop: 6 }} value={fulfillment} onChange={(e)=>setFulfillment(e.target.value as FulfillmentStatus)} required>
+                                        {(['Unfulfilled','Fulfilled','Partial'] as FulfillmentStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="label">Shipping Status</label>
+                                    <select className="input" style={{ width: '100%', marginTop: 6 }} value={delivery} onChange={(e)=>setDelivery(e.target.value as DeliveryStatus)} required>
+                                        {(['In Transit','Delivered','RTO','Pending Pickup'] as DeliveryStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
+                                <div>
+                                    <label className="label">COD Charges (₹)</label>
+                                    <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} step="0.01" value={codCharges} onChange={(e)=>setCodCharges(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="label">Shipping Charges (₹)</label>
+                                    <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} step="0.01" value={shippingCharges} onChange={(e)=>setShippingCharges(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="label">Discount (₹)</label>
+                                    <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} step="0.01" value={discount} onChange={(e)=>setDiscount(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="label">Total Amount (₹)</label>
+                                    <input 
+                                        className="input" 
+                                        style={{ width: '100%', marginTop: 6, backgroundColor: 'var(--bg)', cursor: 'not-allowed' }} 
+                                        type="number" 
+                                        min={0} 
+                                        value={amount} 
+                                        readOnly
+                                        required 
+                                    />
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label className="label">Customer Name</label>
-                            <input 
-                                className="input" 
-                                style={{ width: '100%', marginTop: 6 }} 
-                                type="text"
-                                value={name} 
-                                onChange={(e) => setName(e.target.value)}
-                                required 
-                            />
-                        </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
-                        <div>
-                            <label className="label">Address</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={address} onChange={(e)=>setAddress(e.target.value)} required />
-                        </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
-                        <div>
-                            <label className="label">Date</label>
-                            <DatePicker value={date} onChange={setDate} placeholder="Select date" />
-                        </div>
-                        <div>
-                            <label className="label">State</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={state} onChange={(e)=>setState(e.target.value)} required />
-                        </div>
-                        <div>
-                            <label className="label">Pincode</label>
-                            <input 
-                                className="input" 
-                                style={{ width: '100%', marginTop: 6 }} 
-                                type="tel"
-                                value={pincode} 
-                                onChange={(e) => {
-                                    const value = e.target.value.replace(/\D/g, ''); // Remove non-numeric characters
-                                    if (value.length <= 6) {
-                                        setPincode(value);
-                                    }
-                                }}
-                                maxLength={6}
-                                pattern="[0-9]{6}"
-                                required 
-                            />
-                        </div>
-                        <div>
-                            <label className="label">Type</label>
-                            <select className="input" style={{ width: '100%', marginTop: 6 }} value={type} onChange={(e)=>setType(e.target.value as OrderType | '')} required>
-                                <option value="">Select Type</option>
-                                <option value="New">New</option>
-                                <option value="Repeat">Repeat</option>
-                                <option value="Reference">Reference</option>
-                            </select>
+
+                        <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            <div>
+                                <label className="label">AWB No (optional)</label>
+                                <input
+                                    className="input"
+                                    style={{ width: '100%', marginTop: 6 }}
+                                    type="text"
+                                    value={awb}
+                                    onChange={(e) => setAwb(e.target.value)}
+                                    placeholder="Enter AWB number"
+                                />
+                            </div>
+                            <div>
+                                <div className="label" style={{ marginBottom: 8 }}>Shipping Status Timeline</div>
+                                <ShippingTimeline
+                                    status={delivery}
+                                    awb={awb}
+                                    tracking={tracking}
+                                    loading={trackingLoading}
+                                    error={trackingError}
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <div>
-                        <div style={{ display: 'grid', gap: 10 }}>
-                            {items.map((it, idx) => {
-                                const availableProducts = getAvailableProducts(idx);
-                                return (
-                                    <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 140px 44px', gap: 10, alignItems: 'end', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
-                                        <div>
-                                            <label className="label">Variant</label>
-                                            <select 
-                                                className="input" 
-                                                style={{ width: '100%', marginTop: 6 }} 
-                                                value={it.variant} 
-                                                onChange={(e)=>updateItem(idx, 'variant', e.target.value)} 
-                                                required
-                                            >
-                                                <option value="">Select product</option>
-                                                {availableProducts.map((product) => (
-                                                    <option key={product.id} value={`${product.name} - ${product.size}`}>
-                                                        {product.name} - {product.size}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="label">Quantity</label>
-                                            <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={1} value={it.quantity} onChange={(e)=>updateItem(idx, 'quantity', e.target.value)} required />
-                                        </div>
-                                        <div>
-                                            <label className="label">Price (₹)</label>
-                                            <input 
-                                                className="input" 
-                                                style={{ width: '100%', marginTop: 6 }} 
-                                                type="number" 
-                                                min={0} 
-                                                value={it.price || ''} 
-                                                onChange={(e)=>updateItem(idx, 'price', e.target.value)} 
-                                                required 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="label" style={{ visibility: 'hidden' }}>Remove</label>
-                                            <button type="button" className="icon-btn" onClick={()=>removeItem(idx)} aria-label="Remove item">–</button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            <button type="button" className="filter-btn" onClick={addItem} style={{ width: 'fit-content' }}>+ Add item</button>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 }}>
-                        <div>
-                            <label className="label">Platform</label>
-                            <select className="input" style={{ width: '100%', marginTop: 6 }} value={platform} onChange={(e)=>setPlatform(e.target.value as Platform | '')} required>
-                                <option value="">Select Platform</option>
-                                {(['Shopify','Abandoned','Whatsapp','Amazon','Flipkart'] as Platform[]).map((p)=> <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="label">Payment Mode</label>
-                            <select className="input" style={{ width: '100%', marginTop: 6 }} value={payment} onChange={(e)=>setPayment(e.target.value as PaymentStatus | '')} required>
-                                <option value="">Select Payment Mode</option>
-                                {(['COD','PAID'] as PaymentStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="label">Fullfillment Status</label>
-                            <select className="input" style={{ width: '100%', marginTop: 6 }} value={fulfillment} onChange={(e)=>setFulfillment(e.target.value as FulfillmentStatus)} required>
-                                {(['Unfulfilled','Fulfilled','Partial'] as FulfillmentStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="label">Shipping Status</label>
-                            <select className="input" style={{ width: '100%', marginTop: 6 }} value={delivery} onChange={(e)=>setDelivery(e.target.value as DeliveryStatus)} required>
-                                {(['In Transit','Delivered','RTO','Pending Pickup'] as DeliveryStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
-                        <div>
-                            <label className="label">COD Charges (₹)</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} step="0.01" value={codCharges} onChange={(e)=>setCodCharges(e.target.value)} />
-                        </div>
-                        <div>
-                            <label className="label">Shipping Charges (₹)</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} step="0.01" value={shippingCharges} onChange={(e)=>setShippingCharges(e.target.value)} />
-                        </div>
-                        <div>
-                            <label className="label">Discount (₹)</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} step="0.01" value={discount} onChange={(e)=>setDiscount(e.target.value)} />
-                        </div>
-                        <div>
-                            <label className="label">Total Amount (₹)</label>
-                            <input 
-                                className="input" 
-                                style={{ width: '100%', marginTop: 6, backgroundColor: 'var(--bg)', cursor: 'not-allowed' }} 
-                                type="number" 
-                                min={0} 
-                                value={amount} 
-                                readOnly
-                                required 
-                            />
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 20 }}>
                         <button type="button" className="icon-btn" onClick={onClose}>Cancel</button>
                         <button type="submit" className="button" style={{ width: 'auto', padding: '0 16px' }}>
                             {mode === 'edit' ? 'Save Changes' : 'Create'}
@@ -2380,6 +2495,126 @@ function AddOrderModal({
                     </div>
                 </form>
             </div>
+        </div>
+    );
+}
+
+function ShippingTimeline({
+    status,
+    awb,
+    tracking,
+    loading,
+    error,
+}: {
+    status: DeliveryStatus;
+    awb: string;
+    tracking: {
+        awb: string;
+        statusText?: string;
+        statusLocation?: string;
+        statusDateTime?: string;
+        scans: Array<{
+            status: string;
+            instructions: string;
+            location: string;
+            dateTime: string;
+        }>;
+    } | null;
+    loading: boolean;
+    error: string | null;
+}) {
+    const steps: DeliveryStatus[] = ['Pending Pickup', 'In Transit', 'Delivered', 'RTO'];
+
+    return (
+        <div style={{ background: 'var(--bg-elev)', borderRadius: 8, border: '1px solid var(--border)', padding: 12, display: 'grid', gap: 12 }}>
+            <div>
+                {steps.map((step, index) => {
+                    const isActive = step === status;
+                    return (
+                        <div key={step} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 2 }}>
+                                <div
+                                    style={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: '999px',
+                                        background: isActive ? '#16a34a' : '#e5e7eb',
+                                        border: '2px solid',
+                                        borderColor: isActive ? '#16a34a' : '#d1d5db',
+                                    }}
+                                />
+                                {index < steps.length - 1 && (
+                                    <div
+                                        style={{
+                                            flex: 1,
+                                            width: 2,
+                                            background: '#e5e7eb',
+                                            marginTop: 2,
+                                            marginBottom: 2,
+                                        }}
+                                    />
+                                )}
+                            </div>
+                            <div style={{ fontSize: 12, color: isActive ? '#111827' : '#6b7280', fontWeight: isActive ? 600 : 400, paddingTop: 0 }}>
+                                {step}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                {!awb && <div>Enter an AWB number above to view live Delhivery tracking.</div>}
+                {awb && loading && <div>Loading live tracking…</div>}
+                {awb && !loading && error && <div style={{ color: '#b91c1c' }}>{error}</div>}
+                {awb && !loading && !error && !tracking && (
+                    <div>No live tracking events found yet for this AWB.</div>
+                )}
+            </div>
+
+            {tracking && tracking.scans && tracking.scans.length > 0 && (
+                <div
+                    style={{
+                        borderTop: '1px dashed var(--border)',
+                        paddingTop: 8,
+                        maxHeight: 220,
+                        overflowY: 'auto',
+                    }}
+                >
+                    <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Live Events</div>
+                    {tracking.scans
+                        .slice()
+                        .reverse()
+                        .map((scan, idx) => {
+                            const d = scan.dateTime ? new Date(scan.dateTime) : null;
+                            const ts = d
+                                ? d.toLocaleString('en-IN', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                  })
+                                : scan.dateTime;
+                            return (
+                                <div
+                                    key={`${scan.status}-${scan.dateTime}-${idx}`}
+                                    style={{ marginBottom: 8, fontSize: 11, lineHeight: 1.4 }}
+                                >
+                                    <div style={{ fontWeight: 600 }}>{scan.status}</div>
+                                    {scan.instructions && (
+                                        <div style={{ color: 'var(--muted)' }}>{scan.instructions}</div>
+                                    )}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                                        {scan.location && (
+                                            <span style={{ color: 'var(--muted)' }}>{scan.location}</span>
+                                        )}
+                                        {ts && <span style={{ color: 'var(--muted)' }}>{ts}</span>}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                </div>
+            )}
         </div>
     );
 }

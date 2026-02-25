@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs').promises;
 const path = require('path');
+const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -1424,6 +1425,45 @@ app.delete('/api/followups/:customerPhone', async (req, res) => {
     console.error('Error deleting from followups.json', err);
     res.status(500).json({ message: 'Failed to delete followup' });
   }
+});
+
+app.get('/api/delhivery-track', async (req, res) => {
+  const awb = req.query.awb;
+  if (!awb || typeof awb !== 'string') {
+    return res.status(400).json({ message: 'Missing awb query parameter' });
+  }
+
+  const url = `https://track.delhivery.com/api/v1/packages/json/?waybill=${encodeURIComponent(awb)}`;
+
+  const options = {
+    headers: {
+      Authorization: 'Token cd8c22b7d58baf249855b7c02e66c71a07779a02',
+      'Content-type': 'application/json',
+    },
+  };
+
+  https
+    .get(url, options, (apiRes) => {
+      let data = '';
+
+      apiRes.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      apiRes.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          res.json(json);
+        } catch (err) {
+          console.error('Error parsing Delhivery response', err);
+          res.status(500).json({ message: 'Failed to parse Delhivery response' });
+        }
+      });
+    })
+    .on('error', (err) => {
+      console.error('Error calling Delhivery tracking API', err);
+      res.status(500).json({ message: 'Failed to contact Delhivery tracking API' });
+    });
 });
 
 app.listen(PORT, () => {

@@ -22,6 +22,7 @@ export type Order = {
     codCharges?: number;
     shippingCharges?: number;
     discountAmount?: number;
+    awbNumber?: string;
     state: string;
     platform?: Platform;
     type?: OrderType;
