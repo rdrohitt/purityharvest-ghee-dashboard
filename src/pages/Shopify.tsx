@@ -2565,6 +2565,45 @@ function ShippingTimeline({
         (a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
     );
 
+    const hasAwb = awb.trim().length > 0;
+
+    if (!hasAwb) {
+        return (
+            <div
+                style={{
+                    background: 'var(--bg-elev)',
+                    borderRadius: 12,
+                    border: '1px solid var(--border)',
+                    padding: 12,
+                    fontSize: 11,
+                    color: 'var(--muted)',
+                }}
+            >
+                Enter an AWB number above to view live Delhivery tracking.
+            </div>
+        );
+    }
+
+    const hasTrackingInfo = !!tracking && (sortedScans.length > 0 || tracking.statusText || tracking.statusLocation);
+
+    if (!hasTrackingInfo && !loading && !error) {
+        // AWB present but no tracking data yet – just show a simple message, no timeline UI
+        return (
+            <div
+                style={{
+                    background: 'var(--bg-elev)',
+                    borderRadius: 12,
+                    border: '1px solid var(--border)',
+                    padding: 12,
+                    fontSize: 11,
+                    color: 'var(--muted)',
+                }}
+            >
+                No tracking information found for this AWB yet.
+            </div>
+        );
+    }
+
     return (
         <div
             style={{
@@ -2674,90 +2713,88 @@ function ShippingTimeline({
                 )}
             </div>
 
-            {/* Shipment status steps (vertical, no progress bar) */}
-            <div
-                style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                    marginTop: 2,
-                }}
-            >
-                {steps.map((step, index) => {
-                    const isActive = index === safeCurrentStep;
-                    const isPast = index < safeCurrentStep;
+            {/* Shipment status steps (vertical, only when tracking info exists) */}
+            {hasTrackingInfo && (
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                        marginTop: 2,
+                    }}
+                >
+                    {steps.map((step, index) => {
+                        const isActive = index === safeCurrentStep;
+                        const isPast = index < safeCurrentStep;
 
-                    let activeColor = '#0f172a';
-                    let glowColor = 'rgba(15,23,42,0.15)';
-                    if (step === 'In Transit') {
-                        activeColor = '#2563eb'; // blue
-                        glowColor = 'rgba(37,99,235,0.20)';
-                    } else if (step === 'Delivered') {
-                        activeColor = '#16a34a'; // green
-                        glowColor = 'rgba(22,163,74,0.20)';
-                    } else if (step === 'RTO') {
-                        activeColor = '#b91c1c'; // red
-                        glowColor = 'rgba(185,28,28,0.25)';
-                    }
+                        let activeColor = '#0f172a';
+                        let glowColor = 'rgba(15,23,42,0.15)';
+                        if (step === 'In Transit') {
+                            activeColor = '#2563eb'; // blue
+                            glowColor = 'rgba(37,99,235,0.20)';
+                        } else if (step === 'Delivered') {
+                            activeColor = '#16a34a'; // green
+                            glowColor = 'rgba(22,163,74,0.20)';
+                        } else if (step === 'RTO') {
+                            activeColor = '#b91c1c'; // red
+                            glowColor = 'rgba(185,28,28,0.25)';
+                        }
 
-                    return (
-                        <div
-                            key={step}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                            }}
-                        >
+                        return (
                             <div
+                                key={step}
                                 style={{
-                                    width: 10,
-                                    height: 10,
-                                    borderRadius: 999,
-                                    border: '2px solid',
-                                    borderColor: isActive
-                                        ? activeColor
-                                        : isPast
-                                        ? '#4b5563'
-                                        : '#d1d5db',
-                                    background: isActive
-                                        ? activeColor
-                                        : isPast
-                                        ? '#4b5563'
-                                        : '#f9fafb',
-                                    opacity: isActive ? (blinkOn ? 1 : 0.25) : 1,
-                                    boxShadow: isActive
-                                        ? blinkOn
-                                            ? `0 0 0 4px ${glowColor}`
-                                            : 'none'
-                                        : 'none',
-                                    transition: 'opacity 0.2s ease-out, box-shadow 0.2s ease-out',
-                                }}
-                            />
-                            <div
-                                style={{
-                                    fontSize: 11,
-                                    fontWeight: isActive ? 700 : isPast ? 600 : 500,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.08em',
-                                    color: isActive ? activeColor : isPast ? '#4b5563' : '#9ca3af',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
                                 }}
                             >
-                                {step}
+                                <div
+                                    style={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: 999,
+                                        border: '2px solid',
+                                        borderColor: isActive
+                                            ? activeColor
+                                            : isPast
+                                            ? '#4b5563'
+                                            : '#d1d5db',
+                                        background: isActive
+                                            ? activeColor
+                                            : isPast
+                                            ? '#4b5563'
+                                            : '#f9fafb',
+                                        opacity: isActive ? (blinkOn ? 1 : 0.25) : 1,
+                                        boxShadow: isActive
+                                            ? blinkOn
+                                                ? `0 0 0 4px ${glowColor}`
+                                                : 'none'
+                                            : 'none',
+                                        transition: 'opacity 0.2s ease-out, box-shadow 0.2s ease-out',
+                                    }}
+                                />
+                                <div
+                                    style={{
+                                        fontSize: 11,
+                                        fontWeight: isActive ? 700 : isPast ? 600 : 500,
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.08em',
+                                        color: isActive ? activeColor : isPast ? '#4b5563' : '#9ca3af',
+                                    }}
+                                >
+                                    {step}
+                                </div>
                             </div>
-                        </div>
-                    );
-                })}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
 
-            {/* Status helper text */}
+            {/* Status helper text (only when AWB is present) */}
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                {!awb && <div>Enter an AWB number above to view live Delhivery tracking.</div>}
-                {awb && loading && <div>Loading live tracking…</div>}
-                {awb && !loading && error && <div style={{ color: '#b91c1c' }}>{error}</div>}
-                {awb && !loading && !error && !tracking && (
-                    <div>No live tracking events found yet for this AWB.</div>
-                )}
+                {loading && <div>Loading live tracking…</div>}
+                {!loading && error && <div style={{ color: '#b91c1c' }}>{error}</div>}
             </div>
 
             {/* All live events (latest first) */}
