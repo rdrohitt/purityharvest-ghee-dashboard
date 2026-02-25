@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadMarketingSpend, addMarketingSpend, updateMarketingSpend, deleteMarketingSpend, type SpendRecord, type MiscRecord } from '../utils/marketing-spend';
 
 type DateFilterMode = 'all' | 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
-type Platform = 'Meta' | 'Amazon' | 'Flipkart' | 'Miscellaneous';
+type Platform = 'Meta' | 'Amazon' | 'Flipkart' | 'Checkout' | 'Engage' | 'Dolchi' | 'Miscellaneous';
 
 type Toast = {
     id: string;
@@ -36,6 +36,9 @@ export default function MarketingSpend() {
     const [meta, setMeta] = useState<SpendRecord[]>([]);
     const [amazon, setAmazon] = useState<SpendRecord[]>([]);
     const [flipkart, setFlipkart] = useState<SpendRecord[]>([]);
+    const [checkout, setCheckout] = useState<SpendRecord[]>([]);
+    const [engage, setEngage] = useState<SpendRecord[]>([]);
+    const [dolchi, setDolchi] = useState<SpendRecord[]>([]);
     const [misc, setMisc] = useState<MiscRecord[]>([]);
     const [mode, setMode] = useState<DateFilterMode>('currentMonth');
     const [customFrom, setCustomFrom] = useState<string>('');
@@ -58,13 +61,19 @@ export default function MarketingSpend() {
             loadMarketingSpend('meta-spend'),
             loadMarketingSpend('amazon-spend'),
             loadMarketingSpend('flipkart-spend'),
+            loadMarketingSpend('checkout-spend'),
+            loadMarketingSpend('engage-spend'),
+            loadMarketingSpend('dolchi-spend'),
             loadMarketingSpend('misc-spend')
         ])
-            .then(([metaData, amazonData, flipkartData, miscData]) => {
+            .then(([metaData, amazonData, flipkartData, checkoutData, engageData, dolchiData, miscData]) => {
                 if (cancelled) return;
                 setMeta(metaData as SpendRecord[]);
                 setAmazon(amazonData as SpendRecord[]);
                 setFlipkart(flipkartData as SpendRecord[]);
+                setCheckout(checkoutData as SpendRecord[]);
+                setEngage(engageData as SpendRecord[]);
+                setDolchi(dolchiData as SpendRecord[]);
                 setMisc(miscData as MiscRecord[]);
             })
             .catch((err) => {
@@ -85,14 +94,20 @@ export default function MarketingSpend() {
     const filteredMeta = useFilterRows(meta, mode, customFrom, customTo);
     const filteredAmazon = useFilterRows(amazon, mode, customFrom, customTo);
     const filteredFlipkart = useFilterRows(flipkart, mode, customFrom, customTo);
+    const filteredCheckout = useFilterRows(checkout, mode, customFrom, customTo);
+    const filteredEngage = useFilterRows(engage, mode, customFrom, customTo);
+    const filteredDolchi = useFilterRows(dolchi, mode, customFrom, customTo);
     const filteredMisc = useFilterRows(misc, mode, customFrom, customTo);
 
     const totals = useMemo(() => ({
         meta: filteredMeta.reduce((s, r) => s + r.amount, 0),
         amazon: filteredAmazon.reduce((s, r) => s + r.amount, 0),
         flipkart: filteredFlipkart.reduce((s, r) => s + r.amount, 0),
+        checkout: filteredCheckout.reduce((s, r) => s + r.amount, 0),
+        engage: filteredEngage.reduce((s, r) => s + r.amount, 0),
+        dolchi: filteredDolchi.reduce((s, r) => s + r.amount, 0),
         misc: filteredMisc.reduce((s, r) => s + r.amount, 0),
-    }), [filteredMeta, filteredAmazon, filteredFlipkart, filteredMisc]);
+    }), [filteredMeta, filteredAmazon, filteredFlipkart, filteredCheckout, filteredEngage, filteredDolchi, filteredMisc]);
 
     return (
         <section style={{ display: 'grid', gap: 12, maxWidth: 1200, margin: '0 auto', width: '100%', padding: 8 }}>
@@ -141,12 +156,36 @@ export default function MarketingSpend() {
                         isEven={false}
                     />
                     <ModernMetricItem 
+                        icon="💳" 
+                        label="Checkout Wallet" 
+                        value={formatCurrency(totals.checkout)} 
+                        iconColor="#0f766e"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItem 
+                        icon="💬" 
+                        label="Engage Wallet" 
+                        value={formatCurrency(totals.engage)} 
+                        iconColor="#7c3aed"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItem 
+                        icon="🍫" 
+                        label="Dolchi Wallet" 
+                        value={formatCurrency(totals.dolchi)} 
+                        iconColor="#b45309"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItem 
                         icon="💰" 
                         label="Miscellaneous" 
                         value={formatCurrency(totals.misc)} 
                         iconColor="#8b5cf6"
                         isLast={true}
-                        isEven={true}
+                        isEven={false}
                     />
                 </div>
             </div>
@@ -155,7 +194,10 @@ export default function MarketingSpend() {
                     meta={meta}
                     amazon={amazon}
                     flipkart={flipkart}
-                misc={misc}
+                    checkout={checkout}
+                    engage={engage}
+                    dolchi={dolchi}
+                    misc={misc}
                     mode={mode}
                     customFrom={customFrom}
                     customTo={customTo}
@@ -166,11 +208,42 @@ export default function MarketingSpend() {
                             const saved = await addMarketingSpend('misc-spend', rec as MiscRecord);
                             setMisc((v) => [saved as MiscRecord, ...v]);
                         } else {
-                            const endpoint = platform === 'Meta' ? 'meta-spend' : platform === 'Amazon' ? 'amazon-spend' : 'flipkart-spend';
+                            let endpoint:
+                                | 'meta-spend'
+                                | 'amazon-spend'
+                                | 'flipkart-spend'
+                                | 'checkout-spend'
+                                | 'engage-spend'
+                                | 'dolchi-spend';
+                            switch (platform) {
+                                case 'Meta':
+                                    endpoint = 'meta-spend';
+                                    break;
+                                case 'Amazon':
+                                    endpoint = 'amazon-spend';
+                                    break;
+                                case 'Flipkart':
+                                    endpoint = 'flipkart-spend';
+                                    break;
+                                case 'Checkout':
+                                    endpoint = 'checkout-spend';
+                                    break;
+                                case 'Engage':
+                                    endpoint = 'engage-spend';
+                                    break;
+                                case 'Dolchi':
+                                    endpoint = 'dolchi-spend';
+                                    break;
+                                default:
+                                    endpoint = 'meta-spend';
+                            }
                             const saved = await addMarketingSpend(endpoint, rec as SpendRecord);
                             if (platform === 'Meta') setMeta((v) => [saved as SpendRecord, ...v]);
                             if (platform === 'Amazon') setAmazon((v) => [saved as SpendRecord, ...v]);
                             if (platform === 'Flipkart') setFlipkart((v) => [saved as SpendRecord, ...v]);
+                            if (platform === 'Checkout') setCheckout((v) => [saved as SpendRecord, ...v]);
+                            if (platform === 'Engage') setEngage((v) => [saved as SpendRecord, ...v]);
+                            if (platform === 'Dolchi') setDolchi((v) => [saved as SpendRecord, ...v]);
                         }
                             showToast(`${platform} spend added successfully!`, 'success');
                         } catch (err) {
@@ -184,11 +257,42 @@ export default function MarketingSpend() {
                             const updated = await updateMarketingSpend('misc-spend', rec as MiscRecord);
                             setMisc((v) => v.map((r) => r.id === updated.id ? updated as MiscRecord : r));
                         } else {
-                            const endpoint = platform === 'Meta' ? 'meta-spend' : platform === 'Amazon' ? 'amazon-spend' : 'flipkart-spend';
+                            let endpoint:
+                                | 'meta-spend'
+                                | 'amazon-spend'
+                                | 'flipkart-spend'
+                                | 'checkout-spend'
+                                | 'engage-spend'
+                                | 'dolchi-spend';
+                            switch (platform) {
+                                case 'Meta':
+                                    endpoint = 'meta-spend';
+                                    break;
+                                case 'Amazon':
+                                    endpoint = 'amazon-spend';
+                                    break;
+                                case 'Flipkart':
+                                    endpoint = 'flipkart-spend';
+                                    break;
+                                case 'Checkout':
+                                    endpoint = 'checkout-spend';
+                                    break;
+                                case 'Engage':
+                                    endpoint = 'engage-spend';
+                                    break;
+                                case 'Dolchi':
+                                    endpoint = 'dolchi-spend';
+                                    break;
+                                default:
+                                    endpoint = 'meta-spend';
+                            }
                             const updated = await updateMarketingSpend(endpoint, rec as SpendRecord);
                             if (platform === 'Meta') setMeta((v) => v.map((r) => r.id === updated.id ? updated as SpendRecord : r));
                             if (platform === 'Amazon') setAmazon((v) => v.map((r) => r.id === updated.id ? updated as SpendRecord : r));
                             if (platform === 'Flipkart') setFlipkart((v) => v.map((r) => r.id === updated.id ? updated as SpendRecord : r));
+                            if (platform === 'Checkout') setCheckout((v) => v.map((r) => r.id === updated.id ? updated as SpendRecord : r));
+                            if (platform === 'Engage') setEngage((v) => v.map((r) => r.id === updated.id ? updated as SpendRecord : r));
+                            if (platform === 'Dolchi') setDolchi((v) => v.map((r) => r.id === updated.id ? updated as SpendRecord : r));
                         }
                             showToast(`${platform} spend updated successfully!`, 'success');
                         } catch (err) {
@@ -202,11 +306,42 @@ export default function MarketingSpend() {
                             await deleteMarketingSpend('misc-spend', id);
                             setMisc((v) => v.filter((r) => r.id !== id));
                         } else {
-                            const endpoint = platform === 'Meta' ? 'meta-spend' : platform === 'Amazon' ? 'amazon-spend' : 'flipkart-spend';
+                            let endpoint:
+                                | 'meta-spend'
+                                | 'amazon-spend'
+                                | 'flipkart-spend'
+                                | 'checkout-spend'
+                                | 'engage-spend'
+                                | 'dolchi-spend';
+                            switch (platform) {
+                                case 'Meta':
+                                    endpoint = 'meta-spend';
+                                    break;
+                                case 'Amazon':
+                                    endpoint = 'amazon-spend';
+                                    break;
+                                case 'Flipkart':
+                                    endpoint = 'flipkart-spend';
+                                    break;
+                                case 'Checkout':
+                                    endpoint = 'checkout-spend';
+                                    break;
+                                case 'Engage':
+                                    endpoint = 'engage-spend';
+                                    break;
+                                case 'Dolchi':
+                                    endpoint = 'dolchi-spend';
+                                    break;
+                                default:
+                                    endpoint = 'meta-spend';
+                            }
                             await deleteMarketingSpend(endpoint, id);
                             if (platform === 'Meta') setMeta((v) => v.filter((r) => r.id !== id));
                             if (platform === 'Amazon') setAmazon((v) => v.filter((r) => r.id !== id));
                             if (platform === 'Flipkart') setFlipkart((v) => v.filter((r) => r.id !== id));
+                            if (platform === 'Checkout') setCheckout((v) => v.filter((r) => r.id !== id));
+                            if (platform === 'Engage') setEngage((v) => v.filter((r) => r.id !== id));
+                            if (platform === 'Dolchi') setDolchi((v) => v.filter((r) => r.id !== id));
                         }
                             showToast(`${platform} spend deleted successfully!`, 'delete');
                         } catch (err) {
@@ -272,10 +407,13 @@ function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { i
 
 type UnifiedRecord = (SpendRecord & { _source: Platform; _type: 'spend' }) | (MiscRecord & { _source: 'Miscellaneous'; _type: 'misc' });
 
-function UnifiedSpendSection({ meta, amazon, flipkart, misc, onAdd, onUpdate, onDelete, mode, customFrom, customTo, loading }: { 
+function UnifiedSpendSection({ meta, amazon, flipkart, checkout, engage, dolchi, misc, onAdd, onUpdate, onDelete, mode, customFrom, customTo, loading }: { 
     meta: SpendRecord[]; 
     amazon: SpendRecord[]; 
     flipkart: SpendRecord[]; 
+    checkout: SpendRecord[];
+    engage: SpendRecord[];
+    dolchi: SpendRecord[];
     misc: MiscRecord[];
     onAdd: (platform: Platform, rec: SpendRecord | MiscRecord) => Promise<void>;
     onUpdate: (platform: Platform, rec: SpendRecord | MiscRecord) => Promise<void>;
@@ -387,9 +525,12 @@ function UnifiedSpendSection({ meta, amazon, flipkart, misc, onAdd, onUpdate, on
         const m = meta.map(r => ({ ...r, _source: 'Meta' as const, _type: 'spend' as const }));
         const a = amazon.map(r => ({ ...r, _source: 'Amazon' as const, _type: 'spend' as const }));
         const f = flipkart.map(r => ({ ...r, _source: 'Flipkart' as const, _type: 'spend' as const }));
+        const c = checkout.map(r => ({ ...r, _source: 'Checkout' as const, _type: 'spend' as const }));
+        const e = engage.map(r => ({ ...r, _source: 'Engage' as const, _type: 'spend' as const }));
+        const d = dolchi.map(r => ({ ...r, _source: 'Dolchi' as const, _type: 'spend' as const }));
         const miscRecords = misc.map(r => ({ ...r, _source: 'Miscellaneous' as const, _type: 'misc' as const }));
-        return [...m, ...a, ...f, ...miscRecords].sort((p, q) => new Date(q.date).getTime() - new Date(p.date).getTime());
-    }, [meta, amazon, flipkart, misc]);
+        return [...m, ...a, ...f, ...c, ...e, ...d, ...miscRecords].sort((p, q) => new Date(q.date).getTime() - new Date(p.date).getTime());
+    }, [meta, amazon, flipkart, checkout, engage, dolchi, misc]);
 
     const filtered = useFilterRows(combined, mode, customFrom, customTo);
 
@@ -407,6 +548,9 @@ function UnifiedSpendSection({ meta, amazon, flipkart, misc, onAdd, onUpdate, on
                             <option value="Meta">Meta</option>
                             <option value="Amazon">Amazon</option>
                             <option value="Flipkart">Flipkart</option>
+                            <option value="Checkout">Checkout</option>
+                            <option value="Engage">Engage</option>
+                            <option value="Dolchi">Dolchi</option>
                             <option value="Miscellaneous">Miscellaneous</option>
                         </select>
                     </div>
@@ -482,6 +626,21 @@ function PlatformTag({ platform }: { platform: Platform }) {
             style.background = '#e0e7ff';
             style.color = '#3730a3';
             style.borderColor = '#a5b4fc';
+            break;
+        case 'Checkout':
+            style.background = '#ccfbf1';
+            style.color = '#115e59';
+            style.borderColor = '#5eead4';
+            break;
+        case 'Engage':
+            style.background = '#ede9fe';
+            style.color = '#4c1d95';
+            style.borderColor = '#c4b5fd';
+            break;
+        case 'Dolchi':
+            style.background = '#fef3c7';
+            style.color = '#92400e';
+            style.borderColor = '#fed7aa';
             break;
         case 'Miscellaneous':
             style.background = '#e9d5ff';

@@ -4,7 +4,16 @@ export type MiscRecord = { id: string; date: string; amount: number; where: stri
 /**
  * Load marketing spend records from the backend API.
  */
-export async function loadMarketingSpend(endpoint: 'meta-spend' | 'amazon-spend' | 'flipkart-spend' | 'misc-spend'): Promise<SpendRecord[] | MiscRecord[]> {
+export async function loadMarketingSpend(
+    endpoint:
+        | 'meta-spend'
+        | 'amazon-spend'
+        | 'flipkart-spend'
+        | 'checkout-spend'
+        | 'engage-spend'
+        | 'dolchi-spend'
+        | 'misc-spend'
+): Promise<SpendRecord[] | MiscRecord[]> {
     const response = await fetch(`/api/${endpoint}`);
     if (!response.ok) {
         throw new Error(`Failed to load ${endpoint} from API`);
@@ -15,7 +24,17 @@ export async function loadMarketingSpend(endpoint: 'meta-spend' | 'amazon-spend'
 /**
  * Add a new marketing spend record via the backend API.
  */
-export async function addMarketingSpend(endpoint: 'meta-spend' | 'amazon-spend' | 'flipkart-spend' | 'misc-spend', record: SpendRecord | MiscRecord): Promise<SpendRecord | MiscRecord> {
+export async function addMarketingSpend(
+    endpoint:
+        | 'meta-spend'
+        | 'amazon-spend'
+        | 'flipkart-spend'
+        | 'checkout-spend'
+        | 'engage-spend'
+        | 'dolchi-spend'
+        | 'misc-spend',
+    record: SpendRecord | MiscRecord
+): Promise<SpendRecord | MiscRecord> {
     const response = await fetch(`/api/${endpoint}`, {
         method: 'POST',
         headers: {
@@ -34,7 +53,17 @@ export async function addMarketingSpend(endpoint: 'meta-spend' | 'amazon-spend' 
 /**
  * Update an existing marketing spend record via the backend API.
  */
-export async function updateMarketingSpend(endpoint: 'meta-spend' | 'amazon-spend' | 'flipkart-spend' | 'misc-spend', record: SpendRecord | MiscRecord): Promise<SpendRecord | MiscRecord> {
+export async function updateMarketingSpend(
+    endpoint:
+        | 'meta-spend'
+        | 'amazon-spend'
+        | 'flipkart-spend'
+        | 'checkout-spend'
+        | 'engage-spend'
+        | 'dolchi-spend'
+        | 'misc-spend',
+    record: SpendRecord | MiscRecord
+): Promise<SpendRecord | MiscRecord> {
     const response = await fetch(`/api/${endpoint}/${record.id}`, {
         method: 'PUT',
         headers: {
@@ -53,7 +82,17 @@ export async function updateMarketingSpend(endpoint: 'meta-spend' | 'amazon-spen
 /**
  * Delete a marketing spend record via the backend API.
  */
-export async function deleteMarketingSpend(endpoint: 'meta-spend' | 'amazon-spend' | 'flipkart-spend' | 'misc-spend', id: string): Promise<void> {
+export async function deleteMarketingSpend(
+    endpoint:
+        | 'meta-spend'
+        | 'amazon-spend'
+        | 'flipkart-spend'
+        | 'checkout-spend'
+        | 'engage-spend'
+        | 'dolchi-spend'
+        | 'misc-spend',
+    id: string
+): Promise<void> {
     const response = await fetch(`/api/${endpoint}/${id}`, {
         method: 'DELETE',
     });

@@ -16,6 +16,9 @@ const ABANDONED_CART_ORDERS_PATH = path.join(__dirname, 'public', 'abandoned-car
 const META_SPEND_PATH = path.join(__dirname, 'public', 'meta-spend.json');
 const AMAZON_SPEND_PATH = path.join(__dirname, 'public', 'amazon-spend.json');
 const FLIPKART_SPEND_PATH = path.join(__dirname, 'public', 'flipkart-spend.json');
+const CHECKOUT_SPEND_PATH = path.join(__dirname, 'public', 'checkout-spend.json');
+const ENGAGE_SPEND_PATH = path.join(__dirname, 'public', 'engage-spend.json');
+const DOLCHI_SPEND_PATH = path.join(__dirname, 'public', 'dolchi-spend.json');
 const MISC_SPEND_PATH = path.join(__dirname, 'public', 'misc-spend.json');
 const GURUGRAM_MARTS_PATH = path.join(__dirname, 'public', 'gurugram-marts.json');
 const DELHI_MARTS_PATH = path.join(__dirname, 'public', 'delhi-marts.json');
@@ -168,6 +171,57 @@ async function readFlipkartSpend() {
 async function writeFlipkartSpend(records) {
   const json = JSON.stringify(records, null, 2);
   await fs.writeFile(FLIPKART_SPEND_PATH, json, 'utf8');
+}
+
+async function readCheckoutSpend() {
+  try {
+    const data = await fs.readFile(CHECKOUT_SPEND_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function writeCheckoutSpend(records) {
+  const json = JSON.stringify(records, null, 2);
+  await fs.writeFile(CHECKOUT_SPEND_PATH, json, 'utf8');
+}
+
+async function readEngageSpend() {
+  try {
+    const data = await fs.readFile(ENGAGE_SPEND_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function writeEngageSpend(records) {
+  const json = JSON.stringify(records, null, 2);
+  await fs.writeFile(ENGAGE_SPEND_PATH, json, 'utf8');
+}
+
+async function readDolchiSpend() {
+  try {
+    const data = await fs.readFile(DOLCHI_SPEND_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function writeDolchiSpend(records) {
+  const json = JSON.stringify(records, null, 2);
+  await fs.writeFile(DOLCHI_SPEND_PATH, json, 'utf8');
 }
 
 async function readMiscSpend() {
@@ -834,6 +888,234 @@ app.delete('/api/flipkart-spend/:id', async (req, res) => {
   } catch (err) {
     console.error('Error deleting from flipkart-spend.json', err);
     res.status(500).json({ message: 'Failed to delete Flipkart spend' });
+  }
+});
+
+app.get('/api/checkout-spend', async (_req, res) => {
+  try {
+    const records = await readCheckoutSpend();
+    res.json(records);
+  } catch (err) {
+    console.error('Error reading checkout-spend.json', err);
+    res.status(500).json({ message: 'Failed to read Checkout spend' });
+  }
+});
+
+app.post('/api/checkout-spend', async (req, res) => {
+  try {
+    const newRecord = req.body;
+    if (!newRecord || typeof newRecord !== 'object') {
+      return res.status(400).json({ message: 'Invalid record payload' });
+    }
+
+    const records = await readCheckoutSpend();
+    if (!newRecord.id) {
+      newRecord.id = `CHECKOUT-${Date.now()}`;
+    }
+    records.push(newRecord);
+    await writeCheckoutSpend(records);
+
+    res.status(201).json(newRecord);
+  } catch (err) {
+    console.error('Error writing to checkout-spend.json', err);
+    res.status(500).json({ message: 'Failed to save Checkout spend' });
+  }
+});
+
+app.put('/api/checkout-spend/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updated = req.body;
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ message: 'Invalid record payload' });
+    }
+
+    const records = await readCheckoutSpend();
+    const index = records.findIndex((r) => r.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+
+    records[index] = { ...records[index], ...updated, id };
+    await writeCheckoutSpend(records);
+
+    res.json(records[index]);
+  } catch (err) {
+    console.error('Error updating checkout-spend.json', err);
+    res.status(500).json({ message: 'Failed to update Checkout spend' });
+  }
+});
+
+app.delete('/api/checkout-spend/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const records = await readCheckoutSpend();
+    const index = records.findIndex((r) => r.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+
+    records.splice(index, 1);
+    await writeCheckoutSpend(records);
+
+    res.status(204).end();
+  } catch (err) {
+    console.error('Error deleting from checkout-spend.json', err);
+    res.status(500).json({ message: 'Failed to delete Checkout spend' });
+  }
+});
+
+app.get('/api/engage-spend', async (_req, res) => {
+  try {
+    const records = await readEngageSpend();
+    res.json(records);
+  } catch (err) {
+    console.error('Error reading engage-spend.json', err);
+    res.status(500).json({ message: 'Failed to read Engage spend' });
+  }
+});
+
+app.post('/api/engage-spend', async (req, res) => {
+  try {
+    const newRecord = req.body;
+    if (!newRecord || typeof newRecord !== 'object') {
+      return res.status(400).json({ message: 'Invalid record payload' });
+    }
+
+    const records = await readEngageSpend();
+    if (!newRecord.id) {
+      newRecord.id = `ENGAGE-${Date.now()}`;
+    }
+    records.push(newRecord);
+    await writeEngageSpend(records);
+
+    res.status(201).json(newRecord);
+  } catch (err) {
+    console.error('Error writing to engage-spend.json', err);
+    res.status(500).json({ message: 'Failed to save Engage spend' });
+  }
+});
+
+app.put('/api/engage-spend/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updated = req.body;
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ message: 'Invalid record payload' });
+    }
+
+    const records = await readEngageSpend();
+    const index = records.findIndex((r) => r.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+
+    records[index] = { ...records[index], ...updated, id };
+    await writeEngageSpend(records);
+
+    res.json(records[index]);
+  } catch (err) {
+    console.error('Error updating engage-spend.json', err);
+    res.status(500).json({ message: 'Failed to update Engage spend' });
+  }
+});
+
+app.delete('/api/engage-spend/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const records = await readEngageSpend();
+    const index = records.findIndex((r) => r.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+
+    records.splice(index, 1);
+    await writeEngageSpend(records);
+
+    res.status(204).end();
+  } catch (err) {
+    console.error('Error deleting from engage-spend.json', err);
+    res.status(500).json({ message: 'Failed to delete Engage spend' });
+  }
+});
+
+app.get('/api/dolchi-spend', async (_req, res) => {
+  try {
+    const records = await readDolchiSpend();
+    res.json(records);
+  } catch (err) {
+    console.error('Error reading dolchi-spend.json', err);
+    res.status(500).json({ message: 'Failed to read Dolchi spend' });
+  }
+});
+
+app.post('/api/dolchi-spend', async (req, res) => {
+  try {
+    const newRecord = req.body;
+    if (!newRecord || typeof newRecord !== 'object') {
+      return res.status(400).json({ message: 'Invalid record payload' });
+    }
+
+    const records = await readDolchiSpend();
+    if (!newRecord.id) {
+      newRecord.id = `DOLCHI-${Date.now()}`;
+    }
+    records.push(newRecord);
+    await writeDolchiSpend(records);
+
+    res.status(201).json(newRecord);
+  } catch (err) {
+    console.error('Error writing to dolchi-spend.json', err);
+    res.status(500).json({ message: 'Failed to save Dolchi spend' });
+  }
+});
+
+app.put('/api/dolchi-spend/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updated = req.body;
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ message: 'Invalid record payload' });
+    }
+
+    const records = await readDolchiSpend();
+    const index = records.findIndex((r) => r.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+
+    records[index] = { ...records[index], ...updated, id };
+    await writeDolchiSpend(records);
+
+    res.json(records[index]);
+  } catch (err) {
+    console.error('Error updating dolchi-spend.json', err);
+    res.status(500).json({ message: 'Failed to update Dolchi spend' });
+  }
+});
+
+app.delete('/api/dolchi-spend/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const records = await readDolchiSpend();
+    const index = records.findIndex((r) => r.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+
+    records.splice(index, 1);
+    await writeDolchiSpend(records);
+
+    res.status(204).end();
+  } catch (err) {
+    console.error('Error deleting from dolchi-spend.json', err);
+    res.status(500).json({ message: 'Failed to delete Dolchi spend' });
   }
 });
 
