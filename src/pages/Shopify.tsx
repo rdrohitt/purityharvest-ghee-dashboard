@@ -2071,6 +2071,10 @@ function AddOrderModal({
         statusText?: string;
         statusLocation?: string;
         statusDateTime?: string;
+        expectedDeliveryDate?: string;
+        pickupDate?: string;
+        origin?: string;
+        destination?: string;
         scans: Array<{
             status: string;
             instructions: string;
@@ -2172,6 +2176,10 @@ function AddOrderModal({
                     statusText: status.Status || '',
                     statusLocation: status.StatusLocation || '',
                     statusDateTime: status.StatusDateTime || '',
+                    expectedDeliveryDate: shipment.ExpectedDeliveryDate || shipment.PromisedDeliveryDate || null,
+                    pickupDate: shipment.PickUpDate || shipment.PickedupDate || null,
+                    origin: shipment.Origin || shipment.PickupLocation || '',
+                    destination: shipment.Destination || (shipment.Consignee && shipment.Consignee.City) || '',
                     scans: mappedScans,
                 });
             })
@@ -2513,6 +2521,10 @@ function ShippingTimeline({
         statusText?: string;
         statusLocation?: string;
         statusDateTime?: string;
+        expectedDeliveryDate?: string;
+        pickupDate?: string;
+        origin?: string;
+        destination?: string;
         scans: Array<{
             status: string;
             instructions: string;
@@ -2525,8 +2537,78 @@ function ShippingTimeline({
 }) {
     const steps: DeliveryStatus[] = ['Pending Pickup', 'In Transit', 'Delivered', 'RTO'];
 
+    function formatShortDate(input?: string) {
+        if (!input) return '';
+        const d = new Date(input);
+        if (Number.isNaN(d.getTime())) return input;
+        return d.toLocaleString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }
+
     return (
-        <div style={{ background: 'var(--bg-elev)', borderRadius: 8, border: '1px solid var(--border)', padding: 12, display: 'grid', gap: 12 }}>
+        <div style={{ background: 'var(--bg-elev)', borderRadius: 8, border: '1px solid var(--border)', padding: 12, display: 'grid', gap: 10 }}>
+            {/* Header card with AWB + key dates */}
+            <div
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    padding: 8,
+                    borderRadius: 8,
+                    background:
+                        tracking && tracking.statusText === 'Delivered'
+                            ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
+                            : 'linear-gradient(135deg, #eff6ff, #e0f2fe)',
+                    border: '1px solid rgba(148, 163, 184, 0.5)',
+                }}
+            >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#4b5563' }}>
+                            AWB
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>
+                            {awb || 'Not assigned'}
+                        </div>
+                    </div>
+                    <div
+                        style={{
+                            padding: '3px 8px',
+                            borderRadius: 999,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            background: '#111827',
+                            color: '#f9fafb',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.08em',
+                        }}
+                    >
+                        Delhivery
+                    </div>
+                </div>
+                {tracking && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, marginTop: 4 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+                            <span style={{ color: '#4b5563' }}>Pickup</span>
+                            <span style={{ color: '#111827', fontWeight: 500 }}>
+                                {formatShortDate(tracking.pickupDate) || '—'}
+                            </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+                            <span style={{ color: '#4b5563' }}>Expected Delivery</span>
+                            <span style={{ color: '#111827', fontWeight: 500 }}>
+                                {formatShortDate(tracking.expectedDeliveryDate) || '—'}
+                            </span>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* High-level delivery status steps */}
             <div>
                 {steps.map((step, index) => {
                     const isActive = step === status;
