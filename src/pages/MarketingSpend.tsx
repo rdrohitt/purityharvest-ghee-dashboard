@@ -30,6 +30,251 @@ function formatDate(date: string | Date): string {
     return `${day}-${month}-${year}`;
 }
 
+function DatePicker({ value, onChange, required, placeholder }: { value: string; onChange: (value: string) => void; required?: boolean; placeholder?: string }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [currentMonth, setCurrentMonth] = useState(() => {
+        const date = value ? new Date(value) : new Date();
+        return new Date(date.getFullYear(), date.getMonth(), 1);
+    });
+    const containerRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLDivElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+
+    const selectedDate = value ? new Date(value) : null;
+    const displayValue = selectedDate ? selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen && inputRef.current && popupRef.current) {
+            const inputRect = inputRef.current.getBoundingClientRect();
+            const popup = popupRef.current;
+            const popupHeight = 350;
+            const popupWidth = 280;
+            let top = inputRect.bottom + window.scrollY + 4;
+            let left = inputRect.left + window.scrollX;
+            if (inputRect.bottom + popupHeight > window.innerHeight) {
+                top = inputRect.top + window.scrollY - popupHeight - 4;
+            }
+            if (inputRect.left + popupWidth > window.innerWidth) {
+                left = window.innerWidth - popupWidth - 10;
+            }
+            popup.style.top = `${top}px`;
+            popup.style.left = `${left}px`;
+        }
+    }, [isOpen]);
+
+    const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+    const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    function handleDateSelect(day: number) {
+        const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+        onChange(toInputDate(newDate));
+        setIsOpen(false);
+    }
+
+    function handlePrevMonth() {
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+    }
+
+    function handleNextMonth() {
+        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+    }
+
+    function handleToday() {
+        const today = new Date();
+        onChange(toInputDate(today));
+        setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+        setIsOpen(false);
+    }
+
+    return (
+        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+            <div
+                ref={inputRef}
+                onClick={() => setIsOpen(!isOpen)}
+                className="input"
+                style={{
+                    width: '100%',
+                    marginTop: 6,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    userSelect: 'none'
+                }}
+            >
+                <span style={{ color: displayValue ? 'var(--text)' : 'var(--muted)' }}>
+                    {displayValue || placeholder || 'Select date'}
+                </span>
+                <span style={{ fontSize: 18, color: 'var(--muted)' }}>📅</span>
+            </div>
+            <input
+                type="date"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                required={required}
+                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+                tabIndex={-1}
+            />
+            {isOpen && (
+                <div
+                    ref={popupRef}
+                    style={{
+                        position: 'fixed',
+                        background: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 12,
+                        padding: 20,
+                        boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
+                        zIndex: 10000,
+                        minWidth: 300,
+                        maxWidth: 300,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <button
+                            type="button"
+                            onClick={handlePrevMonth}
+                            style={{
+                                padding: '6px 10px',
+                                fontSize: 18,
+                                border: 'none',
+                                background: '#f3f4f6',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                color: '#374151',
+                                fontWeight: 600,
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#e5e7eb'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+                            aria-label="Previous month"
+                        >
+                            ‹
+                        </button>
+                        <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>
+                            {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleNextMonth}
+                            style={{
+                                padding: '6px 10px',
+                                fontSize: 18,
+                                border: 'none',
+                                background: '#f3f4f6',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                color: '#374151',
+                                fontWeight: 600,
+                                transition: 'all 0.2s',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#e5e7eb'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+                            aria-label="Next month"
+                        >
+                            ›
+                        </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 16 }}>
+                        {weekDays.map((day) => (
+                            <div key={day} style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#6b7280', padding: '8px 0' }}>
+                                {day}
+                            </div>
+                        ))}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                        {Array(firstDayOfMonth).fill(null).map((_, i) => (
+                            <div key={`empty-${i}`} />
+                        ))}
+                        {days.map((day) => {
+                            const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                            const isSelected = selectedDate &&
+                                date.getDate() === selectedDate.getDate() &&
+                                date.getMonth() === selectedDate.getMonth() &&
+                                date.getFullYear() === selectedDate.getFullYear();
+                            const isToday = date.toDateString() === new Date().toDateString();
+                            return (
+                                <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => handleDateSelect(day)}
+                                    style={{
+                                        padding: '10px 4px',
+                                        border: 'none',
+                                        background: isSelected ? '#16a34a' : isToday ? '#dcfce7' : 'transparent',
+                                        color: isSelected ? '#ffffff' : isToday ? '#16a34a' : '#111827',
+                                        borderRadius: 8,
+                                        cursor: 'pointer',
+                                        fontSize: 14,
+                                        fontWeight: isSelected ? 700 : isToday ? 600 : 400,
+                                        transition: 'all 0.2s',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!isSelected && !isToday) {
+                                            e.currentTarget.style.background = '#f3f4f6';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isSelected && !isToday) {
+                                            e.currentTarget.style.background = 'transparent';
+                                        } else if (isToday && !isSelected) {
+                                            e.currentTarget.style.background = '#dcfce7';
+                                        }
+                                    }}
+                                >
+                                    {day}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleToday}
+                        style={{
+                            marginTop: 16,
+                            width: '100%',
+                            padding: '10px',
+                            border: '1px solid #e5e7eb',
+                            background: '#f9fafb',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: '#111827',
+                            transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#f3f4f6';
+                            e.currentTarget.style.borderColor = '#d1d5db';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f9fafb';
+                            e.currentTarget.style.borderColor = '#e5e7eb';
+                        }}
+                    >
+                        Today
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function MarketingSpend() {
     const today = toInputDate(new Date());
 
@@ -556,7 +801,7 @@ function UnifiedSpendSection({ meta, amazon, flipkart, checkout, engage, dolchi,
                     </div>
                     <div>
                         <label className="label">Date</label>
-                        <input className="input" type="date" value={date} onChange={(e)=>setDate(e.target.value)} style={{ width: '100%', marginTop: 6 }} />
+                        <DatePicker value={date} onChange={setDate} placeholder="Select date" />
                     </div>
                     <div>
                         <label className="label">Note</label>
