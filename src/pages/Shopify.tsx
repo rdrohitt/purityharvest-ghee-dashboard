@@ -553,7 +553,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             className="filter-btn" 
                             onClick={() => {
                                 // Export to CSV
-                                const headers = ['S.no', 'Name', 'Quantity (L)', 'Amount', 'Delivery Status', 'State'];
+                                const headers = ['S.no', 'Name', 'Quantity (L)', 'Amount', 'Shipping Status', 'State'];
                                 // Exclude orders with delivery status RTO from CSV export
                                 const exportableOrders = filtered.filter(order => order.deliveryStatus !== 'RTO');
                                 const rows = exportableOrders.map((order, index) => {
@@ -743,7 +743,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                 <Th>Amount</Th>
                                 <Th>Payment Mode</Th>
                                 <Th>Platform</Th>
-                                <Th>Delivery Status</Th>
+                                <Th>Shipping Status</Th>
                                 <Th>Type</Th>
                                 <Th>Actions</Th>
                             </tr>
@@ -1524,7 +1524,7 @@ function ModernDeliveryStatusMetric({ delivered, deliveredAmount, rto, rtoAmount
                 textTransform: 'uppercase', 
                     letterSpacing: '0.4px',
             }}>
-                Delivery Status
+                Shipping Status
                 </div>
             </div>
             <div style={{ 
@@ -2338,7 +2338,7 @@ function AddOrderModal({
                             </select>
                         </div>
                         <div>
-                            <label className="label">Delivery Status</label>
+                            <label className="label">Shipping Status</label>
                             <select className="input" style={{ width: '100%', marginTop: 6 }} value={delivery} onChange={(e)=>setDelivery(e.target.value as DeliveryStatus)} required>
                                 {(['In Transit','Delivered','RTO','Pending Pickup'] as DeliveryStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
                             </select>
