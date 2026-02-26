@@ -472,22 +472,54 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
     // Group orders by display date for rowSpan rendering
     const groupedByDate = useMemo(() => {
-        const groups: Array<{ label: string; items: Order[]; metaSpent: number }> = [];
+        const groups: Array<{
+            label: string;
+            items: Order[];
+            metaSpent: number;
+            totalAmount: number;
+            totalShipping: number;
+            codCount: number;
+            paidCount: number;
+        }> = [];
         const dateToIndex = new Map<string, number>();
         for (const o of filtered) {
             const label = formatDate(o.date);
             const idx = dateToIndex.get(label);
             if (idx === undefined) {
-                groups.push({ label, items: [o], metaSpent: 0 });
+                groups.push({
+                    label,
+                    items: [o],
+                    metaSpent: 0,
+                    totalAmount: 0,
+                    totalShipping: 0,
+                    codCount: 0,
+                    paidCount: 0,
+                });
                 dateToIndex.set(label, groups.length - 1);
             } else {
                 groups[idx].items.push(o);
             }
         }
-        // compute meta spent as 22% of revenue for that day (mock)
         for (const g of groups) {
-            const total = g.items.reduce((s, it) => s + it.amount, 0);
-            g.metaSpent = Math.round(total * 0.22);
+            let totalAmount = 0;
+            let totalShipping = 0;
+            let codCount = 0;
+            let paidCount = 0;
+            for (const it of g.items) {
+                totalAmount += it.amount;
+                const shipping =
+                    (it.shippingCharges ?? 0) ||
+                    (it.shippingAmount ?? 0);
+                totalShipping += shipping;
+                if (it.paymentStatus === 'COD') codCount += 1;
+                if (it.paymentStatus === 'PAID') paidCount += 1;
+            }
+            g.totalAmount = totalAmount;
+            g.totalShipping = totalShipping;
+            g.codCount = codCount;
+            g.paidCount = paidCount;
+            // compute meta spent as 22% of revenue for that day (mock)
+            g.metaSpent = Math.round(totalAmount * 0.22);
         }
         return groups;
     }, [filtered]);
@@ -766,49 +798,137 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     group.items.map((o, idx) => (
                                         <tr key={o.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                             {idx === 0 ? (
-                                                <td rowSpan={group.items.length} style={{ padding: '12px', verticalAlign: 'top', fontWeight: 600, color: 'var(--text)', borderRight: '1px solid var(--border)' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                        <span>{group.label}</span>
-                                                        {group.items.length > 0 && (
-                                                            <a
-                                                                href={`https://wa.me/918685045943?text=${encodeURIComponent(generateWhatsAppSummary(group.label, group.items, marketingSpend))}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
+                                                <td
+                                                    rowSpan={group.items.length}
+                                                    style={{
+                                                        padding: '12px',
+                                                        verticalAlign: 'top',
+                                                        fontWeight: 600,
+                                                        color: 'var(--text)',
+                                                        borderRight: '1px solid var(--border)',
+                                                    }}
+                                                >
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                            <span>{group.label}</span>
+                                                            {group.items.length > 0 && (
+                                                                <a
+                                                                    href={`https://wa.me/918685045943?text=${encodeURIComponent(generateWhatsAppSummary(group.label, group.items, marketingSpend))}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        width: '32px',
+                                                                        height: '32px',
+                                                                        borderRadius: '8px',
+                                                                        background: '#25D366',
+                                                                        color: 'white',
+                                                                        textDecoration: 'none',
+                                                                        fontSize: '18px',
+                                                                        cursor: 'pointer',
+                                                                        flexShrink: 0,
+                                                                        border: '2px solid #128C7E',
+                                                                        boxShadow: '0 2px 4px rgba(37, 211, 102, 0.3)',
+                                                                        transition: 'all 0.2s ease',
+                                                                        fontWeight: 'bold',
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.currentTarget.style.background = '#128C7E';
+                                                                        e.currentTarget.style.transform = 'scale(1.1)';
+                                                                        e.currentTarget.style.boxShadow =
+                                                                            '0 4px 8px rgba(37, 211, 102, 0.5)';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.currentTarget.style.background = '#25D366';
+                                                                        e.currentTarget.style.transform = 'scale(1)';
+                                                                        e.currentTarget.style.boxShadow =
+                                                                            '0 2px 4px rgba(37, 211, 102, 0.3)';
+                                                                    }}
+                                                                    title="Send summary on WhatsApp"
+                                                                >
+                                                                    <svg
+                                                                        width="18"
+                                                                        height="18"
+                                                                        viewBox="0 0 24 24"
+                                                                        fill="currentColor"
+                                                                        style={{ display: 'block' }}
+                                                                    >
+                                                                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                                                                    </svg>
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                        <div
+                                                            style={{
+                                                                display: 'flex',
+                                                                flexWrap: 'wrap',
+                                                                gap: 6,
+                                                                fontSize: 10,
+                                                                color: 'var(--muted)',
+                                                            }}
+                                                        >
+                                                            <span
                                                                 style={{
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    width: '32px',
-                                                                    height: '32px',
-                                                                    borderRadius: '8px',
-                                                                    background: '#25D366',
-                                                                    color: 'white',
-                                                                    textDecoration: 'none',
-                                                                    fontSize: '18px',
-                                                                    cursor: 'pointer',
-                                                                    flexShrink: 0,
-                                                                    border: '2px solid #128C7E',
-                                                                    boxShadow: '0 2px 4px rgba(37, 211, 102, 0.3)',
-                                                                    transition: 'all 0.2s ease',
-                                                                    fontWeight: 'bold'
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: 999,
+                                                                    background: '#eff6ff',
+                                                                    color: '#1d4ed8',
+                                                                    fontWeight: 600,
+                                                                    textTransform: 'uppercase',
+                                                                    letterSpacing: '0.06em',
                                                                 }}
-                                                                onMouseEnter={(e) => {
-                                                                    e.currentTarget.style.background = '#128C7E';
-                                                                    e.currentTarget.style.transform = 'scale(1.1)';
-                                                                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(37, 211, 102, 0.5)';
-                                                                }}
-                                                                onMouseLeave={(e) => {
-                                                                    e.currentTarget.style.background = '#25D366';
-                                                                    e.currentTarget.style.transform = 'scale(1)';
-                                                                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(37, 211, 102, 0.3)';
-                                                                }}
-                                                                title="Send Summary on WhatsApp"
                                                             >
-                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'block' }}>
-                                                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                                                                </svg>
-                                                            </a>
-                                                        )}
+                                                                {group.items.length} Orders
+                                                            </span>
+                                                            <span
+                                                                style={{
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: 999,
+                                                                    background: '#ecfdf3',
+                                                                    color: '#166534',
+                                                                    fontWeight: 600,
+                                                                }}
+                                                            >
+                                                                {formatCurrency(group.totalAmount)}
+                                                            </span>
+                                                            {group.totalShipping > 0 && (
+                                                                <span
+                                                                    style={{
+                                                                        padding: '2px 6px',
+                                                                        borderRadius: 999,
+                                                                        background: '#fef3c7',
+                                                                        color: '#92400e',
+                                                                        fontWeight: 600,
+                                                                    }}
+                                                                >
+                                                                    Shipping {formatCurrency(group.totalShipping)}
+                                                                </span>
+                                                            )}
+                                                            <span
+                                                                style={{
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: 999,
+                                                                    background: '#eef2ff',
+                                                                    color: '#3730a3',
+                                                                    fontWeight: 600,
+                                                                }}
+                                                            >
+                                                                COD {group.codCount}
+                                                            </span>
+                                                            <span
+                                                                style={{
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: 999,
+                                                                    background: '#ecfdf5',
+                                                                    color: '#047857',
+                                                                    fontWeight: 600,
+                                                                }}
+                                                            >
+                                                                Paid {group.paidCount}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </td>
                                             ) : null}
