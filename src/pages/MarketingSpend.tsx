@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadMarketingSpend, addMarketingSpend, updateMarketingSpend, deleteMarketingSpend, type SpendRecord, type MiscRecord } from '../utils/marketing-spend';
 
 type DateFilterMode = 'all' | 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
-type Platform = 'Meta' | 'Amazon' | 'Flipkart' | 'Checkout' | 'Engage' | 'Dolchi' | 'Miscellaneous';
+type Platform = 'Meta' | 'Amazon' | 'Flipkart' | 'Checkout' | 'Engage' | 'Dolchi' | 'Delhivery' | 'Miscellaneous';
 
 type Toast = {
     id: string;
@@ -284,6 +284,7 @@ export default function MarketingSpend() {
     const [checkout, setCheckout] = useState<SpendRecord[]>([]);
     const [engage, setEngage] = useState<SpendRecord[]>([]);
     const [dolchi, setDolchi] = useState<SpendRecord[]>([]);
+    const [delhivery, setDelhivery] = useState<SpendRecord[]>([]);
     const [misc, setMisc] = useState<MiscRecord[]>([]);
     const [mode, setMode] = useState<DateFilterMode>('currentMonth');
     const [customFrom, setCustomFrom] = useState<string>('');
@@ -309,9 +310,10 @@ export default function MarketingSpend() {
             loadMarketingSpend('checkout-spend'),
             loadMarketingSpend('engage-spend'),
             loadMarketingSpend('dolchi-spend'),
+            loadMarketingSpend('delhivery-spend'),
             loadMarketingSpend('misc-spend')
         ])
-            .then(([metaData, amazonData, flipkartData, checkoutData, engageData, dolchiData, miscData]) => {
+            .then(([metaData, amazonData, flipkartData, checkoutData, engageData, dolchiData, delhiveryData, miscData]) => {
                 if (cancelled) return;
                 setMeta(metaData as SpendRecord[]);
                 setAmazon(amazonData as SpendRecord[]);
@@ -319,6 +321,7 @@ export default function MarketingSpend() {
                 setCheckout(checkoutData as SpendRecord[]);
                 setEngage(engageData as SpendRecord[]);
                 setDolchi(dolchiData as SpendRecord[]);
+                setDelhivery(delhiveryData as SpendRecord[]);
                 setMisc(miscData as MiscRecord[]);
             })
             .catch((err) => {
@@ -342,6 +345,7 @@ export default function MarketingSpend() {
     const filteredCheckout = useFilterRows(checkout, mode, customFrom, customTo);
     const filteredEngage = useFilterRows(engage, mode, customFrom, customTo);
     const filteredDolchi = useFilterRows(dolchi, mode, customFrom, customTo);
+    const filteredDelhivery = useFilterRows(delhivery, mode, customFrom, customTo);
     const filteredMisc = useFilterRows(misc, mode, customFrom, customTo);
 
     const totals = useMemo(() => ({
@@ -351,8 +355,9 @@ export default function MarketingSpend() {
         checkout: filteredCheckout.reduce((s, r) => s + r.amount, 0),
         engage: filteredEngage.reduce((s, r) => s + r.amount, 0),
         dolchi: filteredDolchi.reduce((s, r) => s + r.amount, 0),
+        delhivery: filteredDelhivery.reduce((s, r) => s + r.amount, 0),
         misc: filteredMisc.reduce((s, r) => s + r.amount, 0),
-    }), [filteredMeta, filteredAmazon, filteredFlipkart, filteredCheckout, filteredEngage, filteredDolchi, filteredMisc]);
+    }), [filteredMeta, filteredAmazon, filteredFlipkart, filteredCheckout, filteredEngage, filteredDolchi, filteredDelhivery, filteredMisc]);
 
     return (
         <section style={{ display: 'grid', gap: 12, maxWidth: 1200, margin: '0 auto', width: '100%', padding: 8 }}>
@@ -425,12 +430,20 @@ export default function MarketingSpend() {
                         isEven={true}
                     />
                     <ModernMetricItem 
+                        icon="🚚" 
+                        label="Delhivery Wallet" 
+                        value={formatCurrency(totals.delhivery)} 
+                        iconColor="#2563eb"
+                        isLast={false}
+                        isEven={false}
+                    />
+                    <ModernMetricItem 
                         icon="💰" 
                         label="Miscellaneous" 
                         value={formatCurrency(totals.misc)} 
                         iconColor="#8b5cf6"
                         isLast={true}
-                        isEven={false}
+                        isEven={true}
                     />
                 </div>
             </div>
@@ -442,6 +455,7 @@ export default function MarketingSpend() {
                     checkout={checkout}
                     engage={engage}
                     dolchi={dolchi}
+                    delhivery={delhivery}
                     misc={misc}
                     mode={mode}
                     customFrom={customFrom}
@@ -459,7 +473,8 @@ export default function MarketingSpend() {
                                 | 'flipkart-spend'
                                 | 'checkout-spend'
                                 | 'engage-spend'
-                                | 'dolchi-spend';
+                                | 'dolchi-spend'
+                                | 'delhivery-spend';
                             switch (platform) {
                                 case 'Meta':
                                     endpoint = 'meta-spend';
@@ -479,6 +494,9 @@ export default function MarketingSpend() {
                                 case 'Dolchi':
                                     endpoint = 'dolchi-spend';
                                     break;
+                                case 'Delhivery':
+                                    endpoint = 'delhivery-spend';
+                                    break;
                                 default:
                                     endpoint = 'meta-spend';
                             }
@@ -489,6 +507,7 @@ export default function MarketingSpend() {
                             if (platform === 'Checkout') setCheckout((v) => [saved as SpendRecord, ...v]);
                             if (platform === 'Engage') setEngage((v) => [saved as SpendRecord, ...v]);
                             if (platform === 'Dolchi') setDolchi((v) => [saved as SpendRecord, ...v]);
+                            if (platform === 'Delhivery') setDelhivery((v) => [saved as SpendRecord, ...v]);
                         }
                             showToast(`${platform} spend added successfully!`, 'success');
                         } catch (err) {
@@ -508,7 +527,8 @@ export default function MarketingSpend() {
                                 | 'flipkart-spend'
                                 | 'checkout-spend'
                                 | 'engage-spend'
-                                | 'dolchi-spend';
+                                | 'dolchi-spend'
+                                | 'delhivery-spend';
                             switch (platform) {
                                 case 'Meta':
                                     endpoint = 'meta-spend';
@@ -528,6 +548,9 @@ export default function MarketingSpend() {
                                 case 'Dolchi':
                                     endpoint = 'dolchi-spend';
                                     break;
+                                case 'Delhivery':
+                                    endpoint = 'delhivery-spend';
+                                    break;
                                 default:
                                     endpoint = 'meta-spend';
                             }
@@ -538,6 +561,7 @@ export default function MarketingSpend() {
                             if (platform === 'Checkout') setCheckout((v) => v.map((r) => r.id === updated.id ? updated as SpendRecord : r));
                             if (platform === 'Engage') setEngage((v) => v.map((r) => r.id === updated.id ? updated as SpendRecord : r));
                             if (platform === 'Dolchi') setDolchi((v) => v.map((r) => r.id === updated.id ? updated as SpendRecord : r));
+                            if (platform === 'Delhivery') setDelhivery((v) => v.map((r) => r.id === updated.id ? updated as SpendRecord : r));
                         }
                             showToast(`${platform} spend updated successfully!`, 'success');
                         } catch (err) {
@@ -557,7 +581,8 @@ export default function MarketingSpend() {
                                 | 'flipkart-spend'
                                 | 'checkout-spend'
                                 | 'engage-spend'
-                                | 'dolchi-spend';
+                                | 'dolchi-spend'
+                                | 'delhivery-spend';
                             switch (platform) {
                                 case 'Meta':
                                     endpoint = 'meta-spend';
@@ -577,6 +602,9 @@ export default function MarketingSpend() {
                                 case 'Dolchi':
                                     endpoint = 'dolchi-spend';
                                     break;
+                                case 'Delhivery':
+                                    endpoint = 'delhivery-spend';
+                                    break;
                                 default:
                                     endpoint = 'meta-spend';
                             }
@@ -587,6 +615,7 @@ export default function MarketingSpend() {
                             if (platform === 'Checkout') setCheckout((v) => v.filter((r) => r.id !== id));
                             if (platform === 'Engage') setEngage((v) => v.filter((r) => r.id !== id));
                             if (platform === 'Dolchi') setDolchi((v) => v.filter((r) => r.id !== id));
+                            if (platform === 'Delhivery') setDelhivery((v) => v.filter((r) => r.id !== id));
                         }
                             showToast(`${platform} spend deleted successfully!`, 'delete');
                         } catch (err) {
@@ -652,13 +681,14 @@ function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { i
 
 type UnifiedRecord = (SpendRecord & { _source: Platform; _type: 'spend' }) | (MiscRecord & { _source: 'Miscellaneous'; _type: 'misc' });
 
-function UnifiedSpendSection({ meta, amazon, flipkart, checkout, engage, dolchi, misc, onAdd, onUpdate, onDelete, mode, customFrom, customTo, loading }: { 
+function UnifiedSpendSection({ meta, amazon, flipkart, checkout, engage, dolchi, delhivery, misc, onAdd, onUpdate, onDelete, mode, customFrom, customTo, loading }: { 
     meta: SpendRecord[]; 
     amazon: SpendRecord[]; 
     flipkart: SpendRecord[]; 
     checkout: SpendRecord[];
     engage: SpendRecord[];
     dolchi: SpendRecord[];
+    delhivery: SpendRecord[];
     misc: MiscRecord[];
     onAdd: (platform: Platform, rec: SpendRecord | MiscRecord) => Promise<void>;
     onUpdate: (platform: Platform, rec: SpendRecord | MiscRecord) => Promise<void>;
@@ -773,9 +803,10 @@ function UnifiedSpendSection({ meta, amazon, flipkart, checkout, engage, dolchi,
         const c = checkout.map(r => ({ ...r, _source: 'Checkout' as const, _type: 'spend' as const }));
         const e = engage.map(r => ({ ...r, _source: 'Engage' as const, _type: 'spend' as const }));
         const d = dolchi.map(r => ({ ...r, _source: 'Dolchi' as const, _type: 'spend' as const }));
+        const dl = delhivery.map(r => ({ ...r, _source: 'Delhivery' as const, _type: 'spend' as const }));
         const miscRecords = misc.map(r => ({ ...r, _source: 'Miscellaneous' as const, _type: 'misc' as const }));
-        return [...m, ...a, ...f, ...c, ...e, ...d, ...miscRecords].sort((p, q) => new Date(q.date).getTime() - new Date(p.date).getTime());
-    }, [meta, amazon, flipkart, checkout, engage, dolchi, misc]);
+        return [...m, ...a, ...f, ...c, ...e, ...d, ...dl, ...miscRecords].sort((p, q) => new Date(q.date).getTime() - new Date(p.date).getTime());
+    }, [meta, amazon, flipkart, checkout, engage, dolchi, delhivery, misc]);
 
     const filtered = useFilterRows(combined, mode, customFrom, customTo);
 
@@ -796,6 +827,7 @@ function UnifiedSpendSection({ meta, amazon, flipkart, checkout, engage, dolchi,
                             <option value="Checkout">Checkout</option>
                             <option value="Engage">Engage</option>
                             <option value="Dolchi">Dolchi</option>
+                            <option value="Delhivery">Delhivery</option>
                             <option value="Miscellaneous">Miscellaneous</option>
                         </select>
                     </div>

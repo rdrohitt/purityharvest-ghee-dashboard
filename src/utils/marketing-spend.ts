@@ -12,6 +12,7 @@ export async function loadMarketingSpend(
         | 'checkout-spend'
         | 'engage-spend'
         | 'dolchi-spend'
+        | 'delhivery-spend'
         | 'misc-spend'
 ): Promise<SpendRecord[] | MiscRecord[]> {
     const response = await fetch(`/api/${endpoint}`);
@@ -32,6 +33,7 @@ export async function addMarketingSpend(
         | 'checkout-spend'
         | 'engage-spend'
         | 'dolchi-spend'
+        | 'delhivery-spend'
         | 'misc-spend',
     record: SpendRecord | MiscRecord
 ): Promise<SpendRecord | MiscRecord> {
@@ -61,6 +63,7 @@ export async function updateMarketingSpend(
         | 'checkout-spend'
         | 'engage-spend'
         | 'dolchi-spend'
+        | 'delhivery-spend'
         | 'misc-spend',
     record: SpendRecord | MiscRecord
 ): Promise<SpendRecord | MiscRecord> {
@@ -90,6 +93,7 @@ export async function deleteMarketingSpend(
         | 'checkout-spend'
         | 'engage-spend'
         | 'dolchi-spend'
+        | 'delhivery-spend'
         | 'misc-spend',
     id: string
 ): Promise<void> {

@@ -20,6 +20,7 @@ const FLIPKART_SPEND_PATH = path.join(__dirname, 'public', 'flipkart-spend.json'
 const CHECKOUT_SPEND_PATH = path.join(__dirname, 'public', 'checkout-spend.json');
 const ENGAGE_SPEND_PATH = path.join(__dirname, 'public', 'engage-spend.json');
 const DOLCHI_SPEND_PATH = path.join(__dirname, 'public', 'dolchi-spend.json');
+const DELHIVERY_SPEND_PATH = path.join(__dirname, 'public', 'delhivery-spend.json');
 const MISC_SPEND_PATH = path.join(__dirname, 'public', 'misc-spend.json');
 const GURUGRAM_MARTS_PATH = path.join(__dirname, 'public', 'gurugram-marts.json');
 const DELHI_MARTS_PATH = path.join(__dirname, 'public', 'delhi-marts.json');
@@ -223,6 +224,23 @@ async function readDolchiSpend() {
 async function writeDolchiSpend(records) {
   const json = JSON.stringify(records, null, 2);
   await fs.writeFile(DOLCHI_SPEND_PATH, json, 'utf8');
+}
+
+async function readDelhiverySpend() {
+  try {
+    const data = await fs.readFile(DELHIVERY_SPEND_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function writeDelhiverySpend(records) {
+  const json = JSON.stringify(records, null, 2);
+  await fs.writeFile(DELHIVERY_SPEND_PATH, json, 'utf8');
 }
 
 async function readMiscSpend() {
@@ -1117,6 +1135,82 @@ app.delete('/api/dolchi-spend/:id', async (req, res) => {
   } catch (err) {
     console.error('Error deleting from dolchi-spend.json', err);
     res.status(500).json({ message: 'Failed to delete Dolchi spend' });
+  }
+});
+
+app.get('/api/delhivery-spend', async (_req, res) => {
+  try {
+    const records = await readDelhiverySpend();
+    res.json(records);
+  } catch (err) {
+    console.error('Error reading delhivery-spend.json', err);
+    res.status(500).json({ message: 'Failed to read Delhivery spend' });
+  }
+});
+
+app.post('/api/delhivery-spend', async (req, res) => {
+  try {
+    const newRecord = req.body;
+    if (!newRecord || typeof newRecord !== 'object') {
+      return res.status(400).json({ message: 'Invalid record payload' });
+    }
+
+    const records = await readDelhiverySpend();
+    if (!newRecord.id) {
+      newRecord.id = `DELHIVERY-${Date.now()}`;
+    }
+    records.push(newRecord);
+    await writeDelhiverySpend(records);
+
+    res.status(201).json(newRecord);
+  } catch (err) {
+    console.error('Error writing to delhivery-spend.json', err);
+    res.status(500).json({ message: 'Failed to save Delhivery spend' });
+  }
+});
+
+app.put('/api/delhivery-spend/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updated = req.body;
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ message: 'Invalid record payload' });
+    }
+
+    const records = await readDelhiverySpend();
+    const index = records.findIndex((r) => r.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+
+    records[index] = { ...records[index], ...updated, id };
+    await writeDelhiverySpend(records);
+
+    res.json(records[index]);
+  } catch (err) {
+    console.error('Error updating delhivery-spend.json', err);
+    res.status(500).json({ message: 'Failed to update Delhivery spend' });
+  }
+});
+
+app.delete('/api/delhivery-spend/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const records = await readDelhiverySpend();
+    const index = records.findIndex((r) => r.id === id);
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+
+    records.splice(index, 1);
+    await writeDelhiverySpend(records);
+
+    res.status(204).end();
+  } catch (err) {
+    console.error('Error deleting from delhivery-spend.json', err);
+    res.status(500).json({ message: 'Failed to delete Delhivery spend' });
   }
 });
 
