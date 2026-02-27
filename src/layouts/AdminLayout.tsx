@@ -61,6 +61,10 @@ export default function AdminLayout() {
                         <span className="mi-icon">💳</span>
                         <span className="mi-label">Marketing Spend</span>
                     </NavLink>
+                    <NavLink to="/admin/costing-master" className={({ isActive }) => (isActive ? 'active' : '')}>
+                        <span className="mi-icon">📊</span>
+                        <span className="mi-label">Costing Master</span>
+                    </NavLink>
                     <NavLink to="/admin/callers" className={({ isActive }) => (isActive ? 'active' : '')}>
                         <span className="mi-icon">📞</span>
                         <span className="mi-label">Callers</span>
