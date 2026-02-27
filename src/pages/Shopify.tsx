@@ -586,8 +586,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             onClick={() => {
                                 // Export to CSV
                                 const headers = ['S.no', 'Name', 'Quantity (L)', 'Amount', 'Shipping Status', 'State'];
-                                // Exclude orders with delivery status RTO from CSV export
-                                const exportableOrders = filtered.filter(order => order.deliveryStatus !== 'RTO');
+                                // Include all orders (COD, PAID, RTO, In Transit, etc.)
+                                const exportableOrders = filtered;
                                 const rows = exportableOrders.map((order, index) => {
                                     // Calculate total quantity in liters for this order
                                     const totalQuantityLiters = order.items.reduce((sum, item) => {
