@@ -11,11 +11,10 @@ import Flipkart from './pages/Flipkart';
 import WALeads from './pages/WALeads';
 import Followups from './pages/Followups';
 import MarketingSpend from './pages/MarketingSpend';
-import CostingMaster from './pages/CostingMaster';
 import Products from './pages/Products';
-import Callers from './pages/Callers';
 import GurugramMarts from './pages/GurugramMarts';
 import DelhiMarts from './pages/DelhiMarts';
+import Modules from './pages/Modules';
 import { isAuthenticated } from './auth';
 
 function PrivateRoute({ children }: { children: ReactElement }) {
@@ -49,11 +48,11 @@ export default function App() {
 					<Route path="wa-leads" element={<WALeads />} />
 					<Route path="amazon" element={<Amazon />} />
 					<Route path="flipkart" element={<Flipkart />} />
-					<Route path="callers" element={<Callers />} />
+					<Route path="users-and-roles" element={<Users />} />
+					<Route path="modules" element={<Modules />} />
 					<Route path="products" element={<Products />} />
 					<Route path="followups" element={<Followups />} />
 					<Route path="marketing-spend" element={<MarketingSpend />} />
-					<Route path="costing-master" element={<CostingMaster />} />
 					<Route path="gurugram-marts" element={<GurugramMarts />} />
 					<Route path="delhi-marts" element={<DelhiMarts />} />
 					<Route path="users" element={<Users />} />

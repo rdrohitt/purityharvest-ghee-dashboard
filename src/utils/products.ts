@@ -4,6 +4,7 @@ export type Product = {
     category: string;
     size: string;
     price: number;
+    actualPrice?: number;
     dimension: {
         height: number;
         width: number;

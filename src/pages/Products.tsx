@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { loadProducts, addProduct, updateProduct, deleteProduct, type Product } from '../utils/products';
 
 function formatCurrency(n: number): string {
@@ -60,6 +60,41 @@ export default function Products() {
         const categorySet = new Set<string>(filtered.map(p => (p as any).category || ''));
         const categories = [...categorySet].filter(Boolean).length;
         return { total, avgPrice, minPrice, maxPrice, avgWeight, categories };
+    }, [filtered]);
+
+    const groupedProducts = useMemo(() => {
+        const groups = new Map<string, { name: string; category: string; variants: Product[] }>();
+
+        for (const p of filtered) {
+            const category = (p as any).category || '';
+            const key = `${p.name}::${category}`;
+            const existing = groups.get(key);
+            if (existing) {
+                existing.variants.push(p);
+            } else {
+                groups.set(key, {
+                    name: p.name,
+                    category,
+                    variants: [p],
+                });
+            }
+        }
+
+        const result = Array.from(groups.values());
+
+        // Sort variants within each product by size for a stable order
+        result.forEach((group) => {
+            group.variants.sort((a, b) => a.size.localeCompare(b.size));
+        });
+
+        // Sort products by name, then category
+        result.sort(
+            (a, b) =>
+                a.name.localeCompare(b.name) ||
+                a.category.localeCompare(b.category)
+        );
+
+        return result;
     }, [filtered]);
 
     function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
@@ -149,7 +184,7 @@ export default function Products() {
                     </button>
                 </div>
                 <div style={{ width: '100%', color: 'var(--muted)', fontSize: 14 }}>
-                    {loading ? 'Loading products…' : `Showing ${filtered.length} products`}
+                    {loading ? 'Loading products…' : `Showing ${groupedProducts.length} products (${filtered.length} variants)`}
                 </div>
 
                 <div style={{ 
@@ -214,12 +249,13 @@ export default function Products() {
 
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div className="table-scroll-wrapper">
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1200, tableLayout: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1300, tableLayout: 'auto' }}>
                         <colgroup>
                             <col style={{ width: '140px', minWidth: '140px' }} />
                             <col style={{ width: '250px', minWidth: '250px' }} />
                             <col style={{ width: '160px', minWidth: '160px' }} />
                             <col style={{ width: '120px', minWidth: '120px' }} />
+                            <col style={{ width: '140px', minWidth: '140px' }} />
                             <col style={{ width: '140px', minWidth: '140px' }} />
                             <col style={{ width: '180px', minWidth: '180px' }} />
                             <col style={{ width: '120px', minWidth: '120px' }} />
@@ -232,47 +268,73 @@ export default function Products() {
                                 <Th>Category</Th>
                                 <Th>Size</Th>
                                 <Th>Price</Th>
+                                <Th>Actual Price</Th>
                                 <Th>Dimension (H × W × L)</Th>
                                 <Th>Weight</Th>
                                 <Th>Actions</Th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((p) => (
-                                <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                    <Td>{p.id}</Td>
-                                    <Td style={{ fontWeight: 600 }}>{p.name}</Td>
-                                    <Td>{(p as any).category || '-'}</Td>
-                                    <Td>{p.size}</Td>
-                                    <Td>{formatCurrency(p.price)}</Td>
-                                    <Td>{p.dimension.height} × {p.dimension.width} × {p.dimension.length} cm</Td>
-                                    <Td>{p.weight} g</Td>
-                                    <Td>
-                                        <div style={{ display: 'flex', gap: 8 }}>
-                                            <button
-                                                type="button"
-                                                className="icon-btn"
-                                                onClick={() => {
-                                                    setEditingProduct(p);
-                                                    setShowAddProduct(true);
-                                                }}
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="icon-btn icon-btn--danger"
-                                                onClick={() => handleDeleteProduct(p.id)}
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </Td>
-                                </tr>
+                            {groupedProducts.map((group) => (
+                                <Fragment key={`${group.name}::${group.category || 'uncategorised'}`}>
+                                    {group.variants.map((p, idx) => (
+                                        <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <Td>{p.id}</Td>
+                                            {idx === 0 ? (
+                                                <>
+                                                    <td
+                                                        rowSpan={group.variants.length}
+                                                        style={{ padding: '12px', fontWeight: 600 }}
+                                                    >
+                                                        {group.name}
+                                                    </td>
+                                                    <td
+                                                        rowSpan={group.variants.length}
+                                                        style={{ padding: '12px' }}
+                                                    >
+                                                        {group.category || '-'}
+                                                    </td>
+                                                </>
+                                            ) : null}
+                                            <Td>{p.size}</Td>
+                                            <Td>{formatCurrency(p.price)}</Td>
+                                            <Td>
+                                                {((p as any).actualPrice ?? (p as any).actual_price) != null
+                                                    ? formatCurrency(
+                                                        (p as any).actualPrice ?? (p as any).actual_price
+                                                    )
+                                                    : '—'}
+                                            </Td>
+                                            <Td>{p.dimension.height} × {p.dimension.width} × {p.dimension.length} cm</Td>
+                                            <Td>{p.weight} g</Td>
+                                            <Td>
+                                                <div style={{ display: 'flex', gap: 8 }}>
+                                                    <button
+                                                        type="button"
+                                                        className="icon-btn"
+                                                        onClick={() => {
+                                                            setEditingProduct(p);
+                                                            setShowAddProduct(true);
+                                                        }}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="icon-btn icon-btn--danger"
+                                                        onClick={() => handleDeleteProduct(p.id)}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </Td>
+                                        </tr>
+                                    ))}
+                                </Fragment>
                             ))}
-                            {filtered.length === 0 ? (
+                            {groupedProducts.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
                                         No products found
                                     </td>
                                 </tr>
@@ -391,6 +453,7 @@ function AddProductModal({
     const [size, setSize] = useState('');
     const [category, setCategory] = useState('');
     const [price, setPrice] = useState<string>('');
+    const [actualPrice, setActualPrice] = useState<string>('');
     const [height, setHeight] = useState<string>('');
     const [width, setWidth] = useState<string>('');
     const [length, setLength] = useState<string>('');
@@ -402,6 +465,13 @@ function AddProductModal({
             setSize(initialProduct.size);
             setCategory((initialProduct as any).category || '');
             setPrice(String(initialProduct.price ?? ''));
+            setActualPrice(
+                String(
+                    (initialProduct as any).actualPrice ??
+                    (initialProduct as any).actual_price ??
+                    ''
+                )
+            );
             setHeight(String(initialProduct.dimension?.height ?? ''));
             setWidth(String(initialProduct.dimension?.width ?? ''));
             setLength(String(initialProduct.dimension?.length ?? ''));
@@ -411,6 +481,7 @@ function AddProductModal({
             setSize('');
             setCategory('');
             setPrice('');
+            setActualPrice('');
             setHeight('');
             setWidth('');
             setLength('');
@@ -426,6 +497,7 @@ function AddProductModal({
             category,
             size,
             price: parseFloat(price) || 0,
+            actualPrice: actualPrice === '' ? undefined : (parseFloat(actualPrice) || 0),
             dimension: {
                 height: parseFloat(height) || 0,
                 width: parseFloat(width) || 0,
@@ -465,7 +537,7 @@ function AddProductModal({
                     <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
                 </div>
                 <form onSubmit={submit} style={{ display: 'grid', gap: 20, padding: 20, maxHeight: '70vh', overflow: 'auto' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
                         <div style={{ gridColumn: '1 / -1' }}>
                             <label className="label">Product Name</label>
                             <input
@@ -515,6 +587,17 @@ function AddProductModal({
                                 value={price}
                                 onChange={(e) => setPrice(e.target.value)}
                                 required
+                            />
+                        </div>
+                        <div>
+                            <label className="label">Actual Price (₹)</label>
+                            <input
+                                className="input"
+                                style={{ width: '100%', marginTop: 6 }}
+                                type="number"
+                                min={0}
+                                value={actualPrice}
+                                onChange={(e) => setActualPrice(e.target.value)}
                             />
                         </div>
                     </div>

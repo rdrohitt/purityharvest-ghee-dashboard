@@ -1,0 +1,23 @@
+/* Admin layout specific styles */
+
+.admin-sidebar-footer {
+  margin-top: auto;
+}
+
+.admin-topbar-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.admin-topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-topbar-search {
+  height: 36px;
+  width: 220px;
+}
+

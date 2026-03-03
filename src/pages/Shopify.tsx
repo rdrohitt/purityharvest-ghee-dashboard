@@ -527,10 +527,10 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     return (
         <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
             <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
-                <div style={{ fontWeight: 800 }}>{title}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div className="filter-group" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: 'var(--text)' }}>{title}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%' }}>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div className="filter-group" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                             <FilterButton active={range === 'all'} onClick={() => { setRange('all'); setShowCustom(false); }}>All</FilterButton>
                             <FilterButton active={range === 'today'} onClick={() => { setRange('today'); setShowCustom(false); }}>Today</FilterButton>
                             <FilterButton active={range === 'yesterday'} onClick={() => { setRange('yesterday'); setShowCustom(false); }}>Yesterday</FilterButton>
@@ -546,11 +546,41 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                 }}
                             >Custom</FilterButton>
                         </div>
-                        <div style={{ flex: 1 }} />
-                        <input className="input" placeholder="Search customer name or phone" style={{ width: 240 }} value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} />
-                        <button className="button" style={{ width: 'auto', padding: '0 16px' }} onClick={() => setShowAddOrder(true)}>Add Order</button>
+                        <div style={{ flex: 1, minWidth: 8 }} />
+                        <div style={{ position: 'relative' }}>
+                            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'var(--muted)', pointerEvents: 'none' }} aria-hidden>🔍</span>
+                            <input
+                                className="input"
+                                placeholder="Search customer or phone"
+                                style={{ width: 260, paddingLeft: 36, transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                                value={customerFilter}
+                                onChange={(e) => setCustomerFilter(e.target.value)}
+                            />
+                        </div>
+                        <button
+                            className="button"
+                            style={{
+                                width: 'auto',
+                                padding: '0 20px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                transition: 'transform 0.15s ease, box-shadow 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(46, 125, 91, 0.25)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                            onClick={() => setShowAddOrder(true)}
+                        >
+                            <span>+</span> Add Order
+                        </button>
                     </div>
-                    <div className="status-filters-row" style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <div className="status-filters-row" style={{ display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                         <StatusFilter
                             label="Payment Mode"
                             value={paymentStatusFilter}
@@ -585,7 +615,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             className="filter-btn" 
                             onClick={() => {
                                 // Export to CSV
-                                const headers = ['S.no', 'Name', 'Quantity (L)', 'Amount', 'Shipping Status', 'State'];
+                                const headers = ['S.no', 'Name', 'Mobile', 'Quantity (L)', 'Amount', 'Shipping Status', 'State'];
                                 // Include all orders (COD, PAID, RTO, In Transit, etc.)
                                 const exportableOrders = filtered;
                                 const rows = exportableOrders.map((order, index) => {
@@ -612,6 +642,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     return [
                                         index + 1,
                                         order.customer,
+                                        order.customerPhone,
                                         totalQuantityLiters,
                                         order.amount,
                                         order.deliveryStatus || '',
@@ -753,9 +784,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 ) : null}
             </div>
 
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card" style={{ padding: 0, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15, 79, 60, 0.06)' }}>
+                <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', fontSize: 13, color: 'var(--muted)' }}>
+                    {loading ? '—' : `${filtered.length.toLocaleString()} order${filtered.length === 1 ? '' : 's'}`}
+                </div>
                 <div className="table-scroll-wrapper">
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1400, tableLayout: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1400, tableLayout: 'auto' }} className="orders-table">
                         <colgroup>
                             <col style={{ width: '120px', minWidth: '120px' }} />
                             <col style={{ width: '200px', minWidth: '200px' }} />
@@ -2394,11 +2428,11 @@ function AddOrderModal({
             <div
                 className="card"
                 onClick={(e)=>e.stopPropagation()}
-                style={{ width: '100%', maxWidth: 1350, maxHeight: '90vh', padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                style={{ width: '100%', maxWidth: 1350, maxHeight: '90vh', padding: 0, boxShadow: '0 24px 48px rgba(15, 79, 60, 0.12), 0 8px 24px rgba(0,0,0,.08)', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: 16 }}
             >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-                    <h3 style={{ margin: 0 }}>{mode === 'edit' ? 'Edit Order' : 'Add Order'}</h3>
-                    <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-elev)' }}>
+                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{mode === 'edit' ? 'Edit Order' : 'Add Order'}</h3>
+                    <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ width: 40, height: 40, padding: 0, borderRadius: 10 }}>✕</button>
                 </div>
                 <form
                     onSubmit={submit}
@@ -2406,14 +2440,16 @@ function AddOrderModal({
                 >
                     <div
                         style={{
-                            padding: 20,
+                            padding: 24,
                             overflowY: 'auto',
                             flex: 1,
+                            background: 'var(--bg)',
                         }}
                     >
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 4fr) minmax(260px, 1.4fr)', gap: 20, alignItems: 'flex-start' }}>
-                        <div style={{ display: 'grid', gap: 20 }}>
-                            {/* First Row: Phone and Customer Name */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 4fr) minmax(280px, 1.4fr)', gap: 24, alignItems: 'flex-start' }}>
+                        <div style={{ display: 'grid', gap: 24 }}>
+                            {/* Customer & address */}
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: -8 }}>Customer & address</div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
                                 <div>
                                     <label className="label">Phone</label>
@@ -2457,6 +2493,7 @@ function AddOrderModal({
                                     <input className="input" style={{ width: '100%', marginTop: 6 }} value={address} onChange={(e)=>setAddress(e.target.value)} required />
                                 </div>
                             </div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: -8 }}>Date & location</div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
                                 <div>
                                     <label className="label">Date</label>
@@ -2496,11 +2533,12 @@ function AddOrderModal({
                             </div>
 
                             <div>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Order items</div>
                                 <div style={{ display: 'grid', gap: 10 }}>
                                     {items.map((it, idx) => {
                                         const availableProducts = getAvailableProducts(idx);
                                         return (
-                                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 140px 44px', gap: 10, alignItems: 'end', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 140px 44px', gap: 10, alignItems: 'end', background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
                                                 <div>
                                                     <label className="label">Variant</label>
                                                     <select 
@@ -2541,10 +2579,11 @@ function AddOrderModal({
                                             </div>
                                         );
                                     })}
-                                    <button type="button" className="filter-btn" onClick={addItem} style={{ width: 'fit-content' }}>+ Add item</button>
+                                    <button type="button" className="filter-btn" onClick={addItem} style={{ width: 'fit-content', marginTop: 4 }}>+ Add item</button>
                                 </div>
                             </div>
 
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: -8 }}>Platform & status</div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 }}>
                                 <div>
                                     <label className="label">Platform</label>
@@ -2574,6 +2613,7 @@ function AddOrderModal({
                                 </div>
                             </div>
 
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: -8 }}>Charges & amount</div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
                                 <div>
                                     <label className="label">COD Charges (₹)</label>
@@ -2613,20 +2653,21 @@ function AddOrderModal({
                             </div>
                         </div>
 
-                        <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                            <div>
-                                <label className="label">AWB No (optional)</label>
+                        <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                            <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Tracking (optional)</div>
+                                <label className="label" style={{ fontSize: 13 }}>AWB No</label>
                                 <input
                                     className="input"
                                     style={{ width: '100%', marginTop: 6 }}
                                     type="text"
                                     value={awb}
                                     onChange={(e) => setAwb(e.target.value)}
-                                    placeholder="Enter AWB number"
+                                    placeholder="Enter Delhivery AWB"
                                 />
                             </div>
                             <div>
-                                <div className="label" style={{ marginBottom: 8 }}>Shipping Status Timeline</div>
+                                <div className="label" style={{ marginBottom: 10, fontSize: 13 }}>Shipping timeline</div>
                                 <ShippingTimeline
                                     status={delivery}
                                     awb={awb}
@@ -2642,17 +2683,34 @@ function AddOrderModal({
                     <div
                         style={{
                             display: 'flex',
-                            gap: 8,
+                            gap: 12,
                             justifyContent: 'flex-end',
                             borderTop: '1px solid var(--border)',
-                            padding: '12px 20px',
+                            padding: '16px 24px',
                             flexShrink: 0,
                             background: 'var(--bg-elev)',
+                            boxShadow: '0 -2px 8px rgba(15, 79, 60, 0.04)',
                         }}
                     >
-                        <button type="button" className="icon-btn" onClick={onClose}>Cancel</button>
-                        <button type="submit" className="button" style={{ width: 'auto', padding: '0 16px' }}>
-                            {mode === 'edit' ? 'Save Changes' : 'Create'}
+                        <button type="button" className="icon-btn" onClick={onClose} style={{ padding: '0 20px' }}>Cancel</button>
+                        <button
+                            type="submit"
+                            className="button"
+                            style={{
+                                width: 'auto',
+                                padding: '0 24px',
+                                transition: 'transform 0.15s ease, box-shadow 0.2s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(46, 125, 91, 0.25)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                        >
+                            {mode === 'edit' ? 'Save changes' : 'Create order'}
                         </button>
                     </div>
                 </form>
@@ -2725,14 +2783,17 @@ function ShippingTimeline({
         return (
             <div
                 style={{
-                    background: 'var(--bg-elev)',
+                    background: 'linear-gradient(135deg, var(--bg-elev) 0%, color-mix(in srgb, var(--primary) 4%, var(--bg-elev)) 100%)',
                     borderRadius: 12,
-                    border: '1px solid var(--border)',
-                    padding: 12,
-                    fontSize: 11,
+                    border: '1px dashed var(--border)',
+                    padding: 20,
+                    fontSize: 13,
                     color: 'var(--muted)',
+                    textAlign: 'center',
+                    lineHeight: 1.5,
                 }}
             >
+                <span style={{ display: 'block', marginBottom: 6, fontSize: 20 }}>📦</span>
                 Enter an AWB number above to view live Delhivery tracking.
             </div>
         );
@@ -2741,18 +2802,20 @@ function ShippingTimeline({
     const hasTrackingInfo = !!tracking && (sortedScans.length > 0 || tracking.statusText || tracking.statusLocation);
 
     if (!hasTrackingInfo && !loading && !error) {
-        // AWB present but no tracking data yet – just show a simple message, no timeline UI
         return (
             <div
                 style={{
-                    background: 'var(--bg-elev)',
+                    background: 'linear-gradient(135deg, var(--bg-elev) 0%, color-mix(in srgb, var(--primary) 4%, var(--bg-elev)) 100%)',
                     borderRadius: 12,
-                    border: '1px solid var(--border)',
-                    padding: 12,
-                    fontSize: 11,
+                    border: '1px dashed var(--border)',
+                    padding: 20,
+                    fontSize: 13,
                     color: 'var(--muted)',
+                    textAlign: 'center',
+                    lineHeight: 1.5,
                 }}
             >
+                <span style={{ display: 'block', marginBottom: 6, fontSize: 20 }}>🔍</span>
                 No tracking information found for this AWB yet.
             </div>
         );
@@ -2764,9 +2827,10 @@ function ShippingTimeline({
                 background: 'var(--bg-elev)',
                 borderRadius: 12,
                 border: '1px solid var(--border)',
-                padding: 12,
+                padding: 14,
                 display: 'grid',
-                gap: 10,
+                gap: 12,
+                boxShadow: '0 1px 3px rgba(15, 79, 60, 0.04)',
             }}
         >
             {/* Header with AWB + key dates */}
@@ -2774,14 +2838,15 @@ function ShippingTimeline({
                 style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 6,
-                    padding: 8,
+                    gap: 8,
+                    padding: 12,
                     borderRadius: 10,
                     background:
                         tracking && tracking.statusText === 'Delivered'
-                            ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
-                            : 'linear-gradient(135deg, #eff6ff, #e0f2fe)',
-                    border: '1px solid rgba(148, 163, 184, 0.5)',
+                            ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)'
+                            : 'linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%)',
+                    border: '1px solid rgba(148, 163, 184, 0.4)',
+                    transition: 'box-shadow 0.2s ease',
                 }}
             >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
@@ -2946,22 +3011,23 @@ function ShippingTimeline({
             )}
 
             {/* Status helper text (only when AWB is present) */}
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                {loading && <div>Loading live tracking…</div>}
-                {!loading && error && <div style={{ color: '#b91c1c' }}>{error}</div>}
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                {loading && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>Loading live tracking…</div>}
+                {!loading && error && <div style={{ color: '#b91c1c', fontWeight: 500 }}>{error}</div>}
             </div>
 
             {/* All live events (latest first) */}
             {tracking && sortedScans.length > 0 && (
                 <div
                     style={{
-                        borderTop: '1px dashed var(--border)',
-                        paddingTop: 8,
+                        borderTop: '1px solid var(--border)',
+                        paddingTop: 12,
                         maxHeight: 220,
                         overflowY: 'auto',
                     }}
                 >
-                    <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Latest Updates</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Latest updates</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {[...sortedScans].reverse().map((scan, idx) => {
                         const d = scan.dateTime ? new Date(scan.dateTime) : null;
                         const ts = d
@@ -2976,27 +3042,37 @@ function ShippingTimeline({
                             <div
                                 key={`${scan.status}-${scan.dateTime}-${idx}`}
                                 style={{
-                                    marginBottom: 8,
-                                    fontSize: 11,
-                                    lineHeight: 1.4,
-                                    padding: 6,
+                                    fontSize: 12,
+                                    lineHeight: 1.45,
+                                    padding: 10,
                                     borderRadius: 8,
                                     background: 'var(--bg)',
+                                    border: '1px solid var(--border)',
+                                    transition: 'background 0.15s ease, border-color 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'color-mix(in srgb, var(--primary) 6%, var(--bg))';
+                                    e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--primary) 20%, var(--border))';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'var(--bg)';
+                                    e.currentTarget.style.borderColor = 'var(--border)';
                                 }}
                             >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-                                    <div style={{ fontWeight: 600 }}>{scan.status}</div>
-                                    {ts && <span style={{ color: 'var(--muted)' }}>{ts}</span>}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                    <div style={{ fontWeight: 600, color: 'var(--text)' }}>{scan.status}</div>
+                                    {ts && <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{ts}</span>}
                                 </div>
                                 {scan.instructions && (
-                                    <div style={{ color: 'var(--muted)', marginTop: 2 }}>{scan.instructions}</div>
+                                    <div style={{ color: 'var(--muted)', marginTop: 4, fontSize: 11 }}>{scan.instructions}</div>
                                 )}
                                 {scan.location && (
-                                    <div style={{ color: 'var(--muted)', marginTop: 2 }}>{scan.location}</div>
+                                    <div style={{ color: 'var(--muted)', marginTop: 2, fontSize: 11 }}>📍 {scan.location}</div>
                                 )}
                             </div>
                         );
                     })}
+                    </div>
                 </div>
             )}
         </div>
@@ -3025,6 +3101,12 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
 
     const totalOrders = customerOrders.length;
     const totalAmount = customerOrders.reduce((sum, o) => sum + o.amount, 0);
+    const deliveredCount = customerOrders.filter((o) => o.deliveryStatus === 'Delivered').length;
+    const rtoCount = customerOrders.filter((o) => o.deliveryStatus === 'RTO').length;
+    const inTransitCount = customerOrders.filter((o) => o.deliveryStatus === 'In Transit').length;
+
+    const [activeTab, setActiveTab] = useState<'orders' | 'followups' | 'notes'>('orders');
+    const [notes, setNotes] = useState<string>('');
 
     useEffect(() => {
         const prev = document.body.style.overflow;
@@ -3041,22 +3123,22 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
             role="dialog"
             aria-modal="true"
             onClick={onClose}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.45)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', zIndex: 60 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(15, 79, 60, 0.12)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', zIndex: 60 }}
         >
             <div
                 className="card"
                 onClick={(e) => e.stopPropagation()}
-                style={{ width: '100%', maxWidth: 1200, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+                style={{ width: '100%', maxWidth: 1200, padding: 0, boxShadow: '0 24px 48px rgba(15, 79, 60, 0.12), 0 8px 24px rgba(0,0,0,.08)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 16 }}
             >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: '1px solid var(--border)' }}>
-                    <h3 style={{ margin: 0 }}>Customer Profile</h3>
-                    <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
+                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Customer profile</h3>
+                    <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ width: 40, height: 40, padding: 0, borderRadius: 10 }}>✕</button>
                 </div>
                 
-                <div style={{ padding: 20, overflow: 'auto', flex: 1 }}>
+                <div style={{ padding: 24, overflow: 'auto', flex: 1, background: 'var(--bg)' }}>
                     {/* Customer Information */}
-                    <div style={{ marginBottom: 24, padding: 16, background: 'var(--bg-elev)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                        <h4 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Customer Information</h4>
+                    <div style={{ marginBottom: 20, padding: 20, background: 'var(--bg-elev)', borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(15, 79, 60, 0.04)' }}>
+                        <h4 style={{ margin: '0 0 18px 0', fontSize: 14, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Customer information</h4>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                             {/* First Row: Name and Phone */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
@@ -3088,60 +3170,222 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
                                 </div>
                             </div>
                         </div>
-                        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', gap: 24 }}>
-                            <div>
-                                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Total Orders</div>
-                                <div style={{ fontSize: 18, color: 'var(--text)', fontWeight: 700 }}>{totalOrders}</div>
-                            </div>
-                            <div>
-                                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Total Amount</div>
-                                <div style={{ fontSize: 18, color: 'var(--text)', fontWeight: 700 }}>{formatCurrency(totalAmount)}</div>
-                            </div>
+                        <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--border)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                            {[
+                                { label: 'Total orders', value: String(totalOrders), color: '#0f172a', bg: '#f1f5f9' },
+                                { label: 'Total amount', value: formatCurrency(totalAmount), color: '#0f4f3c', bg: 'var(--primary-weak)' },
+                                { label: 'Delivered', value: String(deliveredCount), color: '#166534', bg: '#dcfce7' },
+                                { label: 'RTO', value: String(rtoCount), color: '#b91c1c', bg: '#fee2e2' },
+                                { label: 'In transit', value: String(inTransitCount), color: '#2563eb', bg: '#dbeafe' },
+                            ].map((stat) => (
+                                <div
+                                    key={stat.label}
+                                    style={{
+                                        padding: '10px 16px',
+                                        borderRadius: 10,
+                                        background: stat.bg,
+                                        border: '1px solid transparent',
+                                        minWidth: 100,
+                                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = 'none';
+                                    }}
+                                >
+                                    <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{stat.label}</div>
+                                    <div style={{ fontSize: 16, color: stat.color, fontWeight: 700 }}>{stat.value}</div>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Orders Table */}
-                    <div>
-                        <h4 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Order History</h4>
-                        <div className="table-scroll-wrapper" style={{ maxHeight: '400px', overflow: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
-                                <thead>
-                                    <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10 }}>
-                                        <Th>Date</Th>
-                                        <Th>Items</Th>
-                                        <Th>Amount</Th>
-                                        <Th>Payment</Th>
-                                        <Th>Delivery</Th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {customerOrders.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
-                                                No orders found
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        customerOrders.map((order) => (
-                                            <tr key={order.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                                <Td>{formatDate(order.date)}</Td>
-                                                <Td>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                                        {(order.items ?? []).length === 0 ? <span>—</span> : null}
-                                                        {(order.items ?? []).map((it: OrderItem, idx: number) => (
-                                                            <div key={idx} style={{ fontSize: 12 }}>{it.variant} × {it.quantity}</div>
-                                                        ))}
-                                                    </div>
-                                                </Td>
-                                                <Td style={{ fontWeight: 600 }}>{formatCurrency(order.amount)}</Td>
-                                                <Td><StatusTag kind={order.paymentStatus} type="payment" /></Td>
-                                                <Td><StatusTag kind={order.deliveryStatus} type="delivery" /></Td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
+                    {/* Tabs */}
+                    <div style={{ marginTop: 4 }}>
+                        <div
+                            style={{
+                                display: 'flex',
+                                gap: 4,
+                                borderBottom: '1px solid var(--border)',
+                                marginBottom: 16,
+                                flexWrap: 'wrap',
+                            }}
+                        >
+                            {[
+                                { id: 'orders', label: 'Order history' },
+                                { id: 'followups', label: 'Followups' },
+                                { id: 'notes', label: 'Notes' },
+                            ].map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    className={`filter-btn ${activeTab === tab.id ? 'active' : ''}`}
+                                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                                    style={{ padding: '10px 18px', fontSize: 13 }}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
                         </div>
+
+                        {/* Tab panels */}
+                        {activeTab === 'orders' && (
+                            <div>
+                                <div
+                                    className="table-scroll-wrapper"
+                                    style={{ maxHeight: '400px', overflow: 'auto' }}
+                                >
+                                    <table
+                                        style={{
+                                            width: '100%',
+                                            borderCollapse: 'collapse',
+                                            minWidth: 600,
+                                        }}
+                                    >
+                                        <thead>
+                                            <tr
+                                                style={{
+                                                    background: 'var(--bg)',
+                                                    borderBottom: '1px solid var(--border)',
+                                                    position: 'sticky',
+                                                    top: 0,
+                                                    zIndex: 10,
+                                                }}
+                                            >
+                                                <Th>Date</Th>
+                                                <Th>Items</Th>
+                                                <Th>Amount</Th>
+                                                <Th>Payment</Th>
+                                                <Th>Delivery</Th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {customerOrders.length === 0 ? (
+                                                <tr>
+                                                    <td
+                                                        colSpan={5}
+                                                        style={{
+                                                            padding: '40px',
+                                                            textAlign: 'center',
+                                                            color: 'var(--muted)',
+                                                        }}
+                                                    >
+                                                        No orders found
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                customerOrders.map((order) => (
+                                                    <tr
+                                                        key={order.id}
+                                                        style={{ borderBottom: '1px solid var(--border)' }}
+                                                    >
+                                                        <Td>{formatDate(order.date)}</Td>
+                                                        <Td>
+                                                            <div
+                                                                style={{
+                                                                    display: 'flex',
+                                                                    flexDirection: 'column',
+                                                                    gap: 4,
+                                                                }}
+                                                            >
+                                                                {(order.items ?? []).length === 0 ? (
+                                                                    <span>—</span>
+                                                                ) : null}
+                                                                {(order.items ?? []).map(
+                                                                    (it: OrderItem, idx: number) => (
+                                                                        <div
+                                                                            key={idx}
+                                                                            style={{ fontSize: 12 }}
+                                                                        >
+                                                                            {it.variant} × {it.quantity}
+                                                                        </div>
+                                                                    ),
+                                                                )}
+                                                            </div>
+                                                        </Td>
+                                                        <Td style={{ fontWeight: 600 }}>
+                                                            {formatCurrency(order.amount)}
+                                                        </Td>
+                                                        <Td>
+                                                            <StatusTag
+                                                                kind={order.paymentStatus}
+                                                                type="payment"
+                                                            />
+                                                        </Td>
+                                                        <Td>
+                                                            <StatusTag
+                                                                kind={order.deliveryStatus}
+                                                                type="delivery"
+                                                            />
+                                                        </Td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'followups' && (
+                            <div
+                                style={{
+                                    padding: 20,
+                                    borderRadius: 12,
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--bg-elev)',
+                                    fontSize: 13,
+                                    color: 'var(--text)',
+                                    boxShadow: '0 1px 3px rgba(15, 79, 60, 0.04)',
+                                }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>Followups</span>
+                                    <span style={{ fontSize: 12, color: 'var(--muted)', padding: '4px 10px', background: 'var(--bg)', borderRadius: 8 }}>Coming soon</span>
+                                </div>
+                                <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+                                    Use the Followups page to schedule and record calls for this customer. This tab will show those records here in a future update.
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'notes' && (
+                            <div
+                                style={{
+                                    padding: 20,
+                                    borderRadius: 12,
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--bg-elev)',
+                                    display: 'grid',
+                                    gap: 12,
+                                    boxShadow: '0 1px 3px rgba(15, 79, 60, 0.04)',
+                                }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>Notes</span>
+                                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>Session-only (not saved)</span>
+                                </div>
+                                <textarea
+                                    className="input"
+                                    style={{
+                                        width: '100%',
+                                        minHeight: 120,
+                                        resize: 'vertical',
+                                        fontSize: 13,
+                                        fontFamily: 'inherit',
+                                        borderRadius: 10,
+                                        padding: 12,
+                                    }}
+                                    placeholder="Type quick notes about this customer…"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

@@ -1,0 +1,271 @@
+.modules-page {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.modules-header-card {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.modules-header-title {
+  font-weight: 800;
+}
+
+.modules-header-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.modules-header-spacer {
+  flex: 1;
+}
+
+.modules-search {
+  width: 260px;
+}
+
+.modules-create-btn {
+  width: auto;
+  padding: 0 16px;
+}
+
+.modules-table-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.modules-count-bar {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.modules-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 980px;
+  table-layout: auto;
+}
+
+.modules-row-header {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.modules-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.modules-th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.modules-td {
+  padding: 12px;
+  vertical-align: top;
+}
+
+.modules-td--strong {
+  font-weight: 600;
+}
+
+.modules-name-btn {
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.modules-name {
+  display: block;
+  font-weight: 600;
+}
+
+.modules-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.modules-key-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.modules-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.modules-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.modules-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.45);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+}
+
+.modules-confirm-modal {
+  width: 100%;
+  max-width: 420px;
+  padding: 0;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.modules-confirm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modules-confirm-title {
+  margin: 0;
+}
+
+.modules-confirm-body {
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.modules-confirm-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+  padding: 12px 20px 16px;
+}
+
+.modules-toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.modules-toast {
+  pointer-events: auto;
+}
+
+.modules-toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modules-toast-icon {
+  font-size: 18px;
+}
+
+.modules-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.45);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+}
+
+.modules-modal {
+  width: 100%;
+  max-width: 640px;
+  padding: 0;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.modules-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modules-modal-title {
+  margin: 0;
+}
+
+.modules-modal-body {
+  display: grid;
+  gap: 20px;
+  padding: 20px;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.modules-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.modules-form-full-row {
+  grid-column: 1 / -1;
+}
+
+.modules-input {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.modules-textarea {
+  width: 100%;
+  margin-top: 6px;
+  resize: vertical;
+  padding: 8px 12px;
+}
+
+.modules-modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.modules-modal-primary-btn {
+  width: auto;
+  padding: 0 16px;
+}
+
