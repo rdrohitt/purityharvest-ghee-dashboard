@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadOrders, addOrder, updateOrder, deleteOrder, type Order, type OrderItem, type PaymentStatus, type FulfillmentStatus, type DeliveryStatus, type Platform, type OrderType } from '../utils/orders';
 import { loadProducts, type Product } from '../utils/products';
 import { loadMarketingSpend, type SpendRecord, type MiscRecord } from '../utils/marketing-spend';
+import './Shopify.scss';
 
 function formatCurrency(n: number): string { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); }
 
@@ -525,12 +526,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     }, [filtered]);
 
     return (
-        <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
-            <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
-                <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em', color: 'var(--text)' }}>{title}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%' }}>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div className="filter-group" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <section className="shopify-page">
+            <div className="card shopify-header-card">
+                <div className="shopify-header-title">{title}</div>
+                <div className="shopify-header-main">
+                    <div className="shopify-header-filters">
+                        <div className="filter-group shopify-header-filter-group">
                             <FilterButton active={range === 'all'} onClick={() => { setRange('all'); setShowCustom(false); }}>All</FilterButton>
                             <FilterButton active={range === 'today'} onClick={() => { setRange('today'); setShowCustom(false); }}>Today</FilterButton>
                             <FilterButton active={range === 'yesterday'} onClick={() => { setRange('yesterday'); setShowCustom(false); }}>Yesterday</FilterButton>
@@ -546,41 +547,24 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                 }}
                             >Custom</FilterButton>
                         </div>
-                        <div style={{ flex: 1, minWidth: 8 }} />
-                        <div style={{ position: 'relative' }}>
-                            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'var(--muted)', pointerEvents: 'none' }} aria-hidden>🔍</span>
+                        <div className="shopify-header-spacer" />
+                        <div className="shopify-search-wrapper">
+                            <span className="shopify-search-icon" aria-hidden>🔍</span>
                             <input
-                                className="input"
+                                className="input shopify-search-input"
                                 placeholder="Search customer or phone"
-                                style={{ width: 260, paddingLeft: 36, transition: 'border-color 0.2s, box-shadow 0.2s' }}
                                 value={customerFilter}
                                 onChange={(e) => setCustomerFilter(e.target.value)}
                             />
                         </div>
                         <button
-                            className="button"
-                            style={{
-                                width: 'auto',
-                                padding: '0 20px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                transition: 'transform 0.15s ease, box-shadow 0.2s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(46, 125, 91, 0.25)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = 'none';
-                            }}
+                            className="button shopify-add-order-btn"
                             onClick={() => setShowAddOrder(true)}
                         >
                             <span>+</span> Add Order
                         </button>
                     </div>
-                    <div className="status-filters-row" style={{ display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <div className="status-filters-row shopify-status-filters">
                         <StatusFilter
                             label="Payment Mode"
                             value={paymentStatusFilter}
@@ -612,7 +596,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             options={['New', 'Repeat', 'Reference'] as OrderType[]}
                         />
                         <button 
-                            className="filter-btn" 
+                            className="filter-btn shopify-export-btn" 
                             onClick={() => {
                                 // Export to CSV
                                 const headers = ['S.no', 'Name', 'Mobile', 'Quantity (L)', 'Amount', 'Shipping Status', 'State'];
@@ -675,14 +659,13 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                 document.body.removeChild(link);
                                 showToast('Orders exported successfully!', 'success');
                             }}
-                            style={{ fontSize: 12, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}
                         >
                             <span>📥</span>
                             Export CSV
                         </button>
                         {(paymentStatusFilter || fulfillmentStatusFilter || deliveryStatusFilter || platformFilter || typeFilter) ? (
                             <button 
-                                className="filter-btn" 
+                                className="filter-btn shopify-clear-filters-btn" 
                                 onClick={() => { 
                                     setPaymentStatusFilter(''); 
                                     setFulfillmentStatusFilter(''); 
@@ -690,22 +673,13 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     setPlatformFilter(''); 
                                     setTypeFilter(''); 
                                 }}
-                                style={{ fontSize: 12, padding: '6px 12px' }}
                             >
                                 Clear All
                             </button>
                         ) : null}
                     </div>
                 </div>
-                <div style={{ 
-                    width: '100%', 
-                    display: 'flex',
-                    borderRadius: 4,
-                    overflow: 'hidden',
-                    border: '1px solid var(--border)',
-                    marginTop: 12,
-                    background: 'var(--bg-elev)',
-                }}>
+                <div className="shopify-metrics-row">
                     <ModernSalesWithEBITAMetric 
                         totalSales={metrics.totalSales}
                         ebita={metrics.ebita}
@@ -757,39 +731,42 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 {showCustom ? (
                     <div
                         ref={popoverRef}
-                        className="date-range-popover"
+                        className="date-range-popover shopify-date-range-popover"
                         style={{
-                            position: 'absolute',
-                            top: 56,
                             left: customBtnRef.current ? customBtnRef.current.offsetLeft : 0,
                         }}
                     >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 4 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <label className="label" style={{ fontSize: 12, margin: 0 }}>Start</label>
-                                <div style={{ width: 160 }}>
+                        <div className="shopify-date-range-inner">
+                            <div className="shopify-date-range-field">
+                                <label className="label shopify-date-range-label">Start</label>
+                                <div className="shopify-date-range-picker">
                                     <DatePicker value={customStart} onChange={setCustomStart} placeholder="Select start date" />
                                 </div>
                             </div>
-                            <span style={{ color: 'var(--muted)' }}>—</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <label className="label" style={{ fontSize: 12, margin: 0 }}>End</label>
-                                <div style={{ width: 160 }}>
+                            <span className="shopify-date-range-separator">—</span>
+                            <div className="shopify-date-range-field">
+                                <label className="label shopify-date-range-label">End</label>
+                                <div className="shopify-date-range-picker">
                                     <DatePicker value={customEnd} onChange={setCustomEnd} placeholder="Select end date" />
                                 </div>
                             </div>
-                            <button className="button" style={{ width: 'auto', padding: '0 16px', height: 36 }} onClick={() => setShowCustom(false)}>Apply</button>
+                            <button
+                                className="button shopify-date-range-apply"
+                                onClick={() => setShowCustom(false)}
+                            >
+                                Apply
+                            </button>
                         </div>
                     </div>
                 ) : null}
             </div>
 
-            <div className="card" style={{ padding: 0, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15, 79, 60, 0.06)' }}>
-                <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)', fontSize: 13, color: 'var(--muted)' }}>
+            <div className="card shopify-orders-card">
+                <div className="shopify-orders-count-bar">
                     {loading ? '—' : `${filtered.length.toLocaleString()} order${filtered.length === 1 ? '' : 's'}`}
                 </div>
                 <div className="table-scroll-wrapper">
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1400, tableLayout: 'auto' }} className="orders-table">
+                    <table className="orders-table shopify-orders-table">
                         <colgroup>
                             <col style={{ width: '120px', minWidth: '120px' }} />
                             <col style={{ width: '200px', minWidth: '200px' }} />
@@ -802,7 +779,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             <col style={{ width: '120px', minWidth: '120px' }} />
                         </colgroup>
                         <thead>
-                            <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                            <tr className="shopify-orders-header-row">
                                 <Th>Date</Th>
                                 <Th>Customer</Th>
                                 <Th>Variant</Th>
@@ -817,69 +794,34 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                                    <td colSpan={9} className="shopify-orders-empty-cell">
                                         Loading orders…
                                     </td>
                                 </tr>
                             ) : groupedByDate.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                                    <td colSpan={9} className="shopify-orders-empty-cell">
                                         No orders found. Click "Add Order" to create your first order.
                                     </td>
                                 </tr>
                             ) : (
                                 groupedByDate.map((group) => (
                                     group.items.map((o, idx) => (
-                                        <tr key={o.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                        <tr key={o.id} className="shopify-orders-row">
                                             {idx === 0 ? (
                                                 <td
                                                     rowSpan={group.items.length}
-                                                    style={{
-                                                        padding: '12px',
-                                                        verticalAlign: 'top',
-                                                        fontWeight: 600,
-                                                        color: 'var(--text)',
-                                                        borderRight: '1px solid var(--border)',
-                                                    }}
+                                                    className="shopify-orders-date-cell"
                                                 >
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                                    <div className="shopify-orders-date-wrapper">
+                                                        <div className="shopify-orders-date-header">
                                                             <span>{group.label}</span>
                                                             {group.items.length > 0 && (
                                                                 <a
                                                                     href={`https://wa.me/918685045943?text=${encodeURIComponent(generateWhatsAppSummary(group.label, group.items, marketingSpend))}`}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
-                                                                    style={{
-                                                                        display: 'inline-flex',
-                                                                        alignItems: 'center',
-                                                                        justifyContent: 'center',
-                                                                        width: '32px',
-                                                                        height: '32px',
-                                                                        borderRadius: '8px',
-                                                                        background: '#25D366',
-                                                                        color: 'white',
-                                                                        textDecoration: 'none',
-                                                                        fontSize: '18px',
-                                                                        cursor: 'pointer',
-                                                                        flexShrink: 0,
-                                                                        border: '2px solid #128C7E',
-                                                                        boxShadow: '0 2px 4px rgba(37, 211, 102, 0.3)',
-                                                                        transition: 'all 0.2s ease',
-                                                                        fontWeight: 'bold',
-                                                                    }}
-                                                                    onMouseEnter={(e) => {
-                                                                        e.currentTarget.style.background = '#128C7E';
-                                                                        e.currentTarget.style.transform = 'scale(1.1)';
-                                                                        e.currentTarget.style.boxShadow =
-                                                                            '0 4px 8px rgba(37, 211, 102, 0.5)';
-                                                                    }}
-                                                                    onMouseLeave={(e) => {
-                                                                        e.currentTarget.style.background = '#25D366';
-                                                                        e.currentTarget.style.transform = 'scale(1)';
-                                                                        e.currentTarget.style.boxShadow =
-                                                                            '0 2px 4px rgba(37, 211, 102, 0.3)';
-                                                                    }}
+                                                                    className="shopify-whatsapp-summary-link"
                                                                     title="Send summary on WhatsApp"
                                                                 >
                                                                     <svg
@@ -894,71 +836,31 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                                                 </a>
                                                             )}
                                                         </div>
-                                                        <div
-                                                            style={{
-                                                                display: 'flex',
-                                                                flexWrap: 'wrap',
-                                                                gap: 6,
-                                                                fontSize: 10,
-                                                                color: 'var(--muted)',
-                                                            }}
-                                                        >
+                                                        <div className="shopify-orders-date-badges">
                                                             <span
-                                                                style={{
-                                                                    padding: '2px 6px',
-                                                                    borderRadius: 999,
-                                                                    background: '#eff6ff',
-                                                                    color: '#1d4ed8',
-                                                                    fontWeight: 600,
-                                                                    textTransform: 'uppercase',
-                                                                    letterSpacing: '0.06em',
-                                                                }}
+                                                                className="shopify-badge shopify-badge--orders"
                                                             >
                                                                 {group.items.length} Orders
                                                             </span>
                                                             <span
-                                                                style={{
-                                                                    padding: '2px 6px',
-                                                                    borderRadius: 999,
-                                                                    background: '#ecfdf3',
-                                                                    color: '#166534',
-                                                                    fontWeight: 600,
-                                                                }}
+                                                                className="shopify-badge shopify-badge--amount"
                                                             >
                                                                 {formatCurrency(group.totalAmount)}
                                                             </span>
                                                             {group.totalShipping > 0 && (
                                                                 <span
-                                                                    style={{
-                                                                        padding: '2px 6px',
-                                                                        borderRadius: 999,
-                                                                        background: '#fef3c7',
-                                                                        color: '#92400e',
-                                                                        fontWeight: 600,
-                                                                    }}
+                                                                    className="shopify-badge shopify-badge--shipping"
                                                                 >
                                                                     Shipping {formatCurrency(group.totalShipping)}
                                                                 </span>
                                                             )}
                                                             <span
-                                                                style={{
-                                                                    padding: '2px 6px',
-                                                                    borderRadius: 999,
-                                                                    background: '#eef2ff',
-                                                                    color: '#3730a3',
-                                                                    fontWeight: 600,
-                                                                }}
+                                                                className="shopify-badge shopify-badge--cod"
                                                             >
                                                                 COD {group.codCount}
                                                             </span>
                                                             <span
-                                                                style={{
-                                                                    padding: '2px 6px',
-                                                                    borderRadius: 999,
-                                                                    background: '#ecfdf5',
-                                                                    color: '#047857',
-                                                                    fontWeight: 600,
-                                                                }}
+                                                                className="shopify-badge shopify-badge--paid"
                                                             >
                                                                 Paid {group.paidCount}
                                                             </span>
@@ -967,24 +869,10 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                                 </td>
                                             ) : null}
                                             <Td>
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <div className="shopify-customer-cell">
                                                 <span 
                                                     title={o.customerAddress} 
-                                                    style={{ 
-                                                        fontWeight: 600, 
-                                                        cursor: 'pointer',
-                                                        color: 'var(--text)',
-                                                        textDecoration: 'none',
-                                                        transition: 'color 0.2s'
-                                                    }}
-                                                    onMouseEnter={(e) => {
-                                                        e.currentTarget.style.color = '#10b981';
-                                                        e.currentTarget.style.textDecoration = 'underline';
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.currentTarget.style.color = 'var(--text)';
-                                                        e.currentTarget.style.textDecoration = 'none';
-                                                    }}
+                                                    className="shopify-customer-name"
                                                     onClick={() => {
                                                         setSelectedCustomerPhone(o.customerPhone);
                                                         setShowCustomerProfile(true);
@@ -992,11 +880,16 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                                 >
                                                     {o.customer}
                                                 </span>
-                                                <a className="link" href={`tel:${o.customerPhone}`} style={{ fontSize: 12, color: 'var(--muted)', textDecoration: 'none' }}>{o.customerPhone}</a>
+                                                <a
+                                                    className="link shopify-customer-phone"
+                                                    href={`tel:${o.customerPhone}`}
+                                                >
+                                                    {o.customerPhone}
+                                                </a>
                                             </div>
                                             </Td>
                                             <Td>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                            <div className="shopify-items-cell">
                                                 {(o.items ?? []).length === 0 ? <span>—</span> : null}
                                                 {(o.items ?? []).map((it: OrderItem, idx: number) => (
                                                     <div key={idx}>{it.variant} × {it.quantity}</div>
@@ -1004,12 +897,28 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                             </div>
                                             </Td>
                                             <Td>
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <span style={{ fontWeight: 600 }}>{formatCurrency(o.amount)}</span>
-                                                {o.codCharges ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>COD: {formatCurrency(o.codCharges)}</span> : null}
-                                                {o.shippingCharges ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>Shipping: {formatCurrency(o.shippingCharges)}</span> : null}
-                                                {!o.codCharges && !o.shippingCharges && o.shippingAmount ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>Shipping: {formatCurrency(o.shippingAmount)}</span> : null}
-                                                {o.discountAmount ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>Discount: {formatCurrency(o.discountAmount)}</span> : null}
+                                            <div className="shopify-amount-cell">
+                                                <span className="shopify-amount-main">{formatCurrency(o.amount)}</span>
+                                                {o.codCharges ? (
+                                                    <span className="shopify-amount-meta">
+                                                        COD: {formatCurrency(o.codCharges)}
+                                                    </span>
+                                                ) : null}
+                                                {o.shippingCharges ? (
+                                                    <span className="shopify-amount-meta">
+                                                        Shipping: {formatCurrency(o.shippingCharges)}
+                                                    </span>
+                                                ) : null}
+                                                {!o.codCharges && !o.shippingCharges && o.shippingAmount ? (
+                                                    <span className="shopify-amount-meta">
+                                                        Shipping: {formatCurrency(o.shippingAmount)}
+                                                    </span>
+                                                ) : null}
+                                                {o.discountAmount ? (
+                                                    <span className="shopify-amount-meta">
+                                                        Discount: {formatCurrency(o.discountAmount)}
+                                                    </span>
+                                                ) : null}
                                             </div>
                                             </Td>
                                             <Td><StatusTag kind={o.paymentStatus} type="payment" /></Td>
@@ -1017,7 +926,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                             <Td><StatusTag kind={o.deliveryStatus} type="delivery" /></Td>
                                             <Td><TypeTag type={o.type} /></Td>
                                             <Td>
-                                                <div style={{ display: 'flex', gap: 8 }}>
+                                                <div className="shopify-row-actions">
                                                     <button
                                                         type="button"
                                                         className="icon-btn"
@@ -2423,34 +2332,36 @@ function AddOrderModal({
         <div
             role="dialog"
             aria-modal="true"
-            style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.45)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', zIndex: 60 }}
+            className="shopify-add-modal-backdrop"
         >
             <div
-                className="card"
+                className="card shopify-add-modal-card"
                 onClick={(e)=>e.stopPropagation()}
-                style={{ width: '100%', maxWidth: 1350, maxHeight: '90vh', padding: 0, boxShadow: '0 24px 48px rgba(15, 79, 60, 0.12), 0 8px 24px rgba(0,0,0,.08)', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: 16 }}
             >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-elev)' }}>
-                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{mode === 'edit' ? 'Edit Order' : 'Add Order'}</h3>
-                    <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ width: 40, height: 40, padding: 0, borderRadius: 10 }}>✕</button>
+                <div className="shopify-add-modal-header">
+                    <h3 className="shopify-add-modal-title">
+                        {mode === 'edit' ? 'Edit Order' : 'Add Order'}
+                    </h3>
+                    <button
+                        className="icon-btn shopify-add-modal-close"
+                        onClick={onClose}
+                        aria-label="Close"
+                    >
+                        ✕
+                    </button>
                 </div>
                 <form
                     onSubmit={submit}
-                    style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+                    className="shopify-add-modal-form"
                 >
                     <div
-                        style={{
-                            padding: 24,
-                            overflowY: 'auto',
-                            flex: 1,
-                            background: 'var(--bg)',
-                        }}
+                        className="shopify-add-modal-body"
                     >
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 4fr) minmax(280px, 1.4fr)', gap: 24, alignItems: 'flex-start' }}>
-                        <div style={{ display: 'grid', gap: 24 }}>
+                        <div className="shopify-add-modal-grid">
+                        <div className="shopify-add-modal-left">
                             {/* Customer & address */}
-                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: -8 }}>Customer & address</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                            <div className="shopify-add-modal-section-title">Customer & address</div>
+                            <div className="shopify-add-modal-section-grid">
                                 <div>
                                     <label className="label">Phone</label>
                                     <PhoneDropdown
@@ -2478,8 +2389,7 @@ function AddOrderModal({
                                 <div>
                                     <label className="label">Customer Name</label>
                                     <input 
-                                        className="input" 
-                                        style={{ width: '100%', marginTop: 6 }} 
+                                        className="input shopify-add-modal-input" 
                                         type="text"
                                         value={name} 
                                         onChange={(e) => setName(e.target.value)}
@@ -2487,27 +2397,36 @@ function AddOrderModal({
                                     />
                                 </div>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+                            <div className="shopify-add-modal-single-column">
                                 <div>
                                     <label className="label">Address</label>
-                                    <input className="input" style={{ width: '100%', marginTop: 6 }} value={address} onChange={(e)=>setAddress(e.target.value)} required />
+                                    <input
+                                        className="input shopify-add-modal-input"
+                                        value={address}
+                                        onChange={(e)=>setAddress(e.target.value)}
+                                        required
+                                    />
                                 </div>
                             </div>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: -8 }}>Date & location</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
+                            <div className="shopify-add-modal-section-title">Date & location</div>
+                            <div className="shopify-add-modal-section-grid">
                                 <div>
                                     <label className="label">Date</label>
                                     <DatePicker value={date} onChange={setDate} placeholder="Select date" />
                                 </div>
                                 <div>
                                     <label className="label">State</label>
-                                    <input className="input" style={{ width: '100%', marginTop: 6 }} value={state} onChange={(e)=>setState(e.target.value)} required />
+                                    <input
+                                        className="input shopify-add-modal-input"
+                                        value={state}
+                                        onChange={(e)=>setState(e.target.value)}
+                                        required
+                                    />
                                 </div>
                                 <div>
                                     <label className="label">Pincode</label>
                                     <input 
-                                        className="input" 
-                                        style={{ width: '100%', marginTop: 6 }} 
+                                        className="input shopify-add-modal-input" 
                                         type="tel"
                                         value={pincode} 
                                         onChange={(e) => {
@@ -2523,7 +2442,12 @@ function AddOrderModal({
                                 </div>
                                 <div>
                                     <label className="label">Type</label>
-                                    <select className="input" style={{ width: '100%', marginTop: 6 }} value={type} onChange={(e)=>setType(e.target.value as OrderType | '')} required>
+                                    <select
+                                        className="input shopify-add-modal-input"
+                                        value={type}
+                                        onChange={(e)=>setType(e.target.value as OrderType | '')}
+                                        required
+                                    >
                                         <option value="">Select Type</option>
                                         <option value="New">New</option>
                                         <option value="Repeat">Repeat</option>
@@ -2533,17 +2457,18 @@ function AddOrderModal({
                             </div>
 
                             <div>
-                                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Order items</div>
-                                <div style={{ display: 'grid', gap: 10 }}>
+                                <div className="shopify-add-modal-section-title shopify-add-modal-section-title--spaced">
+                                    Order items
+                                </div>
+                                <div className="shopify-add-modal-items">
                                     {items.map((it, idx) => {
                                         const availableProducts = getAvailableProducts(idx);
                                         return (
-                                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 140px 44px', gap: 10, alignItems: 'end', background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
+                                            <div key={idx} className="shopify-add-modal-item-row">
                                                 <div>
                                                     <label className="label">Variant</label>
                                                     <select 
-                                                        className="input" 
-                                                        style={{ width: '100%', marginTop: 6 }} 
+                                                        className="input shopify-add-modal-input" 
                                                         value={it.variant} 
                                                         onChange={(e)=>updateItem(idx, 'variant', e.target.value)} 
                                                         required
@@ -2558,13 +2483,19 @@ function AddOrderModal({
                                                 </div>
                                                 <div>
                                                     <label className="label">Quantity</label>
-                                                    <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={1} value={it.quantity} onChange={(e)=>updateItem(idx, 'quantity', e.target.value)} required />
+                                                    <input
+                                                        className="input shopify-add-modal-input"
+                                                        type="number"
+                                                        min={1}
+                                                        value={it.quantity}
+                                                        onChange={(e)=>updateItem(idx, 'quantity', e.target.value)}
+                                                        required
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="label">Price (₹)</label>
                                                     <input 
-                                                        className="input" 
-                                                        style={{ width: '100%', marginTop: 6 }} 
+                                                        className="input shopify-add-modal-input" 
                                                         type="number" 
                                                         min={0} 
                                                         value={it.price || ''} 
@@ -2573,65 +2504,111 @@ function AddOrderModal({
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="label" style={{ visibility: 'hidden' }}>Remove</label>
+                                                    <label className="label shopify-add-modal-label-hidden">Remove</label>
                                                     <button type="button" className="icon-btn" onClick={()=>removeItem(idx)} aria-label="Remove item">–</button>
                                                 </div>
                                             </div>
                                         );
                                     })}
-                                    <button type="button" className="filter-btn" onClick={addItem} style={{ width: 'fit-content', marginTop: 4 }}>+ Add item</button>
+                                    <button
+                                        type="button"
+                                        className="filter-btn shopify-add-modal-add-item-btn"
+                                        onClick={addItem}
+                                    >
+                                        + Add item
+                                    </button>
                                 </div>
                             </div>
 
-                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: -8 }}>Platform & status</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 }}>
+                            <div className="shopify-add-modal-section-title">Platform & status</div>
+                            <div className="shopify-add-modal-section-grid">
                                 <div>
                                     <label className="label">Platform</label>
-                                    <select className="input" style={{ width: '100%', marginTop: 6 }} value={platform} onChange={(e)=>setPlatform(e.target.value as Platform | '')} required>
+                                    <select
+                                        className="input shopify-add-modal-input"
+                                        value={platform}
+                                        onChange={(e)=>setPlatform(e.target.value as Platform | '')}
+                                        required
+                                    >
                                         <option value="">Select Platform</option>
                                         {(['Shopify','Abandoned','Whatsapp','Amazon','Flipkart'] as Platform[]).map((p)=> <option key={p} value={p}>{p}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="label">Payment Mode</label>
-                                    <select className="input" style={{ width: '100%', marginTop: 6 }} value={payment} onChange={(e)=>setPayment(e.target.value as PaymentStatus | '')} required>
+                                    <select
+                                        className="input shopify-add-modal-input"
+                                        value={payment}
+                                        onChange={(e)=>setPayment(e.target.value as PaymentStatus | '')}
+                                        required
+                                    >
                                         <option value="">Select Payment Mode</option>
                                         {(['COD','PAID'] as PaymentStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="label">Fullfillment Status</label>
-                                    <select className="input" style={{ width: '100%', marginTop: 6 }} value={fulfillment} onChange={(e)=>setFulfillment(e.target.value as FulfillmentStatus)} required>
+                                    <select
+                                        className="input shopify-add-modal-input"
+                                        value={fulfillment}
+                                        onChange={(e)=>setFulfillment(e.target.value as FulfillmentStatus)}
+                                        required
+                                    >
                                         {(['Unfulfilled','Fulfilled','Partial'] as FulfillmentStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="label">Shipping Status</label>
-                                    <select className="input" style={{ width: '100%', marginTop: 6 }} value={delivery} onChange={(e)=>setDelivery(e.target.value as DeliveryStatus)} required>
+                                    <select
+                                        className="input shopify-add-modal-input"
+                                        value={delivery}
+                                        onChange={(e)=>setDelivery(e.target.value as DeliveryStatus)}
+                                        required
+                                    >
                                         {(['In Transit','Delivered','RTO','Pending Pickup'] as DeliveryStatus[]).map((p)=> <option key={p} value={p}>{p}</option>)}
                                     </select>
                                 </div>
                             </div>
 
-                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: -8 }}>Charges & amount</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
+                            <div className="shopify-add-modal-section-title">Charges & amount</div>
+                            <div className="shopify-add-modal-section-grid">
                                 <div>
                                     <label className="label">COD Charges (₹)</label>
-                                    <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} step="0.01" value={codCharges} onChange={(e)=>setCodCharges(e.target.value)} />
+                                    <input
+                                        className="input shopify-add-modal-input"
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        value={codCharges}
+                                        onChange={(e)=>setCodCharges(e.target.value)}
+                                    />
                                 </div>
                                 <div>
                                     <label className="label">Shipping Charges (₹)</label>
-                                    <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} step="0.01" value={shippingCharges} onChange={(e)=>setShippingCharges(e.target.value)} />
+                                    <input
+                                        className="input shopify-add-modal-input"
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        value={shippingCharges}
+                                        onChange={(e)=>setShippingCharges(e.target.value)}
+                                    />
                                 </div>
                                 <div>
                                     <label className="label">Discount (₹)</label>
-                                    <input className="input" style={{ width: '100%', marginTop: 6 }} type="number" min={0} step="0.01" value={discount} onChange={(e)=>setDiscount(e.target.value)} />
+                                    <input
+                                        className="input shopify-add-modal-input"
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        value={discount}
+                                        onChange={(e)=>setDiscount(e.target.value)}
+                                    />
                                 </div>
                                 <div>
                                     <label className="label">Total Amount (₹)</label>
                                     <input 
-                                        className="input" 
-                                        style={{ width: '100%', marginTop: 6, backgroundColor: 'var(--bg)', cursor: 'not-allowed' }} 
+                                        className="input shopify-add-modal-input shopify-add-modal-input--readonly" 
                                         type="number" 
                                         min={0} 
                                         value={amount} 
@@ -2641,11 +2618,10 @@ function AddOrderModal({
                                 </div>
                             </div>
 
-                            <div style={{ paddingTop: 12 }}>
+                            <div className="shopify-add-modal-notes">
                                 <label className="label">Notes</label>
                                 <textarea
-                                    className="input"
-                                    style={{ width: '100%', marginTop: 8, minHeight: 80, resize: 'vertical', paddingTop: 10 }}
+                                    className="input shopify-add-modal-notes-textarea"
                                     placeholder="Internal notes about this order (optional)"
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
@@ -2653,13 +2629,12 @@ function AddOrderModal({
                             </div>
                         </div>
 
-                        <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                            <div style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-                                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Tracking (optional)</div>
-                                <label className="label" style={{ fontSize: 13 }}>AWB No</label>
+                        <div className="shopify-add-modal-sidebar">
+                            <div className="shopify-add-modal-tracking-card">
+                                <div className="shopify-add-modal-tracking-title">Tracking (optional)</div>
+                                <label className="label shopify-add-modal-tracking-label">AWB No</label>
                                 <input
-                                    className="input"
-                                    style={{ width: '100%', marginTop: 6 }}
+                                    className="input shopify-add-modal-tracking-input"
                                     type="text"
                                     value={awb}
                                     onChange={(e) => setAwb(e.target.value)}
@@ -2667,7 +2642,9 @@ function AddOrderModal({
                                 />
                             </div>
                             <div>
-                                <div className="label" style={{ marginBottom: 10, fontSize: 13 }}>Shipping timeline</div>
+                                <div className="label shopify-add-modal-shipping-timeline-label">
+                                    Shipping timeline
+                                </div>
                                 <ShippingTimeline
                                     status={delivery}
                                     awb={awb}
@@ -3012,22 +2989,15 @@ function ShippingTimeline({
 
             {/* Status helper text (only when AWB is present) */}
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                {loading && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>Loading live tracking…</div>}
-                {!loading && error && <div style={{ color: '#b91c1c', fontWeight: 500 }}>{error}</div>}
+        {loading && <div className="tracking-loading">Loading live tracking…</div>}
+                {!loading && error && <div className="tracking-error">{error}</div>}
             </div>
 
             {/* All live events (latest first) */}
             {tracking && sortedScans.length > 0 && (
-                <div
-                    style={{
-                        borderTop: '1px solid var(--border)',
-                        paddingTop: 12,
-                        maxHeight: 220,
-                        overflowY: 'auto',
-                    }}
-                >
-                    <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Latest updates</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="tracking-scans">
+                    <div className="tracking-scans-title">Latest updates</div>
+                    <div className="tracking-scans-list">
                     {[...sortedScans].reverse().map((scan, idx) => {
                         const d = scan.dateTime ? new Date(scan.dateTime) : null;
                         const ts = d
@@ -3041,33 +3011,17 @@ function ShippingTimeline({
                         return (
                             <div
                                 key={`${scan.status}-${scan.dateTime}-${idx}`}
-                                style={{
-                                    fontSize: 12,
-                                    lineHeight: 1.45,
-                                    padding: 10,
-                                    borderRadius: 8,
-                                    background: 'var(--bg)',
-                                    border: '1px solid var(--border)',
-                                    transition: 'background 0.15s ease, border-color 0.15s ease',
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'color-mix(in srgb, var(--primary) 6%, var(--bg))';
-                                    e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--primary) 20%, var(--border))';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'var(--bg)';
-                                    e.currentTarget.style.borderColor = 'var(--border)';
-                                }}
+                                className="tracking-scan-item"
                             >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                    <div style={{ fontWeight: 600, color: 'var(--text)' }}>{scan.status}</div>
-                                    {ts && <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{ts}</span>}
+                                <div className="tracking-scan-header">
+                                    <div className="tracking-scan-status">{scan.status}</div>
+                                    {ts && <span className="tracking-scan-ts">{ts}</span>}
                                 </div>
                                 {scan.instructions && (
-                                    <div style={{ color: 'var(--muted)', marginTop: 4, fontSize: 11 }}>{scan.instructions}</div>
+                                    <div className="tracking-scan-instructions">{scan.instructions}</div>
                                 )}
                                 {scan.location && (
-                                    <div style={{ color: 'var(--muted)', marginTop: 2, fontSize: 11 }}>📍 {scan.location}</div>
+                                    <div className="tracking-scan-location">📍 {scan.location}</div>
                                 )}
                             </div>
                         );
@@ -3123,98 +3077,75 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
             role="dialog"
             aria-modal="true"
             onClick={onClose}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(15, 79, 60, 0.12)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', zIndex: 60 }}
+            className="customer-modal-backdrop"
         >
             <div
-                className="card"
+                className="card customer-modal"
                 onClick={(e) => e.stopPropagation()}
-                style={{ width: '100%', maxWidth: 1200, padding: 0, boxShadow: '0 24px 48px rgba(15, 79, 60, 0.12), 0 8px 24px rgba(0,0,0,.08)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: 16 }}
             >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px', borderBottom: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
-                    <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Customer profile</h3>
-                    <button className="icon-btn" onClick={onClose} aria-label="Close" style={{ width: 40, height: 40, padding: 0, borderRadius: 10 }}>✕</button>
+                <div className="customer-modal-header">
+                    <h3 className="customer-modal-title">Customer profile</h3>
+                    <button className="icon-btn customer-modal-close" onClick={onClose} aria-label="Close">✕</button>
                 </div>
                 
-                <div style={{ padding: 24, overflow: 'auto', flex: 1, background: 'var(--bg)' }}>
+                <div className="customer-modal-content">
                     {/* Customer Information */}
-                    <div style={{ marginBottom: 20, padding: 20, background: 'var(--bg-elev)', borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(15, 79, 60, 0.04)' }}>
-                        <h4 style={{ margin: '0 0 18px 0', fontSize: 14, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Customer information</h4>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                            {/* First Row: Name and Phone */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                    <div className="customer-info-card">
+                        <div className="customer-info-grid">
+                            {/* First Row: Name, Phone, State, Pincode */}
+                            <div className="customer-info-grid-4">
                                 <div>
-                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Name</div>
-                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.name}</div>
+                                    <div className="customer-info-label">Name</div>
+                                    <div className="customer-info-value">{customerProfile.name}</div>
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Phone</div>
-                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>
-                                        <a className="link" href={`tel:${customerProfile.phone}`} style={{ textDecoration: 'none' }}>{customerProfile.phone}</a>
+                                    <div className="customer-info-label">Phone</div>
+                                    <div className="customer-info-value">
+                                        <a
+                                            className="link customer-info-phone-link"
+                                            href={`tel:${customerProfile.phone}`}
+                                        >
+                                            {customerProfile.phone}
+                                        </a>
                                     </div>
+                                </div>
+                                <div>
+                                    <div className="customer-info-label">State</div>
+                                    <div className="customer-info-value">{customerProfile.state}</div>
+                                </div>
+                                <div>
+                                    <div className="customer-info-label">Pincode</div>
+                                    <div className="customer-info-value">{customerProfile.pincode}</div>
                                 </div>
                             </div>
                             {/* Second Row: Address (full width) */}
-                            <div>
-                                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Address</div>
-                                <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.address}</div>
-                            </div>
-                            {/* Third Row: State and Pincode */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
-                                <div>
-                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>State</div>
-                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.state}</div>
-                                </div>
-                                <div>
-                                    <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Pincode</div>
-                                    <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{customerProfile.pincode}</div>
-                                </div>
+                            <div className="customer-info-address">
+                                <div className="customer-info-label">Address</div>
+                                <div className="customer-info-value">{customerProfile.address}</div>
                             </div>
                         </div>
-                        <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--border)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                        <div className="customer-stats-row">
                             {[
-                                { label: 'Total orders', value: String(totalOrders), color: '#0f172a', bg: '#f1f5f9' },
-                                { label: 'Total amount', value: formatCurrency(totalAmount), color: '#0f4f3c', bg: 'var(--primary-weak)' },
-                                { label: 'Delivered', value: String(deliveredCount), color: '#166534', bg: '#dcfce7' },
-                                { label: 'RTO', value: String(rtoCount), color: '#b91c1c', bg: '#fee2e2' },
-                                { label: 'In transit', value: String(inTransitCount), color: '#2563eb', bg: '#dbeafe' },
+                                { label: 'Total orders', value: String(totalOrders), className: 'customer-stat--orders' },
+                                { label: 'Total amount', value: formatCurrency(totalAmount), className: 'customer-stat--amount' },
+                                { label: 'Delivered', value: String(deliveredCount), className: 'customer-stat--delivered' },
+                                { label: 'RTO', value: String(rtoCount), className: 'customer-stat--rto' },
+                                { label: 'In transit', value: String(inTransitCount), className: 'customer-stat--transit' },
                             ].map((stat) => (
                                 <div
                                     key={stat.label}
-                                    style={{
-                                        padding: '10px 16px',
-                                        borderRadius: 10,
-                                        background: stat.bg,
-                                        border: '1px solid transparent',
-                                        minWidth: 100,
-                                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(-2px)';
-                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                        e.currentTarget.style.boxShadow = 'none';
-                                    }}
+                                    className={`customer-stat ${stat.className}`}
                                 >
-                                    <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{stat.label}</div>
-                                    <div style={{ fontSize: 16, color: stat.color, fontWeight: 700 }}>{stat.value}</div>
+                                    <div className="customer-stat-label">{stat.label}</div>
+                                    <div className="customer-stat-value">{stat.value}</div>
                                 </div>
                             ))}
                         </div>
                     </div>
 
                     {/* Tabs */}
-                    <div style={{ marginTop: 4 }}>
-                        <div
-                            style={{
-                                display: 'flex',
-                                gap: 4,
-                                borderBottom: '1px solid var(--border)',
-                                marginBottom: 16,
-                                flexWrap: 'wrap',
-                            }}
-                        >
+                    <div className="customer-tabs">
+                        <div className="customer-tabs-header">
                             {[
                                 { id: 'orders', label: 'Order history' },
                                 { id: 'followups', label: 'Followups' },
@@ -3225,7 +3156,6 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
                                     type="button"
                                     className={`filter-btn ${activeTab === tab.id ? 'active' : ''}`}
                                     onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                                    style={{ padding: '10px 18px', fontSize: 13 }}
                                 >
                                     {tab.label}
                                 </button>
@@ -3235,27 +3165,10 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
                         {/* Tab panels */}
                         {activeTab === 'orders' && (
                             <div>
-                                <div
-                                    className="table-scroll-wrapper"
-                                    style={{ maxHeight: '400px', overflow: 'auto' }}
-                                >
-                                    <table
-                                        style={{
-                                            width: '100%',
-                                            borderCollapse: 'collapse',
-                                            minWidth: 600,
-                                        }}
-                                    >
+                                <div className="table-scroll-wrapper customer-orders-wrapper">
+                                    <table className="customer-orders-table">
                                         <thead>
-                                            <tr
-                                                style={{
-                                                    background: 'var(--bg)',
-                                                    borderBottom: '1px solid var(--border)',
-                                                    position: 'sticky',
-                                                    top: 0,
-                                                    zIndex: 10,
-                                                }}
-                                            >
+                                            <tr className="customer-orders-header-row">
                                                 <Th>Date</Th>
                                                 <Th>Items</Th>
                                                 <Th>Amount</Th>
@@ -3266,14 +3179,7 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
                                         <tbody>
                                             {customerOrders.length === 0 ? (
                                                 <tr>
-                                                    <td
-                                                        colSpan={5}
-                                                        style={{
-                                                            padding: '40px',
-                                                            textAlign: 'center',
-                                                            color: 'var(--muted)',
-                                                        }}
-                                                    >
+                                                        <td colSpan={5} className="customer-orders-empty-cell">
                                                         No orders found
                                                     </td>
                                                 </tr>
@@ -3281,17 +3187,11 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
                                                 customerOrders.map((order) => (
                                                     <tr
                                                         key={order.id}
-                                                        style={{ borderBottom: '1px solid var(--border)' }}
+                                                        className="customer-orders-row"
                                                     >
                                                         <Td>{formatDate(order.date)}</Td>
                                                         <Td>
-                                                            <div
-                                                                style={{
-                                                                    display: 'flex',
-                                                                    flexDirection: 'column',
-                                                                    gap: 4,
-                                                                }}
-                                                            >
+                                                            <div className="customer-orders-items">
                                                                 {(order.items ?? []).length === 0 ? (
                                                                     <span>—</span>
                                                                 ) : null}
@@ -3299,7 +3199,7 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
                                                                     (it: OrderItem, idx: number) => (
                                                                         <div
                                                                             key={idx}
-                                                                            style={{ fontSize: 12 }}
+                                                                            className="customer-orders-item-line"
                                                                         >
                                                                             {it.variant} × {it.quantity}
                                                                         </div>
@@ -3307,9 +3207,9 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
                                                                 )}
                                                             </div>
                                                         </Td>
-                                                        <Td style={{ fontWeight: 600 }}>
+                                                        <td className="customer-orders-amount">
                                                             {formatCurrency(order.amount)}
-                                                        </Td>
+                                                        </td>
                                                         <Td>
                                                             <StatusTag
                                                                 kind={order.paymentStatus}
@@ -3332,54 +3232,25 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
                         )}
 
                         {activeTab === 'followups' && (
-                            <div
-                                style={{
-                                    padding: 20,
-                                    borderRadius: 12,
-                                    border: '1px solid var(--border)',
-                                    background: 'var(--bg-elev)',
-                                    fontSize: 13,
-                                    color: 'var(--text)',
-                                    boxShadow: '0 1px 3px rgba(15, 79, 60, 0.04)',
-                                }}
-                            >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>Followups</span>
-                                    <span style={{ fontSize: 12, color: 'var(--muted)', padding: '4px 10px', background: 'var(--bg)', borderRadius: 8 }}>Coming soon</span>
+                            <div className="customer-followups-card">
+                                <div className="customer-followups-header">
+                                    <span className="customer-followups-title">Followups</span>
+                                    <span className="customer-followups-pill">Coming soon</span>
                                 </div>
-                                <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+                                <div className="customer-followups-text">
                                     Use the Followups page to schedule and record calls for this customer. This tab will show those records here in a future update.
                                 </div>
                             </div>
                         )}
 
                         {activeTab === 'notes' && (
-                            <div
-                                style={{
-                                    padding: 20,
-                                    borderRadius: 12,
-                                    border: '1px solid var(--border)',
-                                    background: 'var(--bg-elev)',
-                                    display: 'grid',
-                                    gap: 12,
-                                    boxShadow: '0 1px 3px rgba(15, 79, 60, 0.04)',
-                                }}
-                            >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>Notes</span>
-                                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>Session-only (not saved)</span>
+                            <div className="customer-notes-card">
+                                <div className="customer-notes-header">
+                                    <span className="customer-notes-title">Notes</span>
+                                    <span className="customer-notes-subtitle">Session-only (not saved)</span>
                                 </div>
                                 <textarea
-                                    className="input"
-                                    style={{
-                                        width: '100%',
-                                        minHeight: 120,
-                                        resize: 'vertical',
-                                        fontSize: 13,
-                                        fontFamily: 'inherit',
-                                        borderRadius: 10,
-                                        padding: 12,
-                                    }}
+                                    className="input customer-notes-textarea"
                                     placeholder="Type quick notes about this customer…"
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
@@ -3405,105 +3276,56 @@ function DeleteConfirmationModal({ order, onConfirm, onCancel }: { order: Order;
             role="dialog"
             aria-modal="true"
             onClick={onCancel}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.45)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', zIndex: 70 }}
+            className="delete-modal-backdrop"
         >
             <div
-                className="card"
+                className="card delete-modal"
                 onClick={(e) => e.stopPropagation()}
-                style={{ width: '100%', maxWidth: 480, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}
             >
-                <div style={{ padding: 24 }}>
+                <div className="delete-modal-inner">
                     {/* Warning Icon */}
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-                        <div style={{
-                            width: 64,
-                            height: 64,
-                            borderRadius: '50%',
-                            background: '#fef2f2',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}>
-                            <span style={{ fontSize: 32, color: '#ef4444' }}>⚠️</span>
+                    <div className="delete-modal-icon-row">
+                        <div className="delete-modal-icon-wrap">
+                            <span className="delete-modal-icon">⚠️</span>
                         </div>
                     </div>
 
                     {/* Title */}
-                    <h3 style={{ margin: '0 0 12px 0', fontSize: 20, fontWeight: 700, color: 'var(--text)', textAlign: 'center' }}>
+                    <h3 className="delete-modal-title">
                         Delete Order?
                     </h3>
 
                     {/* Warning Message */}
-                    <p style={{ margin: '0 0 20px 0', fontSize: 14, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.6 }}>
+                    <p className="delete-modal-text">
                         Are you sure you want to delete this order? This action cannot be undone.
                     </p>
 
                     {/* Customer Name Warning */}
-                    <div style={{
-                        padding: '12px 16px',
-                        background: '#fef2f2',
-                        border: '1px solid #fecaca',
-                        borderRadius: 8,
-                        marginBottom: 24,
-                    }}>
-                        <div style={{ fontSize: 11, color: '#991b1b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+                    <div className="delete-modal-customer-box">
+                        <div className="delete-modal-customer-label">
                             Customer
                         </div>
-                        <div style={{ fontSize: 16, color: '#7f1d1d', fontWeight: 600 }}>
+                        <div className="delete-modal-customer-name">
                             {order.customer}
                         </div>
-                        <div style={{ fontSize: 12, color: '#991b1b', marginTop: 4 }}>
+                        <div className="delete-modal-customer-amount">
                             Order Amount: {formatCurrency(order.amount)}
                         </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div style={{ display: 'flex', gap: 12 }}>
+                    <div className="delete-modal-actions">
                         <button
                             type="button"
                             onClick={onCancel}
-                            style={{
-                                flex: 1,
-                                padding: '10px 20px',
-                                border: '1px solid var(--border)',
-                                borderRadius: 8,
-                                background: 'var(--bg)',
-                                color: 'var(--text)',
-                                fontSize: 14,
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = 'var(--bg-elev)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = 'var(--bg)';
-                            }}
+                            className="delete-modal-cancel"
                         >
                             Cancel
                         </button>
                         <button
                             type="button"
                             onClick={onConfirm}
-                            style={{
-                                flex: 1,
-                                padding: '10px 20px',
-                                border: 'none',
-                                borderRadius: 8,
-                                background: '#ef4444',
-                                color: '#ffffff',
-                                fontSize: 14,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#dc2626';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = '#ef4444';
-                            }}
+                            className="delete-modal-confirm"
                         >
                             Delete Order
                         </button>
@@ -3516,30 +3338,15 @@ function DeleteConfirmationModal({ order, onConfirm, onCancel }: { order: Order;
 
 function ToastContainer({ toasts }: { toasts: Toast[] }) {
     return (
-        <div
-            style={{
-                position: 'fixed',
-                top: 20,
-                right: 20,
-                zIndex: 1000,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                pointerEvents: 'none',
-            }}
-        >
+        <div className="shopify-toast-container">
             {toasts.map((toast) => (
                 <div
                     key={toast.id}
-                    className="toast"
-                    style={{
-                        pointerEvents: 'auto',
-                        animation: 'slideInRight 0.3s ease-out',
-                    }}
+                    className="toast shopify-toast"
                     data-type={toast.type}
                 >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ fontSize: 18 }}>
+                    <div className="shopify-toast-content">
+                        <span className="shopify-toast-icon">
                             {toast.type === 'success' ? '✓' : toast.type === 'delete' ? '🗑' : '✕'}
                         </span>
                         <span>{toast.message}</span>
