@@ -130,6 +130,26 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             setToasts((prev) => prev.filter((t) => t.id !== id));
         }, 3000);
     }
+    const copyPhoneToClipboard = async (phone: string) => {
+        try {
+            if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(phone);
+            } else if (typeof document !== 'undefined') {
+                const textarea = document.createElement('textarea');
+                textarea.value = phone;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+            showToast('Phone number copied to clipboard', 'success');
+        } catch (err) {
+            console.error('Failed to copy phone number', err);
+            showToast('Unable to copy phone number. Please copy manually.', 'error');
+        }
+    };
     const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatus | ''>('');
     const [fulfillmentStatusFilter, setFulfillmentStatusFilter] = useState<FulfillmentStatus | ''>('');
     const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<DeliveryStatus | ''>('');
@@ -549,7 +569,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         </div>
                         <div className="shopify-header-spacer" />
                         <div className="shopify-search-wrapper">
-                            <span className="shopify-search-icon" aria-hidden>🔍</span>
+                            <span className="shopify-search-icon" aria-hidden>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                            </span>
                             <input
                                 className="input shopify-search-input"
                                 placeholder="Search customer or phone"
@@ -783,7 +805,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                 <Th>Date</Th>
                                 <Th>Customer</Th>
                                 <Th>Variant</Th>
-                                <Th>Amount</Th>
+                                <Th align="right">Amount</Th>
                                 <Th>Payment Mode</Th>
                                 <Th>Platform</Th>
                                 <Th>Shipping Status</Th>
@@ -990,7 +1012,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     onClose={() => {
                         setShowCustomerProfile(false);
                         setSelectedCustomerPhone(null);
-                    }} 
+                    }}
+                    onCopyPhone={copyPhoneToClipboard}
                 />
             ) : null}
 
@@ -1029,8 +1052,8 @@ function FilterButton({ active, onClick, children, refEl }: { active: boolean; o
     );
 }
 
-function Th({ children }: { children: string }) {
-    return <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{children}</th>;
+function Th({ children, align = 'left' }: { children: string; align?: 'left' | 'center' | 'right' }) {
+    return <th style={{ textAlign: align, padding: '10px 12px', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{children}</th>;
 }
 function Td({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
     return <td style={{ padding: '12px', ...style }}>{children}</td>;
@@ -3033,7 +3056,7 @@ function ShippingTimeline({
     );
 }
 
-function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhone: string; orders: Order[]; onClose: () => void }) {
+function CustomerProfileModal({ customerPhone, orders, onClose, onCopyPhone }: { customerPhone: string; orders: Order[]; onClose: () => void; onCopyPhone?: (phone: string) => void }) {
     // Get all orders for this customer (grouped by phone number)
     const customerOrders = useMemo(() => {
         return orders.filter(o => o.customerPhone === customerPhone)
@@ -3061,12 +3084,38 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
 
     const [activeTab, setActiveTab] = useState<'orders' | 'followups' | 'notes'>('orders');
     const [notes, setNotes] = useState<string>('');
+    const [copyFeedback, setCopyFeedback] = useState(false);
 
     useEffect(() => {
         const prev = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
         return () => { document.body.style.overflow = prev; };
     }, []);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
+    const handleCopyPhoneClick = async () => {
+        if (!customerProfile?.phone) return;
+        if (onCopyPhone) {
+            onCopyPhone(customerProfile.phone);
+        } else {
+            try {
+                if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(customerProfile.phone);
+                }
+            } catch (err) {
+                console.error('Failed to copy phone number', err);
+            }
+        }
+        setCopyFeedback(true);
+        setTimeout(() => setCopyFeedback(false), 1800);
+    };
 
     if (!customerProfile) {
         return null;
@@ -3084,41 +3133,75 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="customer-modal-header">
-                    <h3 className="customer-modal-title">Customer profile</h3>
-                    <button className="icon-btn customer-modal-close" onClick={onClose} aria-label="Close">✕</button>
+                    <div className="customer-modal-header-left">
+                        <div className="customer-avatar">
+                            <span className="customer-avatar-initial">
+                                {customerProfile.name?.charAt(0)?.toUpperCase() ?? '?'}
+                            </span>
+                        </div>
+                        <div className="customer-modal-header-text">
+                            <h3 className="customer-modal-title">{customerProfile.name}</h3>
+                            <div className="customer-modal-meta">
+                                <span
+                                    className="customer-modal-meta-item customer-modal-phone"
+                                    onClick={handleCopyPhoneClick}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopyPhoneClick(); } }}
+                                    role="button"
+                                    tabIndex={0}
+                                    title="Copy number"
+                                >
+                                    <span className="customer-modal-meta-icon" aria-hidden>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                    </span>
+                                    <span className="customer-modal-phone-value">{customerProfile.phone}</span>
+                                    {copyFeedback && <span className="customer-copy-feedback">Copied!</span>}
+                                </span>
+                                <span className="customer-modal-meta-item">
+                                    <span className="customer-modal-meta-icon" aria-hidden>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                    </span>
+                                    <span>{customerProfile.state}</span>
+                                </span>
+                                <span className="customer-modal-meta-item">
+                                    <span className="customer-modal-meta-icon" aria-hidden>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01"/></svg>
+                                    </span>
+                                    <span>{customerProfile.pincode}</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="customer-modal-header-actions">
+                        <a
+                            href={`tel:${customerProfile.phone}`}
+                            className="customer-modal-action-btn customer-modal-call"
+                            aria-label="Call customer"
+                        >
+                            Call
+                        </a>
+                        <button
+                            type="button"
+                            className="customer-modal-action-btn customer-modal-copy"
+                            onClick={handleCopyPhoneClick}
+                            aria-label="Copy phone"
+                            title="Copy number"
+                        >
+                            {copyFeedback ? 'Copied!' : 'Copy'}
+                        </button>
+                        <button
+                            className="icon-btn customer-modal-close"
+                            onClick={onClose}
+                            aria-label="Close"
+                        >
+                            ✕
+                        </button>
+                    </div>
                 </div>
-                
+
                 <div className="customer-modal-content">
-                    {/* Customer Information */}
+                    {/* Customer data at top */}
                     <div className="customer-info-card">
                         <div className="customer-info-grid">
-                            {/* First Row: Name, Phone, State, Pincode */}
-                            <div className="customer-info-grid-4">
-                                <div>
-                                    <div className="customer-info-label">Name</div>
-                                    <div className="customer-info-value">{customerProfile.name}</div>
-                                </div>
-                                <div>
-                                    <div className="customer-info-label">Phone</div>
-                                    <div className="customer-info-value">
-                                        <a
-                                            className="link customer-info-phone-link"
-                                            href={`tel:${customerProfile.phone}`}
-                                        >
-                                            {customerProfile.phone}
-                                        </a>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="customer-info-label">State</div>
-                                    <div className="customer-info-value">{customerProfile.state}</div>
-                                </div>
-                                <div>
-                                    <div className="customer-info-label">Pincode</div>
-                                    <div className="customer-info-value">{customerProfile.pincode}</div>
-                                </div>
-                            </div>
-                            {/* Second Row: Address (full width) */}
                             <div className="customer-info-address">
                                 <div className="customer-info-label">Address</div>
                                 <div className="customer-info-value">{customerProfile.address}</div>
@@ -3143,121 +3226,128 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
                         </div>
                     </div>
 
-                    {/* Tabs */}
+                    {/* Orders, Followups, Notes below */}
                     <div className="customer-tabs">
-                        <div className="customer-tabs-header">
-                            {[
-                                { id: 'orders', label: 'Order history' },
-                                { id: 'followups', label: 'Followups' },
-                                { id: 'notes', label: 'Notes' },
-                            ].map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    type="button"
-                                    className={`filter-btn ${activeTab === tab.id ? 'active' : ''}`}
-                                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                                >
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* Tab panels */}
-                        {activeTab === 'orders' && (
-                            <div>
-                                <div className="table-scroll-wrapper customer-orders-wrapper">
-                                    <table className="customer-orders-table">
-                                        <thead>
-                                            <tr className="customer-orders-header-row">
-                                                <Th>Date</Th>
-                                                <Th>Items</Th>
-                                                <Th>Amount</Th>
-                                                <Th>Payment</Th>
-                                                <Th>Delivery</Th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {customerOrders.length === 0 ? (
-                                                <tr>
-                                                        <td colSpan={5} className="customer-orders-empty-cell">
-                                                        No orders found
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                customerOrders.map((order) => (
-                                                    <tr
-                                                        key={order.id}
-                                                        className="customer-orders-row"
-                                                    >
-                                                        <Td>{formatDate(order.date)}</Td>
-                                                        <Td>
-                                                            <div className="customer-orders-items">
-                                                                {(order.items ?? []).length === 0 ? (
-                                                                    <span>—</span>
-                                                                ) : null}
-                                                                {(order.items ?? []).map(
-                                                                    (it: OrderItem, idx: number) => (
-                                                                        <div
-                                                                            key={idx}
-                                                                            className="customer-orders-item-line"
-                                                                        >
-                                                                            {it.variant} × {it.quantity}
-                                                                        </div>
-                                                                    ),
-                                                                )}
-                                                            </div>
-                                                        </Td>
-                                                        <td className="customer-orders-amount">
-                                                            {formatCurrency(order.amount)}
-                                                        </td>
-                                                        <Td>
-                                                            <StatusTag
-                                                                kind={order.paymentStatus}
-                                                                type="payment"
-                                                            />
-                                                        </Td>
-                                                        <Td>
-                                                            <StatusTag
-                                                                kind={order.deliveryStatus}
-                                                                type="delivery"
-                                                            />
-                                                        </Td>
-                                                    </tr>
-                                                ))
+                            <div className="customer-tabs-header">
+                                {[
+                                    { id: 'orders', label: 'Order history' },
+                                    { id: 'followups', label: 'Followups' },
+                                    { id: 'notes', label: 'Notes' },
+                                ].map((tab) => {
+                                    const isActive = activeTab === tab.id;
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            type="button"
+                                            className={`customer-tab ${isActive ? 'is-active' : ''}`}
+                                            onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                                        >
+                                            <span className="customer-tab-label">{tab.label}</span>
+                                            {tab.id === 'orders' && (
+                                                <span className="customer-tab-pill">
+                                                    {totalOrders}
+                                                </span>
                                             )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        </button>
+                                    );
+                                })}
                             </div>
-                        )}
 
-                        {activeTab === 'followups' && (
-                            <div className="customer-followups-card">
-                                <div className="customer-followups-header">
-                                    <span className="customer-followups-title">Followups</span>
-                                    <span className="customer-followups-pill">Coming soon</span>
-                                </div>
-                                <div className="customer-followups-text">
-                                    Use the Followups page to schedule and record calls for this customer. This tab will show those records here in a future update.
-                                </div>
-                            </div>
-                        )}
+                            <div className={`customer-tabs-body is-${activeTab}`}>
+                                {activeTab === 'orders' && (
+                                    <div className="table-scroll-wrapper customer-orders-wrapper">
+                                        <table className="customer-orders-table">
+                                            <thead>
+                                                <tr className="customer-orders-header-row">
+                                                    <Th>Date</Th>
+                                                    <Th>Items</Th>
+                                                    <Th>Amount</Th>
+                                                    <Th>Payment</Th>
+                                                    <Th>Delivery</Th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {customerOrders.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={5} className="customer-orders-empty-cell">
+                                                            No orders found
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    customerOrders.map((order) => (
+                                                        <tr
+                                                            key={order.id}
+                                                            className="customer-orders-row"
+                                                        >
+                                                            <Td>{formatDate(order.date)}</Td>
+                                                            <Td>
+                                                                <div className="customer-orders-items">
+                                                                    {(order.items ?? []).length === 0 ? (
+                                                                        <span>—</span>
+                                                                    ) : null}
+                                                                    {(order.items ?? []).map(
+                                                                        (it: OrderItem, idx: number) => (
+                                                                            <div
+                                                                                key={idx}
+                                                                                className="customer-orders-item-line"
+                                                                            >
+                                                                                {it.variant} × {it.quantity}
+                                                                            </div>
+                                                                        ),
+                                                                    )}
+                                                                </div>
+                                                            </Td>
+                                                            <td className="customer-orders-amount">
+                                                                {formatCurrency(order.amount)}
+                                                            </td>
+                                                            <Td>
+                                                                <StatusTag
+                                                                    kind={order.paymentStatus}
+                                                                    type="payment"
+                                                                />
+                                                            </Td>
+                                                            <Td>
+                                                                <StatusTag
+                                                                    kind={order.deliveryStatus}
+                                                                    type="delivery"
+                                                                />
+                                                            </Td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
 
-                        {activeTab === 'notes' && (
-                            <div className="customer-notes-card">
-                                <div className="customer-notes-header">
-                                    <span className="customer-notes-title">Notes</span>
-                                    <span className="customer-notes-subtitle">Session-only (not saved)</span>
-                                </div>
-                                <textarea
-                                    className="input customer-notes-textarea"
-                                    placeholder="Type quick notes about this customer…"
-                                    value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                />
+                                {activeTab === 'followups' && (
+                                    <div className="customer-followups-card">
+                                        <div className="customer-followups-header">
+                                            <span className="customer-followups-title">Followups</span>
+                                            <span className="customer-followups-pill">Coming soon</span>
+                                        </div>
+                                        <div className="customer-followups-text">
+                                            Use the Followups page to schedule and record calls for this customer. This tab will show those records here in a future update.
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'notes' && (
+                                    <div className="customer-notes-card">
+                                        <div className="customer-notes-header">
+                                            <span className="customer-notes-title">Notes</span>
+                                            <span className="customer-notes-subtitle">Session-only (not saved)</span>
+                                        </div>
+                                        <textarea
+                                            className="input customer-notes-textarea"
+                                            placeholder="Type quick notes about this customer…"
+                                            value={notes}
+                                            onChange={(e) => setNotes(e.target.value)}
+                                        />
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        </div>
                 </div>
             </div>
         </div>
@@ -3265,11 +3355,25 @@ function CustomerProfileModal({ customerPhone, orders, onClose }: { customerPhon
 }
 
 function DeleteConfirmationModal({ order, onConfirm, onCancel }: { order: Order; onConfirm: () => void | Promise<void>; onCancel: () => void }) {
+    const [isDeleting, setIsDeleting] = useState(false);
+
     useEffect(() => {
         const prev = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = prev; };
+        return () => {
+            document.body.style.overflow = prev;
+        };
     }, []);
+
+    const handleConfirm = async () => {
+        if (isDeleting) return;
+        try {
+            setIsDeleting(true);
+            await onConfirm();
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     return (
         <div
@@ -3283,24 +3387,22 @@ function DeleteConfirmationModal({ order, onConfirm, onCancel }: { order: Order;
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="delete-modal-inner">
-                    {/* Warning Icon */}
                     <div className="delete-modal-icon-row">
                         <div className="delete-modal-icon-wrap">
-                            <span className="delete-modal-icon">⚠️</span>
+                            <span className="delete-modal-icon" aria-hidden="true">
+                                ⚠️
+                            </span>
                         </div>
                     </div>
 
-                    {/* Title */}
                     <h3 className="delete-modal-title">
-                        Delete Order?
+                        Delete order?
                     </h3>
 
-                    {/* Warning Message */}
                     <p className="delete-modal-text">
                         Are you sure you want to delete this order? This action cannot be undone.
                     </p>
 
-                    {/* Customer Name Warning */}
                     <div className="delete-modal-customer-box">
                         <div className="delete-modal-customer-label">
                             Customer
@@ -3309,25 +3411,26 @@ function DeleteConfirmationModal({ order, onConfirm, onCancel }: { order: Order;
                             {order.customer}
                         </div>
                         <div className="delete-modal-customer-amount">
-                            Order Amount: {formatCurrency(order.amount)}
+                            Order amount: {formatCurrency(order.amount)}
                         </div>
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="delete-modal-actions">
                         <button
                             type="button"
                             onClick={onCancel}
                             className="delete-modal-cancel"
+                            disabled={isDeleting}
                         >
                             Cancel
                         </button>
                         <button
                             type="button"
-                            onClick={onConfirm}
+                            onClick={handleConfirm}
                             className="delete-modal-confirm"
+                            disabled={isDeleting}
                         >
-                            Delete Order
+                            {isDeleting ? 'Deleting…' : 'Delete order'}
                         </button>
                     </div>
                 </div>
