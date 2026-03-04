@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { type Followup, loadFollowupsData, updateFollowupData, type FollowupData } from '../utils/followups';
-import { loadOrders, type Order, type OrderItem } from '../utils/orders';
+import { type Followup, loadFollowupsData, updateFollowupData, type FollowupData } from '../../utils/followups';
+import { loadOrders, type Order, type OrderItem } from '../../utils/orders';
 
 type Toast = {
     id: string;

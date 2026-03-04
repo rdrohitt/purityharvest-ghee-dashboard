@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { loadOrders, addOrder, updateOrder, deleteOrder, type Order, type OrderItem, type PaymentStatus, type FulfillmentStatus, type DeliveryStatus, type Platform, type OrderType } from '../utils/orders';
-import { loadProducts, type Product } from '../utils/products';
-import { loadMarketingSpend, type SpendRecord, type MiscRecord } from '../utils/marketing-spend';
+import { loadOrders, addOrder, updateOrder, deleteOrder, type Order, type OrderItem, type PaymentStatus, type FulfillmentStatus, type DeliveryStatus, type Platform, type OrderType } from '../../../utils/orders';
+import { loadProducts, type Product } from '../../../utils/products';
+import { loadMarketingSpend, type SpendRecord, type MiscRecord } from '../../../utils/marketing-spend';
 import './Shopify.scss';
 
 function formatCurrency(n: number): string { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); }
@@ -798,6 +798,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             <col style={{ width: '120px', minWidth: '120px' }} />
                             <col style={{ width: '140px', minWidth: '140px' }} />
                             <col style={{ width: '120px', minWidth: '120px' }} />
+                            <col style={{ width: '140px', minWidth: '140px' }} />
                             <col style={{ width: '120px', minWidth: '120px' }} />
                         </colgroup>
                         <thead>
@@ -805,24 +806,25 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                 <Th>Date</Th>
                                 <Th>Customer</Th>
                                 <Th>Variant</Th>
-                                <Th align="right">Amount</Th>
+                                <Th>Amount</Th>
                                 <Th>Payment Mode</Th>
                                 <Th>Platform</Th>
                                 <Th>Shipping Status</Th>
                                 <Th>Type</Th>
+                                <Th>Added by</Th>
                                 <Th>Actions</Th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={9} className="shopify-orders-empty-cell">
+                                    <td colSpan={10} className="shopify-orders-empty-cell">
                                         Loading orders…
                                     </td>
                                 </tr>
                             ) : groupedByDate.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="shopify-orders-empty-cell">
+                                    <td colSpan={10} className="shopify-orders-empty-cell">
                                         No orders found. Click "Add Order" to create your first order.
                                     </td>
                                 </tr>
@@ -947,6 +949,13 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                             <Td><PlatformTag platform={o.platform} /></Td>
                                             <Td><StatusTag kind={o.deliveryStatus} type="delivery" /></Td>
                                             <Td><TypeTag type={o.type} /></Td>
+                                            <Td>
+                                                {o.addedBy ? (
+                                                    <span className="shopify-added-by">{o.addedBy}</span>
+                                                ) : (
+                                                    <span className="shopify-added-by shopify-added-by--empty">—</span>
+                                                )}
+                                            </Td>
                                             <Td>
                                                 <div className="shopify-row-actions">
                                                     <button

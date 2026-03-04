@@ -1,20 +1,20 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactElement } from 'react';
-import Login from './pages/Login';
+import Login from './pages/Login/index';
 import AdminLayout from './layouts/AdminLayout';
-import Dashboard from './pages/Dashboard';
-import Users from './pages/Users';
-import Settings from './pages/Settings';
-import Shopify from './pages/Shopify';
-import Amazon from './pages/Amazon';
-import Flipkart from './pages/Flipkart';
-import WALeads from './pages/WALeads';
-import Followups from './pages/Followups';
-import MarketingSpend from './pages/MarketingSpend';
-import Products from './pages/Products';
-import GurugramMarts from './pages/GurugramMarts';
-import DelhiMarts from './pages/DelhiMarts';
-import Modules from './pages/Modules';
+import Dashboard from './pages/Dashboard/index';
+import Users from './pages/Users/index';
+import Settings from './pages/Settings/index';
+import Shopify from './pages/sales/Shopify/index';
+import Amazon from './pages/sales/Amazon/index';
+import Flipkart from './pages/sales/Flipkart/index';
+import WALeads from './pages/WALeads/index';
+import Followups from './pages/Followups/index';
+import MarketingSpend from './pages/MarketingSpend/index';
+import Products from './pages/Products/index';
+import GurugramMarts from './pages/Marts/GurugramMarts/index';
+import DelhiMarts from './pages/Marts/DelhiMarts/index';
+import Modules from './pages/Modules/index';
 import { isAuthenticated } from './auth';
 
 function PrivateRoute({ children }: { children: ReactElement }) {

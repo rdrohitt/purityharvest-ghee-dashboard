@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { UserRecord } from '../utils/users';
+import type { UserRecord } from '../../utils/users';
 import './Users.scss';
 
 type Toast = {

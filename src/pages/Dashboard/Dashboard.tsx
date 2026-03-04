@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, LineElement, BarElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend } from 'chart.js';
-import { DateRange, RangeKey, generateMockData, getPresetRange, sum, getMonthRange, monthLabel } from '../utils/metrics';
+import { DateRange, RangeKey, generateMockData, getPresetRange, sum, getMonthRange, monthLabel } from '../../utils/metrics';
 
 ChartJS.register(LineElement, BarElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 

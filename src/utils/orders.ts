@@ -25,6 +25,11 @@ export type Order = {
     awbNumber?: string;
     notes?: string;
     state: string;
+    /**
+     * Optional metadata for who added the order.
+     * Accepts either `addedBy` or `added_by` from the backend.
+     */
+    addedBy?: string;
     platform?: Platform;
     type?: OrderType;
 };
@@ -37,7 +42,12 @@ export async function loadOrders(): Promise<Order[]> {
     if (!response.ok) {
         throw new Error('Failed to load orders from API');
     }
-    return (await response.json()) as Order[];
+    const raw = (await response.json()) as any[];
+    return raw.map((o) => ({
+        ...o,
+        // Normalise possible backend shapes
+        addedBy: (o.addedBy ?? o.added_by) ?? undefined,
+    })) as Order[];
 }
 
 /**

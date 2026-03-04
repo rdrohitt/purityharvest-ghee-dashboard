@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, Fragment } from 'react';
-import { loadProducts, addProduct, updateProduct, deleteProduct, type Product } from '../utils/products';
+import { loadProducts, addProduct, updateProduct, deleteProduct, type Product } from '../../utils/products';
 
 function formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
