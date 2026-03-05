@@ -23211,7 +23211,7 @@
     "amount": 1870,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "785105",
     "shippingCharges": 281,
     "discountAmount": 20,
@@ -23849,7 +23849,7 @@
     "amount": 2340,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "606201",
     "codCharges": 60,
     "shippingCharges": 254,
@@ -24041,7 +24041,7 @@
     "amount": 9310,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "781035",
     "shippingCharges": 605,
     "discountAmount": 140,
@@ -24184,7 +24184,7 @@
     "amount": 1890,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "440018",
     "shippingCharges": 246,
     "state": "Maharashtra",
@@ -24518,7 +24518,7 @@
     "amount": 2340,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "562117",
     "codCharges": 60,
     "shippingCharges": 255,
@@ -24661,7 +24661,7 @@
     "amount": 1000,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "500024",
     "shippingCharges": 156,
     "discountAmount": 90,
@@ -24908,7 +24908,7 @@
     "amount": 1228,
     "paymentStatus": "COD",
     "fulfillmentStatus": "Fulfilled",
-    "deliveryStatus": "In Transit",
+    "deliveryStatus": "Delivered",
     "pincode": "834001",
     "shippingCharges": 168,
     "discountAmount": 2,
@@ -25587,6 +25587,78 @@
     "shippingCharges": 290,
     "discountAmount": 154,
     "state": "Odisha",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260305-2042",
+    "date": "2026-03-05T00:00:00.000Z",
+    "customer": "Sonali Roy",
+    "customerPhone": "7980095451",
+    "customerAddress": "144 N.D road, kadamtala sonali roy, Howrah, West Bengal",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 500 ml",
+        "quantity": 1,
+        "lineAmount": 1090
+      }
+    ],
+    "amount": 1068,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "711101",
+    "shippingCharges": 109.01,
+    "discountAmount": 22,
+    "state": "West Bengal",
+    "platform": "Shopify",
+    "type": "New"
+  },
+  {
+    "id": "PH-20260305-2043",
+    "date": "2026-03-05T00:00:00.000Z",
+    "customer": "Dr Arjun Gupta",
+    "customerPhone": "9858501150",
+    "customerAddress": "Sai medicoes mob.9622007600 Sungal morh, Landmark - Near, petrol pump, Jammu, Jammu and Kashmir",
+    "items": [
+      {
+        "variant": "A2 Desi Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 1890
+      }
+    ],
+    "amount": 1852,
+    "paymentStatus": "PAID",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "181201",
+    "shippingCharges": 234,
+    "discountAmount": 38,
+    "state": "Jammu and Kashmir",
+    "platform": "Shopify",
+    "type": "Repeat"
+  },
+  {
+    "id": "PH-20260305-2044",
+    "date": "2026-03-05T00:00:00.000Z",
+    "customer": "Dharmendra",
+    "customerPhone": "7002285837",
+    "customerAddress": "Rongpur Pt.4 Po.Rongpur, Dist Cachar, Assam",
+    "items": [
+      {
+        "variant": "A2 Gir Cow Ghee - 1000 ml",
+        "quantity": 1,
+        "lineAmount": 2280
+      }
+    ],
+    "amount": 2340,
+    "paymentStatus": "COD",
+    "fulfillmentStatus": "Fulfilled",
+    "deliveryStatus": "In Transit",
+    "pincode": "788009",
+    "codCharges": 60,
+    "shippingCharges": 281,
+    "state": "Assam",
     "platform": "Shopify",
     "type": "New"
   }

@@ -354,10 +354,31 @@
    font-size: 13px;
  }
 
- .shopify-add-modal-input {
-   width: 100%;
-   margin-top: 6px;
- }
+.shopify-add-modal-input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: #ffffff;
+  font-size: 13px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.shopify-add-modal-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary) 70%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--primary) 8%, transparent);
+  background: #ffffff;
+}
+
+.shopify-add-modal-field-wide {
+  grid-column: span 3;
+}
 
  .shopify-add-modal-input--readonly {
    background-color: var(--bg);
@@ -496,7 +517,10 @@
    margin-top: 8px;
    min-height: 80px;
    resize: vertical;
-   padding-top: 10px;
+  padding-top: 10px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
  }
 
  .shopify-add-modal-sidebar {

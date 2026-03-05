@@ -2392,7 +2392,6 @@ function AddOrderModal({
                         <div className="shopify-add-modal-grid">
                         <div className="shopify-add-modal-left">
                             {/* Customer & address */}
-                            <div className="shopify-add-modal-section-title">Customer & address</div>
                             <div className="shopify-add-modal-section-grid">
                                 <div>
                                     <label className="label">Phone</label>
@@ -2418,7 +2417,7 @@ function AddOrderModal({
                                         required
                                     />
                                 </div>
-                                <div>
+                                <div className="shopify-add-modal-field-wide">
                                     <label className="label">Customer Name</label>
                                     <input 
                                         className="input shopify-add-modal-input" 
@@ -2440,7 +2439,6 @@ function AddOrderModal({
                                     />
                                 </div>
                             </div>
-                            <div className="shopify-add-modal-section-title">Date & location</div>
                             <div className="shopify-add-modal-section-grid">
                                 <div>
                                     <label className="label">Date</label>
@@ -2489,9 +2487,6 @@ function AddOrderModal({
                             </div>
 
                             <div>
-                                <div className="shopify-add-modal-section-title shopify-add-modal-section-title--spaced">
-                                    Order items
-                                </div>
                                 <div className="shopify-add-modal-items">
                                     {items.map((it, idx) => {
                                         const availableProducts = getAvailableProducts(idx);
@@ -2552,7 +2547,6 @@ function AddOrderModal({
                                 </div>
                             </div>
 
-                            <div className="shopify-add-modal-section-title">Platform & status</div>
                             <div className="shopify-add-modal-section-grid">
                                 <div>
                                     <label className="label">Platform</label>
@@ -2602,7 +2596,6 @@ function AddOrderModal({
                                 </div>
                             </div>
 
-                            <div className="shopify-add-modal-section-title">Charges & amount</div>
                             <div className="shopify-add-modal-section-grid">
                                 <div>
                                     <label className="label">COD Charges (₹)</label>
@@ -2663,7 +2656,6 @@ function AddOrderModal({
 
                         <div className="shopify-add-modal-sidebar">
                             <div className="shopify-add-modal-tracking-card">
-                                <div className="shopify-add-modal-tracking-title">Tracking (optional)</div>
                                 <label className="label shopify-add-modal-tracking-label">AWB No</label>
                                 <input
                                     className="input shopify-add-modal-tracking-input"
