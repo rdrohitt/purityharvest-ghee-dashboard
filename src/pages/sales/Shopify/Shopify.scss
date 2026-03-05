@@ -368,6 +368,13 @@
     background-color 0.15s ease;
 }
 
+/* Ensure modal inputs stay white even if global .input overrides */
+.shopify-add-modal-card .shopify-add-modal-input,
+.shopify-add-modal-card .shopify-add-modal-notes-textarea,
+.shopify-add-modal-card .shopify-add-modal-tracking-input {
+  background: #ffffff !important;
+}
+
 .shopify-add-modal-input:focus-visible {
   outline: none;
   border-color: color-mix(in srgb, var(--primary) 70%, var(--border));
@@ -400,6 +407,8 @@
   max-width: 1350px;
   max-height: 90vh;
   padding: 0;
+  /* Match body background so header/footer sit on a subtle grey surface */
+  background: #f3f4f6;
   box-shadow: 0 24px 48px rgba(15, 79, 60, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
@@ -443,7 +452,8 @@
   padding: 24px;
   overflow-y: auto;
   flex: 1;
-  background: var(--bg);
+  /* Light grey canvas behind white input fields */
+  background: #f3f4f6;
 }
 
 .shopify-add-modal-grid {
