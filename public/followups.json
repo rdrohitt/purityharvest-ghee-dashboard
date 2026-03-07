@@ -12,7 +12,7 @@
     "feedback": "Excellent ghee",
     "callingDate": null,
     "callerName": "",
-    "callingDetail": "\ncall back",
+    "callingDetail": "call back",
     "callAgainDate": null
   },
   {
@@ -524,7 +524,7 @@
     "feedback": "",
     "callingDate": "2026-01-10T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "ghee not taste",
+    "callingDetail": "call back tomarrow",
     "callAgainDate": null
   },
   {
@@ -844,7 +844,7 @@
     "feedback": "",
     "callingDate": "2026-01-31T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee and 1 ltr gir cow order placed",
     "callAgainDate": null
   },
   {
@@ -1068,7 +1068,7 @@
     "feedback": "",
     "callingDate": "2026-02-05T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "excellent ghee",
+    "callingDetail": "excellent ghee ",
     "callAgainDate": null
   },
   {
@@ -1532,7 +1532,7 @@
     "feedback": "",
     "callingDate": "2026-02-21T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -1548,7 +1548,7 @@
     "feedback": "",
     "callingDate": "2026-02-21T18:30:00.000Z",
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -1572,7 +1572,7 @@
     "feedback": "",
     "callingDate": null,
     "callerName": "",
-    "callingDetail": "not answering",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   },
   {
@@ -1917,6 +1917,38 @@
     "callingDate": null,
     "callerName": "",
     "callingDetail": "not answring",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9867727057",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": " ",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9324206487",
+    "feedback": "",
+    "callingDate": "2026-03-06T18:30:00.000Z",
+    "callerName": "",
+    "callingDetail": "excellent ghee",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "8168480159",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "not answering",
+    "callAgainDate": null
+  },
+  {
+    "customerPhone": "9612541255",
+    "feedback": "",
+    "callingDate": null,
+    "callerName": "",
+    "callingDetail": "excellent ghee",
     "callAgainDate": null
   }
 ]
