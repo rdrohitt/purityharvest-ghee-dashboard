@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { Spinner } from '../../../components/Spinner';
 import { loadGurugramMarts, addGurugramMart, updateGurugramMart, deleteGurugramMart, type Mart, type RefillEntry, type SalesEntry } from '../../../utils/marts';
 import { loadProducts, type Product } from '../../../utils/products';
 import { loadOrders, type Order, type OrderItem } from '../../../utils/orders';
@@ -344,7 +345,12 @@ export default function GurugramMarts() {
             </div>
 
             {/* Marts Table */}
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
+                {loading ? (
+                    <div style={{ position: 'relative', minHeight: 280 }}>
+                        <Spinner overlay message="Loading marts…" />
+                    </div>
+                ) : (
                 <div className="table-scroll-wrapper">
                     <table
                         style={{
@@ -365,13 +371,7 @@ export default function GurugramMarts() {
                             </tr>
                         </thead>
                         <tbody>
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
-                                        Loading marts...
-                                    </td>
-                                </tr>
-                            ) : marts.length === 0 ? (
+                            {marts.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
                                         No marts found. Click "Add Mart" to create your first mart.
@@ -495,6 +495,7 @@ export default function GurugramMarts() {
                         </tbody>
                     </table>
                 </div>
+                )}
             </div>
             {showAddMart && (
                 <div

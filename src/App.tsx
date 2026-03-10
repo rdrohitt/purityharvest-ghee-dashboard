@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import Login from './pages/Login/index';
 import AdminLayout from './layouts/AdminLayout';
@@ -15,7 +16,7 @@ import Products from './pages/Products/index';
 import GurugramMarts from './pages/Marts/GurugramMarts/index';
 import DelhiMarts from './pages/Marts/DelhiMarts/index';
 import Modules from './pages/Modules/index';
-import { isAuthenticated } from './auth';
+import { isAuthenticated, hydrateUserFromToken } from './auth';
 
 function PrivateRoute({ children }: { children: ReactElement }) {
 	const location = useLocation();
@@ -25,10 +26,26 @@ function PrivateRoute({ children }: { children: ReactElement }) {
 	return children;
 }
 
+/** Redirects root to /admin or /login once; avoids Navigate re-render loop */
+function RootRedirect() {
+	const navigate = useNavigate();
+	const didRedirect = useRef(false);
+	useEffect(() => {
+		if (didRedirect.current) return;
+		didRedirect.current = true;
+		navigate(isAuthenticated() ? '/admin' : '/login', { replace: true });
+	}, [navigate]);
+	return null;
+}
+
 export default function App() {
+	useEffect(() => {
+		if (isAuthenticated()) hydrateUserFromToken();
+	}, []);
+
 	return (
 		<Routes>
-			<Route path="/" element={<Navigate to={isAuthenticated() ? '/admin' : '/login'} replace />} />
+			<Route path="/" element={<RootRedirect />} />
 			<Route 
 				path="/login" 
 				element={
@@ -58,7 +75,7 @@ export default function App() {
 					<Route path="users" element={<Users />} />
 					<Route path="settings" element={<Settings />} />
 				</Route>
-			<Route path="*" element={<Navigate to="/" replace />} />
+			<Route path="*" element={<Navigate to="/login" replace />} />
 		</Routes>
 	);
 }

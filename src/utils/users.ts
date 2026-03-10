@@ -1,10 +1,2 @@
-export type UserRecord = {
-  id: string;
-  name: string;
-  mobile: string;
-  username: string;
-  password: string;
-  role: string;
-  permissions: string[];
-};
-
+/** Re-export user types from central types folder. */
+export type { CreateUserPayload, UpdateUserPayload, UserRecord } from '../types/users';

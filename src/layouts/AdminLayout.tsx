@@ -1,11 +1,10 @@
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { logout } from '../auth';
 import { useEffect, useState } from 'react';
 import { applyTheme, getInitialTheme, type Theme } from '../theme';
 import './AdminLayout.scss';
 
 export default function AdminLayout() {
-    const navigate = useNavigate();
     const location = useLocation();
     const [collapsed, setCollapsed] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -37,7 +36,7 @@ export default function AdminLayout() {
 
     function handleLogout() {
         logout();
-        navigate('/login');
+        window.location.replace('/login');
     }
 
     function toggleTheme() {

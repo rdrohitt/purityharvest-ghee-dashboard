@@ -1,3 +1,5 @@
+import { apiFetch } from '../api';
+
 export type PaymentStatus = 'COD' | 'PAID';
 export type FulfillmentStatus = 'Unfulfilled' | 'Fulfilled' | 'Partial';
 export type DeliveryStatus = 'In Transit' | 'Delivered' | 'RTO' | 'Pending Pickup';
@@ -32,13 +34,19 @@ export type Order = {
     addedBy?: string;
     platform?: Platform;
     type?: OrderType;
+    /**
+     * Optional shipping tracking metadata from the backend (Shopify-style orders).
+     * These come from `shippingDetails.trackingUrl` and `shippingDetails.trackingCompany`.
+     */
+    shippingTrackingUrl?: string;
+    shippingTrackingCompany?: string;
 };
 
 /**
  * Load orders from the backend API, which reads from orders.json on disk.
  */
 export async function loadOrders(): Promise<Order[]> {
-    const response = await fetch('/api/orders');
+    const response = await apiFetch('/api/orders');
     if (!response.ok) {
         throw new Error('Failed to load orders from API');
     }
@@ -54,7 +62,7 @@ export async function loadOrders(): Promise<Order[]> {
  * Add a new order via the backend API so it is appended to orders.json on disk.
  */
 export async function addOrder(order: Order): Promise<Order> {
-    const response = await fetch('/api/orders', {
+    const response = await apiFetch('/api/orders', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -73,7 +81,7 @@ export async function addOrder(order: Order): Promise<Order> {
  * Update an existing order via the backend API.
  */
 export async function updateOrder(order: Order): Promise<Order> {
-    const response = await fetch(`/api/orders/${order.id}`, {
+    const response = await apiFetch(`/api/orders/${order.id}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
@@ -92,7 +100,7 @@ export async function updateOrder(order: Order): Promise<Order> {
  * Delete an order via the backend API.
  */
 export async function deleteOrder(id: string): Promise<void> {
-    const response = await fetch(`/api/orders/${id}`, {
+    const response = await apiFetch(`/api/orders/${id}`, {
         method: 'DELETE',
     });
 

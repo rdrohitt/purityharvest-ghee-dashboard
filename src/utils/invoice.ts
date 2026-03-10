@@ -27,10 +27,10 @@ export function generateInvoicePDF(sale: SalesEntry, mart: Mart): void {
     const centerX = pageWidth / 2;
     
     // Colors
-    const textColor = [0, 0, 0]; // Black
-    const lightGray = [245, 245, 245];
-    const darkGray = [60, 60, 60];
-    const accentColor = [70, 70, 70];
+    const textColor: [number, number, number] = [0, 0, 0]; // Black
+    const lightGray: [number, number, number] = [245, 245, 245];
+    const darkGray: [number, number, number] = [60, 60, 60];
+    const accentColor: [number, number, number] = [70, 70, 70];
     
     let yPos = 20;
     

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { apiFetch } from '../../../api';
+import { Spinner } from '../../../components/Spinner';
 import { type Order, type OrderItem, type PaymentStatus, type FulfillmentStatus, type DeliveryStatus } from '../../../utils/orders';
 
 function formatCurrency(n: number): string { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); }
@@ -22,7 +24,7 @@ export default function Amazon() {
 
     useEffect(() => {
         let cancelled = false;
-        fetch('/api/amazon-orders')
+        apiFetch('/api/amazon-orders')
             .then((res) => {
                 if (!res.ok) throw new Error('Failed to load Amazon orders');
                 return res.json();
@@ -226,7 +228,12 @@ export default function Amazon() {
                 ) : null}
             </div>
 
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
+                {loading ? (
+                    <div style={{ position: 'relative', minHeight: 280 }}>
+                        <Spinner overlay message="Loading orders…" />
+                    </div>
+                ) : (
                 <div className="table-scroll-wrapper">
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1200, tableLayout: 'auto' }}>
                         <colgroup>
@@ -254,13 +261,7 @@ export default function Amazon() {
                             </tr>
                         </thead>
                         <tbody>
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
-                                        Loading orders…
-                                    </td>
-                                </tr>
-                            ) : groupedByDate.length === 0 ? (
+                            {groupedByDate.length === 0 ? (
                                 <tr>
                                     <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
                                         No orders found. Click "Add Order" to create your first order.
@@ -301,6 +302,7 @@ export default function Amazon() {
                         </tbody>
                     </table>
                 </div>
+                )}
             </div>
         </section>
     );

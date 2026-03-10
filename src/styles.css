@@ -53,7 +53,7 @@ body { color: var(--text); background: var(--bg); }
 .input { height: 44px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; padding: 0 12px; outline: none; font-size: 14px; }
 .input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 20%, transparent); }
 select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23537a66' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; cursor: pointer; }
-select.input:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%232e7d5b' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); }
+select.input:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%232e7d5b' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
 .button { height: 46px; background: var(--primary); color: white; border: 0; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%; }
 .button:disabled { opacity: .6; cursor: not-allowed; }
 .muted { text-align: center; margin-top: 12px; color: var(--muted); font-size: 14px; }

@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react';
-import type { UserRecord } from '../../utils/users';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiFetch } from '../../api';
+import { Spinner } from '../../components/Spinner';
+import type { CreateUserPayload, UserRecord } from '../../types/users';
+import { CreateUserModal } from './CreateUserModal';
 import './Users.scss';
 
 type Toast = {
     id: string;
     message: string;
-    type: 'success' | 'error';
+    type: 'success' | 'error' | 'delete';
 };
 
 const ROLE_OPTIONS = ['Admin', 'Manager', 'Agent'];
@@ -24,67 +27,55 @@ const ACTIONS = [
     { key: 'modify', label: 'Modify' },
 ] as const;
 
-const INITIAL_USERS: UserRecord[] = [
-    {
-        id: 'U-001',
-        name: 'Rohit Dahiya',
-        mobile: '9876543210',
-        username: 'rohit',
-        password: 'admin123',
-        role: 'Admin',
-        permissions: [
-            'orders:view',
-            'orders:add',
-            'orders:modify',
-            'products:view',
-            'products:add',
-            'products:modify',
-            'marts:view',
-            'marts:add',
-            'marts:modify',
-            'reports:view',
-            'users:view',
-            'users:add',
-            'users:modify',
-        ],
-    },
-    {
-        id: 'U-002',
-        name: 'Operations Manager',
-        mobile: '9999999999',
-        username: 'ops_manager',
-        password: 'manager123',
-        role: 'Manager',
-        permissions: [
-            'orders:view',
-            'orders:modify',
-            'products:view',
-            'products:modify',
-            'marts:view',
-            'marts:modify',
-            'reports:view',
-        ],
-    },
-    {
-        id: 'U-003',
-        name: 'Support Agent',
-        mobile: '8888888888',
-        username: 'agent',
-        password: 'agent123',
-        role: 'Agent',
-        permissions: ['orders:view', 'reports:view'],
-    },
-];
-
 export default function Users() {
-    const [users, setUsers] = useState<UserRecord[]>(INITIAL_USERS);
+    const [users, setUsers] = useState<UserRecord[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState<string>('');
     const [showCreate, setShowCreate] = useState(false);
     const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+    const [userToDelete, setUserToDelete] = useState<UserRecord | null>(null);
     const [toasts, setToasts] = useState<Toast[]>([]);
 
-    function showToast(message: string, type: 'success' | 'error' = 'success') {
+    const normalizeUsers = useCallback((data: unknown): UserRecord[] => {
+        const list = Array.isArray(data) ? data : [];
+        return list.map((u: Record<string, unknown>) => ({
+            id: (u.id as string) ?? (u._id as string) ?? '',
+            name: (u.name as string) ?? '',
+            username: (u.username as string) ?? '',
+            mobile: (u.mobile as string) ?? (u.phoneNumber as string) ?? '',
+            password: (u.password as string) ?? '',
+            role: (u.role as string) ?? '',
+            permissions: Array.isArray(u.permissions) ? (u.permissions as string[]) : [],
+        }));
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        setLoadError(null);
+        apiFetch('/api/users')
+            .then((res) => {
+                if (cancelled) return;
+                if (!res.ok) throw new Error(res.statusText || 'Failed to load users');
+                return res.json();
+            })
+            .then((data: unknown) => {
+                if (cancelled) return;
+                setUsers(normalizeUsers(data));
+            })
+            .catch((err: Error) => {
+                if (!cancelled) setLoadError(err.message || 'Failed to load users');
+                setUsers([]);
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [normalizeUsers]);
+
+    function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
         const id = `toast-${Date.now()}-${Math.random()}`;
         setToasts((prev) => [...prev, { id, message, type }]);
         setTimeout(() => {
@@ -107,20 +98,55 @@ export default function Users() {
         });
     }, [users, search, roleFilter]);
 
-    function handleCreateUser(newUser: Omit<UserRecord, 'id'>) {
-        const id = `U-${(users.length + 1).toString().padStart(3, '0')}`;
-        setUsers((prev) => [{ id, ...newUser }, ...prev]);
-        showToast('User created successfully', 'success');
-        setShowCreate(false);
+    const refetchUsers = useCallback(() => {
+        apiFetch('/api/users')
+            .then((res) => (res.ok ? res.json() : []))
+            .then((data: unknown) => setUsers(normalizeUsers(data)))
+            .catch(() => setUsers([]));
+    }, [normalizeUsers]);
+
+    function payloadToUserRecord(payload: CreateUserPayload): Omit<UserRecord, 'id'> {
+        return {
+            name: payload.name,
+            mobile: payload.phoneNumber,
+            username: payload.username,
+            password: payload.password,
+            role: payload.role,
+            permissions: payload.permissions,
+        };
     }
 
-    function handleUpdateUser(id: string, updated: Omit<UserRecord, 'id'>) {
-        setUsers((prev) =>
-            prev.map((u) => (u.id === id ? { id, ...updated } : u))
-        );
-        showToast('User updated successfully', 'success');
-        setEditingUser(null);
-        setShowCreate(false);
+    function handleCreateSuccess() {
+        refetchUsers();
+        showToast('User created successfully', 'success');
+    }
+
+    function handleSubmitUser(payload: CreateUserPayload) {
+        if (editingUser) {
+            const updated = payloadToUserRecord(payload);
+            setUsers((prev) =>
+                prev.map((u) =>
+                    u.id === editingUser.id ? { id: u.id, ...updated } : u
+                )
+            );
+            showToast('User updated successfully', 'success');
+            setEditingUser(null);
+            setShowCreate(false);
+        }
+    }
+
+    async function handleDeleteUser() {
+        if (!userToDelete) return;
+        try {
+            const res = await apiFetch(`/api/users/${userToDelete.id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(res.statusText || 'Failed to delete user');
+            setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+            showToast('User deleted successfully!', 'delete');
+            setUserToDelete(null);
+        } catch (err) {
+            console.error('Failed to delete user', err);
+            showToast('Failed to delete user. Please try again.', 'error');
+        }
     }
 
     return (
@@ -130,44 +156,52 @@ export default function Users() {
             <div className="card users-header-card">
                 <div className="users-header-title">Users &amp; Roles</div>
                 <div className="users-header-row">
-                    <div className="users-role-filter-group">
-                        <div className="users-role-filter">
-                            <label className="label users-role-filter-label">Role</label>
-                            <select
-                                className="input users-role-filter-select"
-                                value={roleFilter}
-                                onChange={(e) => setRoleFilter(e.target.value)}
-                            >
-                                <option value="">All</option>
-                                {ROLE_OPTIONS.map((role) => (
-                                    <option key={role} value={role}>{role}</option>
-                                ))}
-                            </select>
-                        </div>
+                    <div className="users-role-filter">
+                        <label className="label users-role-filter-label">Role</label>
+                        <select
+                            className="input users-role-filter-select"
+                            value={roleFilter}
+                            onChange={(e) => setRoleFilter(e.target.value)}
+                        >
+                            <option value="">All</option>
+                            {ROLE_OPTIONS.map((role) => (
+                                <option key={role} value={role}>{role}</option>
+                            ))}
+                        </select>
                     </div>
-                    <div className="users-header-spacer" />
-                    <input
-                        className="input users-search"
-                        placeholder="Search by name, role or permission"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                    <button
-                        className="button users-create-btn"
-                        onClick={() => {
-                            setEditingUser(null);
-                            setShowCreate(true);
-                        }}
-                    >
-                        Create User
-                    </button>
+                    <div className="users-search-row">
+                        <input
+                            className="input users-search"
+                            placeholder="Search by name, role or permission"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                        <button
+                            className="button users-create-btn"
+                            onClick={() => {
+                                setEditingUser(null);
+                                setShowCreate(true);
+                            }}
+                        >
+                            Create User
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <div className="card users-table-card">
                 <div className="users-count-bar">
-                    {`${filtered.length.toLocaleString()} user${filtered.length === 1 ? '' : 's'}`}
+                    {loading
+                        ? 'Loading…'
+                        : loadError
+                            ? loadError
+                            : `${filtered.length.toLocaleString()} user${filtered.length === 1 ? '' : 's'}`}
                 </div>
+                {loading ? (
+                    <div className="users-table-loading">
+                        <Spinner overlay message="Loading users…" />
+                    </div>
+                ) : !loadError ? (
                 <div className="table-scroll-wrapper">
                     <table className="users-table">
                         <colgroup>
@@ -175,13 +209,17 @@ export default function Users() {
                             <col />
                             <col />
                             <col />
+                            <col />
+                            <col />
                         </colgroup>
                         <thead>
                             <tr className="users-row-header">
-                                <Th>User</Th>
+                                <Th>Name</Th>
+                                <Th>Username</Th>
                                 <Th>Role</Th>
                                 <Th>Mobile</Th>
                                 <Th>Permissions</Th>
+                                <Th>Actions</Th>
                             </tr>
                         </thead>
                         <tbody>
@@ -199,13 +237,11 @@ export default function Users() {
                                             <span className="users-name">
                                                 {u.name}
                                             </span>
-                                            <span className="users-meta">
-                                                @{u.username} · {u.id}
-                                            </span>
                                         </button>
                                     </Td>
+                                    <Td>{u.username}</Td>
                                     <Td>{u.role}</Td>
-                                    <Td>{u.mobile}</Td>
+                                    <Td>{u.mobile || '—'}</Td>
                                     <Td>
                                         <div className="users-permissions">
                                             {MODULES.flatMap((mod) => {
@@ -224,11 +260,22 @@ export default function Users() {
                                             })}
                                         </div>
                                     </Td>
+                                    <Td>
+                                        <div className="users-row-actions">
+                                            <button
+                                                type="button"
+                                                className="icon-btn icon-btn--danger"
+                                                onClick={() => setUserToDelete(u)}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </Td>
                                 </tr>
                             ))}
                             {filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="users-empty">
+                                    <td colSpan={6} className="users-empty">
                                         No users found
                                     </td>
                                 </tr>
@@ -236,6 +283,7 @@ export default function Users() {
                         </tbody>
                     </table>
                 </div>
+                ) : null}
             </div>
 
             {showCreate ? (
@@ -243,18 +291,20 @@ export default function Users() {
                     mode={editingUser ? 'edit' : 'create'}
                     initialUser={editingUser}
                     roles={ROLE_OPTIONS}
-                    permissions={[]}
                     onClose={() => {
                         setShowCreate(false);
                         setEditingUser(null);
                     }}
-                    onSubmit={(payload) => {
-                        if (editingUser) {
-                            handleUpdateUser(editingUser.id, payload);
-                        } else {
-                            handleCreateUser(payload);
-                        }
-                    }}
+                    onSubmit={handleSubmitUser}
+                    onSuccess={handleCreateSuccess}
+                />
+            ) : null}
+
+            {userToDelete ? (
+                <DeleteUserModal
+                    user={userToDelete}
+                    onConfirm={handleDeleteUser}
+                    onCancel={() => setUserToDelete(null)}
                 />
             ) : null}
         </section>
@@ -282,7 +332,7 @@ function ToastContainer({ toasts }: { toasts: Toast[] }) {
                 >
                     <div className="users-toast-content">
                         <span className="users-toast-icon">
-                            {toast.type === 'success' ? '✓' : '✕'}
+                            {toast.type === 'success' ? '✓' : toast.type === 'delete' ? '🗑' : '✕'}
                         </span>
                         <span>{toast.message}</span>
                     </div>
@@ -292,188 +342,85 @@ function ToastContainer({ toasts }: { toasts: Toast[] }) {
     );
 }
 
-function CreateUserModal({
-    mode,
-    initialUser,
-    roles,
-    permissions,
-    onClose,
-    onSubmit,
+function DeleteUserModal({
+    user,
+    onConfirm,
+    onCancel,
 }: {
-    mode: 'create' | 'edit';
-    initialUser: UserRecord | null;
-    roles: string[];
-    permissions: string[];
-    onClose: () => void;
-    onSubmit: (user: Omit<UserRecord, 'id'>) => void;
+    user: UserRecord;
+    onConfirm: () => void | Promise<void>;
+    onCancel: () => void;
 }) {
-    const [name, setName] = useState(initialUser?.name ?? '');
-    const [mobile, setMobile] = useState(initialUser?.mobile ?? '');
-    const [username, setUsername] = useState(initialUser?.username ?? '');
-    const [password, setPassword] = useState(initialUser?.password ?? '');
-    const [role, setRole] = useState(initialUser?.role ?? roles[0] ?? '');
-    const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
-        initialUser?.permissions ?? ['orders:view']
-    );
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    function togglePermission(value: string) {
-        setSelectedPermissions((prev) =>
-            prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value]
-        );
-    }
+    useEffect(() => {
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = prev;
+        };
+    }, []);
 
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!name.trim() || !username.trim() || !password.trim()) return;
-        onSubmit({
-            name: name.trim(),
-            mobile: mobile.trim(),
-            username: username.trim(),
-            password,
-            role,
-            permissions: selectedPermissions.slice().sort(),
-        });
-    }
+    const handleConfirm = async () => {
+        if (isDeleting) return;
+        try {
+            setIsDeleting(true);
+            await onConfirm();
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     return (
         <div
             role="dialog"
             aria-modal="true"
-            onClick={onClose}
-            className="users-modal-backdrop"
+            onClick={onCancel}
+            className="users-delete-modal-backdrop"
         >
             <div
-                className="card users-modal"
+                className="card users-delete-modal"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="users-modal-header">
-                    <h3 className="users-modal-title">{mode === 'edit' ? 'Edit User' : 'Create User'}</h3>
-                    <button className="icon-btn" onClick={onClose} aria-label="Close">
-                        ✕
-                    </button>
-                </div>
-                <form
-                    onSubmit={handleSubmit}
-                    className="users-modal-body"
-                >
-                    <div className="users-form-grid">
-                        <div className="users-form-full-row">
-                            <label className="label">Full Name</label>
-                            <input
-                                className="input users-input--compact"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="Enter user name"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="label">Mobile Number</label>
-                            <input
-                                className="input users-input--compact"
-                                value={mobile}
-                                onChange={(e) => {
-                                    const digits = e.target.value.replace(/\D/g, '');
-                                    if (digits.length <= 10) setMobile(digits);
-                                }}
-                                placeholder="10-digit mobile"
-                                inputMode="numeric"
-                                maxLength={10}
-                            />
-                        </div>
-                        <div>
-                            <label className="label">Username</label>
-                            <input
-                                className="input users-input--compact"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                placeholder="Login username"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="label">Password</label>
-                            <input
-                                className="input users-input--compact"
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="Set password"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="label">Role</label>
-                            <select
-                                className="input users-input--compact"
-                                value={role}
-                                onChange={(e) => setRole(e.target.value)}
-                            >
-                                {roles.map((r) => (
-                                    <option key={r} value={r}>
-                                        {r}
-                                    </option>
-                                ))}
-                            </select>
+                <div className="users-delete-modal-inner">
+                    <div className="users-delete-modal-icon-row">
+                        <div className="users-delete-modal-icon-wrap">
+                            <span className="users-delete-modal-icon" aria-hidden="true">
+                                ⚠️
+                            </span>
                         </div>
                     </div>
-
-                    <div>
-                        <label className="label users-permissions-label">
-                            Permissions
-                        </label>
-                        <div
-                            className="users-permissions-grid"
+                    <h3 className="users-delete-modal-title">Delete user?</h3>
+                    <p className="users-delete-modal-text">
+                        Are you sure you want to delete this user? This action cannot be undone.
+                    </p>
+                    <div className="users-delete-modal-user-box">
+                        <div className="users-delete-modal-user-label">User</div>
+                        <div className="users-delete-modal-user-name">{user.name}</div>
+                        <div className="users-delete-modal-user-meta">
+                            @{user.username} · {user.role}
+                        </div>
+                    </div>
+                    <div className="users-delete-modal-actions">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="users-delete-modal-cancel"
+                            disabled={isDeleting}
                         >
-                            {MODULES.map((mod) => (
-                                <div
-                                    key={mod.key}
-                                    className="users-permissions-module"
-                                >
-                                    <div
-                                        className="users-permissions-module-name"
-                                    >
-                                        {mod.label}
-                                    </div>
-                                    <div className="users-permissions-actions">
-                                        {ACTIONS.map((action) => {
-                                            const permKey = `${mod.key}:${action.key}`;
-                                            return (
-                                                <label
-                                                    key={permKey}
-                                                    className="users-permissions-checkbox"
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedPermissions.includes(permKey)}
-                                                        onChange={() => togglePermission(permKey)}
-                                                    />
-                                                    <span>{action.label}</span>
-                                                </label>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div
-                        className="users-modal-footer"
-                    >
-                        <button type="button" className="icon-btn" onClick={onClose}>
                             Cancel
                         </button>
                         <button
-                            type="submit"
-                            className="button users-modal-primary-btn"
+                            type="button"
+                            onClick={handleConfirm}
+                            className="users-delete-modal-confirm"
+                            disabled={isDeleting}
                         >
-                            {mode === 'edit' ? 'Save Changes' : 'Create'}
+                            {isDeleting ? 'Deleting…' : 'Delete user'}
                         </button>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     );
 }
-

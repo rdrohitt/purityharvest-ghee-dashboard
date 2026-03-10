@@ -1,3 +1,5 @@
+import { apiFetch } from '../api';
+
 export type RefillEntry = {
     id: string;
     date: string;
@@ -56,7 +58,7 @@ export type Mart = {
 };
 
 export async function loadGurugramMarts(): Promise<Mart[]> {
-    const response = await fetch('/api/gurugram-marts');
+    const response = await apiFetch('/api/gurugram-marts');
     if (!response.ok) {
         throw new Error('Failed to load Gurugram marts from API');
     }
@@ -64,7 +66,7 @@ export async function loadGurugramMarts(): Promise<Mart[]> {
 }
 
 export async function addGurugramMart(mart: Omit<Mart, 'id'>): Promise<Mart> {
-    const response = await fetch('/api/gurugram-marts', {
+    const response = await apiFetch('/api/gurugram-marts', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -81,7 +83,7 @@ export async function addGurugramMart(mart: Omit<Mart, 'id'>): Promise<Mart> {
 }
 
 export async function updateGurugramMart(mart: Mart): Promise<Mart> {
-    const response = await fetch(`/api/gurugram-marts/${mart.id}`, {
+    const response = await apiFetch(`/api/gurugram-marts/${mart.id}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
@@ -97,7 +99,7 @@ export async function updateGurugramMart(mart: Mart): Promise<Mart> {
 }
 
 export async function deleteGurugramMart(id: string): Promise<void> {
-    const response = await fetch(`/api/gurugram-marts/${id}`, {
+    const response = await apiFetch(`/api/gurugram-marts/${id}`, {
         method: 'DELETE',
     });
 
@@ -107,7 +109,7 @@ export async function deleteGurugramMart(id: string): Promise<void> {
 }
 
 export async function loadDelhiMarts(): Promise<Mart[]> {
-    const response = await fetch('/api/delhi-marts');
+    const response = await apiFetch('/api/delhi-marts');
     if (!response.ok) {
         throw new Error('Failed to load Delhi marts from API');
     }
@@ -115,7 +117,7 @@ export async function loadDelhiMarts(): Promise<Mart[]> {
 }
 
 export async function addDelhiMart(mart: Omit<Mart, 'id'>): Promise<Mart> {
-    const response = await fetch('/api/delhi-marts', {
+    const response = await apiFetch('/api/delhi-marts', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -132,7 +134,7 @@ export async function addDelhiMart(mart: Omit<Mart, 'id'>): Promise<Mart> {
 }
 
 export async function updateDelhiMart(mart: Mart): Promise<Mart> {
-    const response = await fetch(`/api/delhi-marts/${mart.id}`, {
+    const response = await apiFetch(`/api/delhi-marts/${mart.id}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
@@ -148,7 +150,7 @@ export async function updateDelhiMart(mart: Mart): Promise<Mart> {
 }
 
 export async function deleteDelhiMart(id: string): Promise<void> {
-    const response = await fetch(`/api/delhi-marts/${id}`, {
+    const response = await apiFetch(`/api/delhi-marts/${id}`, {
         method: 'DELETE',
     });
 

@@ -1,3 +1,5 @@
+import { apiFetch } from '../api';
+
 export type Followup = {
     id: string;
     customerName: string;
@@ -28,7 +30,7 @@ export type FollowupData = {
  * Load followups data from the backend API, which reads from followups.json on disk.
  */
 export async function loadFollowupsData(): Promise<FollowupData[]> {
-    const response = await fetch('/api/followups');
+    const response = await apiFetch('/api/followups');
     if (!response.ok) {
         throw new Error('Failed to load followups from API');
     }
@@ -39,7 +41,7 @@ export async function loadFollowupsData(): Promise<FollowupData[]> {
  * Save followup data via the backend API so it is saved to followups.json on disk.
  */
 export async function saveFollowupData(followupData: FollowupData): Promise<FollowupData> {
-    const response = await fetch('/api/followups', {
+    const response = await apiFetch('/api/followups', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -58,7 +60,7 @@ export async function saveFollowupData(followupData: FollowupData): Promise<Foll
  * Update existing followup data via the backend API (creates if doesn't exist).
  */
 export async function updateFollowupData(customerPhone: string, followupData: Partial<FollowupData>): Promise<FollowupData> {
-    const response = await fetch(`/api/followups/${encodeURIComponent(customerPhone)}`, {
+    const response = await apiFetch(`/api/followups/${encodeURIComponent(customerPhone)}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',

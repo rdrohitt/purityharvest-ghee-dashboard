@@ -1,27 +1,25 @@
-import { FormEvent, useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { loginWithEmailPassword, isAuthenticated } from '../../auth';
+import { FormEvent, useState } from 'react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Spinner } from '../../components/Spinner';
+import { loginWithUsernamePassword, isAuthenticated } from '../../auth';
 
 export default function Login() {
 	const navigate = useNavigate();
-	const [email, setEmail] = useState('');
+	const [username, setUsername] = useState('');
 	const [password, setPassword] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	// Redirect if already authenticated (remembered credentials)
-	useEffect(() => {
-		if (isAuthenticated()) {
-			navigate('/admin', { replace: true });
-		}
-	}, [navigate]);
+	if (isAuthenticated()) {
+		return <Navigate to="/admin" replace />;
+	}
 
 	async function onSubmit(e: FormEvent) {
 		e.preventDefault();
 		setError(null);
 		setLoading(true);
 		try {
-			await loginWithEmailPassword(email, password);
+			await loginWithUsernamePassword(username, password);
 			navigate('/admin');
 		} catch (err) {
 			setError((err as Error).message);
@@ -32,21 +30,26 @@ export default function Login() {
 
 	return (
 		<div className="auth-wrapper">
+			{loading && (
+				<Spinner overlay fixed message="Signing in…" />
+			)}
 			<div className="auth-card">
 				<div className="auth-icon">🔷</div>
 				<h1 className="auth-title">Welcome Back</h1>
 				<p className="auth-subtitle">Enter your credentials to access your account</p>
 				<form onSubmit={onSubmit}>
 					<div className="field">
-						<label className="label" htmlFor="email">Email</label>
+						<label className="label" htmlFor="username">Username</label>
 						<input
-							id="email"
+							id="username"
 							className="input"
-							type="email"
-							placeholder="name@example.com"
-							value={email}
-							onChange={(e) => setEmail(e.target.value)}
+							type="text"
+							placeholder="Username"
+							value={username}
+							onChange={(e) => setUsername(e.target.value)}
+							autoComplete="username"
 							required
+							disabled={loading}
 						/>
 					</div>
 					<div className="field">
@@ -60,12 +63,20 @@ export default function Login() {
 							onChange={(e) => setPassword(e.target.value)}
 							autoComplete="current-password"
 							required
+							disabled={loading}
 						/>
 					</div>
 					{error ? <div style={{ color: '#b91c1c', marginTop: 8 }}>{error}</div> : null}
 					<div style={{ marginTop: 16 }}>
 						<button className="button" type="submit" disabled={loading}>
-							{loading ? 'Signing in…' : 'Sign In'}
+							{loading ? (
+								<span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+									<Spinner size="sm" />
+									Signing in…
+								</span>
+							) : (
+								'Sign In'
+							)}
 						</button>
 					</div>
 				</form>

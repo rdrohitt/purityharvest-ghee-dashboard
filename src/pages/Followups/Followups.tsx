@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { Spinner } from '../../components/Spinner';
 import { type Followup, loadFollowupsData, updateFollowupData, type FollowupData } from '../../utils/followups';
 import { loadOrders, type Order, type OrderItem } from '../../utils/orders';
 
@@ -372,8 +373,8 @@ export default function Followups() {
     if (loading) {
         return (
             <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
-                <div className="card" style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
-                    Loading followups...
+                <div className="card" style={{ position: 'relative', minHeight: 280 }}>
+                    <Spinner overlay message="Loading followups…" />
                 </div>
             </section>
         );

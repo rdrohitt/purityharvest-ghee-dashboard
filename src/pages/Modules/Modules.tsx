@@ -1,12 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiFetch } from '../../api';
+import { Spinner } from '../../components/Spinner';
+import type { ModuleApiItem, ModuleCreatePayload, ModuleRecord } from '../../types/modules';
+import { ModuleModal } from './ModuleModal';
 import './Modules.scss';
-
-type ModuleRecord = {
-  id: string;
-  key: string;
-  name: string;
-  description?: string;
-};
 
 type Toast = {
   id: string;
@@ -14,21 +11,59 @@ type Toast = {
   type: 'success' | 'error';
 };
 
-const INITIAL_MODULES: ModuleRecord[] = [
-  { id: 'MOD-001', key: 'orders', name: 'Orders', description: 'Order management and fulfillment' },
-  { id: 'MOD-002', key: 'products', name: 'Products', description: 'Product catalog and pricing' },
-  { id: 'MOD-003', key: 'marts', name: 'Marts', description: 'Gurugram / Delhi marts operations' },
-  { id: 'MOD-004', key: 'reports', name: 'Reports', description: 'Analytics and performance reports' },
-  { id: 'MOD-005', key: 'users', name: 'Users & Roles', description: 'User access and permissions' },
-];
+function normalizeModules(data: unknown): ModuleRecord[] {
+  const list = (Array.isArray(data) ? data : []) as ModuleApiItem[];
+  return list.map((item) => ({
+    id: item._id,
+    key: item.key,
+    name: item.label,
+    description: item.path || undefined,
+    order: item.order,
+    active: item.active,
+    icon: item.icon,
+  }));
+}
 
 export default function Modules() {
-  const [modules, setModules] = useState<ModuleRecord[]>(INITIAL_MODULES);
+  const [modules, setModules] = useState<ModuleRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<ModuleRecord | null>(null);
   const [deleting, setDeleting] = useState<ModuleRecord | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    apiFetch('/api/modules')
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.ok) throw new Error(res.statusText || 'Failed to load modules');
+        return res.json();
+      })
+      .then((data: unknown) => {
+        if (cancelled) return;
+        setModules(normalizeModules(data));
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setLoadError(err.message || 'Failed to load modules');
+        setModules([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const refetchModules = useCallback(() => {
+    apiFetch('/api/modules')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: unknown) => setModules(normalizeModules(data)))
+      .catch(() => setModules([]));
+  }, []);
 
   function showToast(message: string, type: 'success' | 'error' = 'success') {
     const id = `toast-${Date.now()}-${Math.random()}`;
@@ -46,24 +81,38 @@ export default function Modules() {
     );
   }, [modules, search]);
 
-  function handleCreateOrUpdate(payload: Omit<ModuleRecord, 'id'>) {
+  function handleCreateOrUpdate(payload: ModuleCreatePayload) {
     if (editing) {
-      setModules((prev) => prev.map((m) => (m.id === editing.id ? { id: editing.id, ...payload } : m)));
+      const updated: ModuleRecord = {
+        id: editing.id,
+        key: payload.key,
+        name: payload.label,
+        description: payload.path || undefined,
+        order: payload.order,
+        active: payload.active,
+        icon: payload.icon,
+      };
+      setModules((prev) => prev.map((m) => (m.id === editing.id ? updated : m)));
       showToast('Module updated successfully', 'success');
     } else {
-      const nextIndex = modules.length + 1;
-      const id = `MOD-${nextIndex.toString().padStart(3, '0')}`;
-      setModules((prev) => [{ id, ...payload }, ...prev]);
       showToast('Module created successfully', 'success');
     }
     setEditing(null);
     setShowModal(false);
   }
 
-  function handleDeleteModule(id: string) {
-    setModules((prev) => prev.filter((m) => m.id !== id));
-    showToast('Module deleted successfully', 'success');
-    setDeleting(null);
+  async function handleDeleteModule(id: string) {
+    try {
+      const res = await apiFetch(`/api/modules/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(res.statusText || 'Failed to delete module');
+      setModules((prev) => prev.filter((m) => m.id !== id));
+      showToast('Module deleted successfully', 'success');
+    } catch (err) {
+      console.error('Failed to delete module', err);
+      showToast('Failed to delete module. Please try again.', 'error');
+    } finally {
+      setDeleting(null);
+    }
   }
 
   return (
@@ -73,29 +122,39 @@ export default function Modules() {
       <div className="card modules-header-card">
         <div className="modules-header-title">Modules</div>
         <div className="modules-header-row">
-          <div className="modules-header-spacer" />
-          <input
-            className="input modules-search"
-            placeholder="Search modules"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button
-            className="button modules-create-btn"
-            onClick={() => {
-              setEditing(null);
-              setShowModal(true);
-            }}
-          >
-            Add Module
-          </button>
+          <div className="modules-search-row">
+            <input
+              className="input modules-search"
+              placeholder="Search by name, key or description"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button
+              className="button modules-create-btn"
+              onClick={() => {
+                setEditing(null);
+                setShowModal(true);
+              }}
+            >
+              Add Module
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="card modules-table-card">
         <div className="modules-count-bar">
-          {`${filtered.length.toLocaleString()} module${filtered.length === 1 ? '' : 's'}`}
+          {loading
+            ? 'Loading…'
+            : loadError
+              ? loadError
+              : `${filtered.length.toLocaleString()} module${filtered.length === 1 ? '' : 's'}`}
         </div>
+        {loading ? (
+          <div className="modules-table-loading">
+            <Spinner overlay message="Loading modules…" />
+          </div>
+        ) : !loadError ? (
         <div className="table-scroll-wrapper">
           <table className="modules-table">
             <thead>
@@ -149,10 +208,11 @@ export default function Modules() {
             </tbody>
           </table>
         </div>
+        ) : null}
       </div>
 
       {showModal ? (
-        <ModulesModal
+        <ModuleModal
           mode={editing ? 'edit' : 'create'}
           initialModule={editing}
           onClose={() => {
@@ -160,6 +220,7 @@ export default function Modules() {
             setEditing(null);
           }}
           onSubmit={handleCreateOrUpdate}
+          onSuccess={refetchModules}
         />
       ) : null}
 
@@ -235,90 +296,6 @@ function ModulesToastContainer({ toasts }: { toasts: Toast[] }) {
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function ModulesModal({
-  mode,
-  initialModule,
-  onClose,
-  onSubmit,
-}: {
-  mode: 'create' | 'edit';
-  initialModule: ModuleRecord | null;
-  onClose: () => void;
-  onSubmit: (module: Omit<ModuleRecord, 'id'>) => void;
-}) {
-  const [name, setName] = useState(initialModule?.name ?? '');
-  const [key, setKey] = useState(initialModule?.key ?? '');
-  const [description, setDescription] = useState(initialModule?.description ?? '');
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmedName = name.trim();
-    const trimmedKey = (key || name).trim().toLowerCase().replace(/\s+/g, '-');
-    if (!trimmedName || !trimmedKey) return;
-    onSubmit({
-      name: trimmedName,
-      key: trimmedKey,
-      description: description.trim() || undefined,
-    });
-  }
-
-  return (
-    <div role="dialog" aria-modal="true" className="modules-modal-backdrop" onClick={onClose}>
-      <div className="card modules-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modules-modal-header">
-          <h3 className="modules-modal-title">{mode === 'edit' ? 'Edit Module' : 'Add Module'}</h3>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
-        <form className="modules-modal-body" onSubmit={handleSubmit}>
-          <div className="modules-form-grid">
-            <div className="modules-form-full-row">
-              <label className="label">Module Name</label>
-              <input
-                className="input modules-input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Orders"
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Key</label>
-              <input
-                className="input modules-input"
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder="e.g. orders"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Description</label>
-            <textarea
-              className="input modules-textarea"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short description for this module"
-              rows={3}
-            />
-          </div>
-
-          <div className="modules-modal-footer">
-            <button type="button" className="icon-btn" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="button modules-modal-primary-btn">
-              {mode === 'edit' ? 'Save Changes' : 'Add Module'}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }

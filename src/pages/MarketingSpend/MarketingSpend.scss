@@ -1,0 +1,513 @@
+.marketing-spend-page {
+  display: grid;
+  gap: 12px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 8px;
+}
+
+.marketing-spend-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.marketing-spend-summary__title {
+  font-weight: 800;
+}
+
+.marketing-spend-summary__subtitle {
+  color: var(--muted);
+}
+
+.marketing-spend-metrics {
+  width: 100%;
+  display: flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-top: 12px;
+  background: var(--bg-elev);
+}
+
+.marketing-spend-metric {
+  flex: 1;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-right: 1px solid var(--border);
+  transition: all 0.2s;
+}
+
+.marketing-spend-metric--last {
+  border-right: none;
+}
+
+.marketing-spend-metric--even {
+  background: #f8f9fa;
+}
+
+.marketing-spend-metric:hover {
+  background: var(--bg);
+}
+
+.marketing-spend-metric__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.marketing-spend-metric__icon {
+  font-size: 16px;
+  opacity: 0.8;
+}
+
+.marketing-spend-metric__label {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.marketing-spend-metric__value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+  letter-spacing: -0.2px;
+}
+
+.marketing-spend-unified {
+  display: grid;
+  gap: 12px;
+}
+
+.marketing-spend-unified__header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.marketing-spend-unified__title {
+  font-weight: 800;
+}
+
+.marketing-spend-unified__subtitle {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.marketing-spend-unified__form-wrapper,
+.marketing-spend-unified__table-wrapper {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.marketing-spend-unified__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.marketing-spend-unified__field {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.marketing-spend-unified__submit-label {
+  visibility: hidden;
+}
+
+.marketing-spend-unified__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.marketing-spend-unified__cancel-btn {
+  width: auto;
+  padding: 0 16px;
+}
+
+.marketing-spend-unified__submit-btn {
+  width: 100%;
+}
+
+.platform-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid;
+}
+
+.platform-tag--meta {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+}
+
+.platform-tag--amazon {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.platform-tag--flipkart {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #a5b4fc;
+}
+
+.platform-tag--checkout {
+  background: #ccfbf1;
+  color: #115e59;
+  border-color: #5eead4;
+}
+
+.platform-tag--engage {
+  background: #ede9fe;
+  color: #4c1d95;
+  border-color: #c4b5fd;
+}
+
+.platform-tag--dolchi {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fed7aa;
+}
+
+.platform-tag--misc {
+  background: #e9d5ff;
+  color: #6b21a8;
+  border-color: #c084fc;
+}
+
+.platform-tag--default {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.marketing-spend-table__loading {
+  position: relative;
+  min-height: 280px;
+}
+
+.marketing-spend-table__empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.marketing-spend-table__wrapper {
+  overflow-x: auto;
+}
+
+.marketing-spend-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.marketing-spend-table__row {
+  border-bottom: 1px solid var(--border);
+}
+
+.marketing-spend-table__header-cell {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.marketing-spend-table__cell {
+  padding: 12px;
+}
+
+.marketing-spend-table__row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.marketing-spend-filter-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  position: relative;
+}
+
+.marketing-spend-filter-group__popover {
+  position: absolute;
+  top: 44px;
+}
+
+.marketing-spend-filter-group__popover-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px;
+}
+
+.marketing-spend-filter-group__date-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.marketing-spend-filter-group__date-label {
+  font-size: 12px;
+  margin: 0;
+}
+
+.marketing-spend-filter-group__date-input {
+  height: 36px;
+}
+
+.marketing-spend-filter-group__dash {
+  color: var(--muted);
+}
+
+.marketing-spend-filter-group__apply-btn {
+  width: auto;
+  padding: 0 16px;
+  height: 36px;
+}
+
+.marketing-toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.marketing-toast {
+  pointer-events: auto;
+  animation: slideInRight 0.3s ease-out;
+}
+
+.marketing-toast__inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.marketing-toast__icon {
+  font-size: 18px;
+}
+
+.ms-date-picker {
+  position: relative;
+  width: 100%;
+}
+
+.ms-date-picker__display {
+  width: 100%;
+  margin-top: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.ms-date-picker__text {
+  color: var(--muted);
+}
+
+.ms-date-picker__text--value {
+  color: var(--text);
+}
+
+.ms-date-picker__icon {
+  font-size: 18px;
+  color: var(--muted);
+}
+
+.ms-date-picker__native-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+.ms-date-picker__popup {
+  position: fixed;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  z-index: 10000;
+  min-width: 300px;
+  max-width: 300px;
+}
+
+.ms-date-picker__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.ms-date-picker__nav-btn {
+  padding: 6px 10px;
+  font-size: 18px;
+  border: none;
+  background: #f3f4f6;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #374151;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.ms-date-picker__nav-btn:hover {
+  background: #e5e7eb;
+}
+
+.ms-date-picker__month {
+  font-weight: 700;
+  font-size: 16px;
+  color: #111827;
+}
+
+.ms-date-picker__weekday-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.ms-date-picker__weekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  padding: 8px 0;
+}
+
+.ms-date-picker__days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.ms-date-picker__day {
+  padding: 10px 4px;
+  border: none;
+  background: transparent;
+  color: #111827;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  transition: all 0.2s;
+}
+
+.ms-date-picker__day--today {
+  background: #dcfce7;
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.ms-date-picker__day--selected {
+  background: #16a34a;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.ms-date-picker__day:not(.ms-date-picker__day--selected):not(.ms-date-picker__day--today):hover {
+  background: #f3f4f6;
+}
+
+.ms-date-picker__today-btn {
+  margin-top: 16px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  transition: all 0.2s;
+}
+
+.ms-date-picker__today-btn:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.marketing-spend-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 11000;
+}
+
+.marketing-spend-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.marketing-spend-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.marketing-spend-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.marketing-spend-modal__form {
+  display: grid;
+  gap: 16px;
+}
+
+.marketing-spend-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.marketing-spend-modal__input {
+  margin-top: 6px;
+  width: 100%;
+}
+
+.marketing-spend-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.marketing-spend-modal__submit-btn {
+  min-width: 120px;
+}
+

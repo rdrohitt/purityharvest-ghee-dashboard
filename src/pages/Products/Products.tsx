@@ -1,11 +1,52 @@
 import { useState, useMemo, useEffect, Fragment } from 'react';
-import { loadProducts, addProduct, updateProduct, deleteProduct, type Product } from '../../utils/products';
+import { Spinner } from '../../components/Spinner';
+import type { ProductApiItem, ProductVariantRow } from '../../types/products';
+import { loadProducts, addProduct, updateProduct, deleteProduct, syncShopify } from '../../utils/products';
+import { useAppDispatch, useAppSelector, setProducts, setProductsLoading, addProductToStore, updateProductInStore, removeProduct } from '../../store';
+import { Categories } from './Categories';
+import { ProductModal } from './ProductModal';
+import './Products.scss';
 
 function formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 }
 
-const CATEGORY_OPTIONS: string[] = ['Ghee', 'Oils', 'Dry Fruits'];
+/** Normalize category to string whether API returns string or populated object { _id, name, ... }. */
+function getCategoryName(cat: ProductApiItem['category']): string {
+    if (cat == null) return '';
+    if (typeof cat === 'string') return cat;
+    return String((cat as { name?: string }).name ?? '');
+}
+
+/** Flatten products into one row per variant (or one row if no variants). */
+function productToVariantRows(p: ProductApiItem): ProductVariantRow[] {
+    const categoryName = getCategoryName(p.category);
+    const isShopify = p.isShopify === true;
+    if (!p.variants || p.variants.length === 0) {
+        return [{
+            productId: p._id,
+            productName: p.name,
+            categoryName,
+            variantName: '—',
+            price: p.price,
+            actualPrice: p.actualPrice,
+            stock: 0,
+            variantIndex: 0,
+            isShopify,
+        }];
+    }
+    return p.variants.map((v, i) => ({
+        productId: p._id,
+        productName: p.name,
+        categoryName,
+        variantName: v.name,
+        price: v.price,
+        actualPrice: v.actualPrice,
+        stock: v.stock,
+        variantIndex: i,
+        isShopify,
+    }));
+}
 
 type Toast = {
     id: string;
@@ -13,89 +54,106 @@ type Toast = {
     type: 'success' | 'error' | 'delete';
 };
 
+type ProductsTab = 'category' | 'products';
+
 export default function Products() {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useAppDispatch();
+    const products = useAppSelector((state) => state.products.products);
+    const loading = useAppSelector((state) => state.products.loading);
+
+    const [activeTab, setActiveTab] = useState<ProductsTab>('products');
     const [showAddProduct, setShowAddProduct] = useState(false);
-    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [editingProduct, setEditingProduct] = useState<ProductApiItem | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string>('');
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [syncLoading, setSyncLoading] = useState(false);
 
     useEffect(() => {
+        if (products.length > 0) {
+            dispatch(setProductsLoading(false));
+            return;
+        }
         let cancelled = false;
         loadProducts()
             .then((data) => {
-                if (cancelled) return;
-                setProducts(data);
+                if (!cancelled) dispatch(setProducts(data));
             })
-            .finally(() => {
-                if (!cancelled) setLoading(false);
+            .catch(() => {
+                if (!cancelled) dispatch(setProductsLoading(false));
             });
 
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [dispatch, products.length]);
 
-    const filtered = useMemo(() => {
-        if (!searchQuery) return products;
-        const query = searchQuery.toLowerCase();
-        const byText = products.filter(p => 
-            p.id.toLowerCase().includes(query) ||
-            p.name.toLowerCase().includes(query) ||
-            p.size.toLowerCase().includes(query) ||
-            (p as any).category?.toLowerCase().includes(query)
+    const allVariantRows = useMemo(() => products.flatMap(productToVariantRows), [products]);
+
+    const filteredRows = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        const byCategory = categoryFilter
+            ? allVariantRows.filter(r => r.categoryName === categoryFilter)
+            : allVariantRows;
+        if (!q) return byCategory;
+        return byCategory.filter(
+            r =>
+                r.productId.toLowerCase().includes(q) ||
+                r.productName.toLowerCase().includes(q) ||
+                r.categoryName.toLowerCase().includes(q) ||
+                r.variantName.toLowerCase().includes(q)
         );
-        return byText.filter(p => !categoryFilter || (p as any).category === categoryFilter);
-    }, [products, searchQuery, categoryFilter]);
+    }, [allVariantRows, searchQuery, categoryFilter]);
+
+    const categoryOptions = useMemo(() => {
+        const set = new Set<string>(products.map(p => getCategoryName(p.category)).filter(Boolean));
+        return Array.from(set).sort();
+    }, [products]);
+
+    const categoryOptionsWithId = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const p of products) {
+            const cat = p.category;
+            if (cat && typeof cat === 'object' && 'name' in cat && '_id' in cat) {
+                const name = (cat as { name: string; _id: string }).name;
+                if (name && !map.has(name)) map.set(name, (cat as { _id: string })._id);
+            }
+        }
+        return Array.from(map.entries()).map(([name, _id]) => ({ _id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [products]);
 
     const metrics = useMemo(() => {
-        const total = filtered.length;
-        const prices = filtered.map(p => p.price);
-        const avgPrice = total ? Math.round(prices.reduce((a,b)=>a+b,0)/total) : 0;
+        const total = filteredRows.length;
+        const prices = filteredRows.map(r => r.price);
+        const avgPrice = total ? Math.round(prices.reduce((a, b) => a + b, 0) / total) : 0;
         const minPrice = prices.length ? Math.min(...prices) : 0;
         const maxPrice = prices.length ? Math.max(...prices) : 0;
-        const avgWeight = total ? Math.round(filtered.reduce((a,b)=> a + b.weight, 0)/total) : 0;
-        const categorySet = new Set<string>(filtered.map(p => (p as any).category || ''));
-        const categories = [...categorySet].filter(Boolean).length;
-        return { total, avgPrice, minPrice, maxPrice, avgWeight, categories };
-    }, [filtered]);
+        const categorySet = new Set<string>(filteredRows.map(r => r.categoryName).filter(Boolean));
+        const categories = categorySet.size;
+        const totalStock = filteredRows.reduce((a, r) => a + r.stock, 0);
+        const avgStock = total ? Math.round(totalStock / total) : 0;
+        return { total, avgPrice, minPrice, maxPrice, categories, avgStock };
+    }, [filteredRows]);
 
-    const groupedProducts = useMemo(() => {
-        const groups = new Map<string, { name: string; category: string; variants: Product[] }>();
-
-        for (const p of filtered) {
-            const category = (p as any).category || '';
-            const key = `${p.name}::${category}`;
-            const existing = groups.get(key);
+    const groupedByProduct = useMemo(() => {
+        const map = new Map<string, { productId: string; productName: string; categoryName: string; rows: ProductVariantRow[] }>();
+        for (const row of filteredRows) {
+            const existing = map.get(row.productId);
             if (existing) {
-                existing.variants.push(p);
+                existing.rows.push(row);
             } else {
-                groups.set(key, {
-                    name: p.name,
-                    category,
-                    variants: [p],
+                map.set(row.productId, {
+                    productId: row.productId,
+                    productName: row.productName,
+                    categoryName: row.categoryName,
+                    rows: [row],
                 });
             }
         }
-
-        const result = Array.from(groups.values());
-
-        // Sort variants within each product by size for a stable order
-        result.forEach((group) => {
-            group.variants.sort((a, b) => a.size.localeCompare(b.size));
-        });
-
-        // Sort products by name, then category
-        result.sort(
-            (a, b) =>
-                a.name.localeCompare(b.name) ||
-                a.category.localeCompare(b.category)
-        );
-
+        const result = Array.from(map.values());
+        result.sort((a, b) => a.productName.localeCompare(b.productName) || a.categoryName.localeCompare(b.categoryName));
         return result;
-    }, [filtered]);
+    }, [filteredRows]);
 
     function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
         const id = `toast-${Date.now()}-${Math.random()}`;
@@ -105,236 +163,236 @@ export default function Products() {
         }, 3000);
     }
 
-    async function handleCreateProduct(newProduct: Product) {
+    async function handleCreateProduct(newProduct: ProductApiItem) {
         try {
-            // Persist to backend first so products.json is updated
             const saved = await addProduct(newProduct);
-
-            setProducts((prev) => [saved, ...prev]);
+            dispatch(addProductToStore(saved));
             setEditingProduct(null);
             setShowAddProduct(false);
             showToast('Product added successfully!', 'success');
         } catch (err) {
             console.error('Failed to create product', err);
-            showToast('Failed to create product. Please check that the server is running and try again.', 'error');
+            showToast('Failed to create product. Please try again.', 'error');
         }
     }
 
-    async function handleUpdateProduct(updatedProduct: Product) {
+    async function handleUpdateProduct(updatedProduct: ProductApiItem) {
         try {
             const saved = await updateProduct(updatedProduct);
-
-            setProducts((prev) =>
-                prev.map((p) => (p.id === saved.id ? saved : p))
-            );
+            const idToName = new Map<string, string>();
+            for (const p of products) {
+                const c = p.category;
+                if (c && typeof c === 'object' && '_id' in c && 'name' in c)
+                    idToName.set((c as { _id: string })._id, (c as { name: string }).name);
+            }
+            const categoryForDisplay =
+                typeof saved.category === 'string' && saved.category
+                    ? { _id: saved.category, name: idToName.get(saved.category) ?? saved.category }
+                    : saved.category;
+            const merged = { ...saved, category: categoryForDisplay };
+            dispatch(updateProductInStore(merged));
             setEditingProduct(null);
             setShowAddProduct(false);
             showToast('Product updated successfully!', 'success');
         } catch (err) {
             console.error('Failed to update product', err);
-            showToast('Failed to update product. Please check that the server is running and try again.', 'error');
+            showToast('Failed to update product. Please try again.', 'error');
         }
     }
 
     async function handleDeleteProduct(id: string) {
         const confirmed = window.confirm('Are you sure you want to delete this product? This action cannot be undone.');
         if (!confirmed) return;
-
         try {
             await deleteProduct(id);
-            setProducts((prev) => prev.filter((p) => p.id !== id));
+            dispatch(removeProduct(id));
             showToast('Product deleted successfully!', 'delete');
         } catch (err) {
             console.error('Failed to delete product', err);
-            showToast('Failed to delete product. Please check that the server is running and try again.', 'error');
+            showToast('Failed to delete product. Please try again.', 'error');
+        }
+    }
+
+    async function handleSyncShopify() {
+        setSyncLoading(true);
+        try {
+            await syncShopify();
+            const data = await loadProducts();
+            dispatch(setProducts(data));
+            showToast('Shopify products synced successfully!', 'success');
+        } catch (err) {
+            console.error('Failed to sync Shopify', err);
+            showToast('Failed to sync Shopify. Please try again.', 'error');
+        } finally {
+            setSyncLoading(false);
+        }
+    }
+
+    function openEditProduct(productId: string) {
+        const p = products.find((x) => x._id === productId);
+        if (p) {
+            setEditingProduct(p);
+            setShowAddProduct(true);
         }
     }
 
     return (
-        <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden', position: 'relative' }}>
+        <section className="products-page">
             <ToastContainer toasts={toasts} />
-            <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
-                <div style={{ fontWeight: 800 }}>Products</div>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div className="card products-tabs-card">
+                <div className="products-tabs-row">
+                    {(['category', 'products'] as const).map((tab) => (
+                        <button
+                            key={tab}
+                            type="button"
+                            className={activeTab === tab ? 'products-tab products-tab--active' : 'products-tab'}
+                            onClick={() => setActiveTab(tab)}
+                        >
+                            {tab === 'category' ? 'Category' : 'Products'}
+                        </button>
+                    ))}
+                </div>
+
+                {activeTab === 'category' && <Categories />}
+
+                {activeTab === 'products' && (
+                    <>
+            <div className="products-toolbar">
+                <div className="products-toolbar-title">Products</div>
+                <div className="products-toolbar-row">
+                    <div className="products-toolbar-filters">
                         <CategoryFilter
                             label="Category"
                             value={categoryFilter}
                             onChange={setCategoryFilter}
-                            options={CATEGORY_OPTIONS}
+                            options={categoryOptions}
                         />
                     </div>
-                    <div style={{ flex: 1 }} />
-                    <input
-                        className="input"
-                        placeholder="Search products"
-                        style={{ width: 240 }}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    <button
-                        className="button"
-                        style={{ width: 'auto', padding: '0 16px' }}
-                        onClick={() => {
-                            setEditingProduct(null);
-                            setShowAddProduct(true);
-                        }}
-                    >
-                        Add Product
-                    </button>
-                </div>
-                <div style={{ width: '100%', color: 'var(--muted)', fontSize: 14 }}>
-                    {loading ? 'Loading products…' : `Showing ${groupedProducts.length} products (${filtered.length} variants)`}
+                    <div className="products-toolbar-spacer" />
+                    <div className="products-toolbar-search-add">
+                        <input
+                            className="input products-toolbar-search"
+                            placeholder="Search products"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <button
+                            className="button products-toolbar-add-btn"
+                            onClick={() => {
+                                setEditingProduct(null);
+                                setShowAddProduct(true);
+                            }}
+                        >
+                            Add Product
+                        </button>
+                        <button
+                            type="button"
+                            className="button products-toolbar-sync-btn"
+                            onClick={handleSyncShopify}
+                            disabled={syncLoading}
+                        >
+                            {syncLoading ? 'Syncing…' : 'Sync Shopify'}
+                        </button>
+                    </div>
                 </div>
 
-                <div style={{ 
-                    width: '100%', 
-                    display: 'flex',
-                    borderRadius: 4,
-                    overflow: 'hidden',
-                    border: '1px solid var(--border)',
-                    marginTop: 12,
-                    background: 'var(--bg-elev)',
-                }}>
-                    <ModernMetricItem 
-                        icon="📦" 
-                        label="Total Products" 
-                        value={metrics.total.toLocaleString()} 
-                        iconColor="#16a34a"
-                        isLast={false}
-                        isEven={false}
-                    />
-                    <ModernMetricItem 
-                        icon="💰" 
-                        label="Avg Price" 
-                        value={formatCurrency(metrics.avgPrice)} 
-                        iconColor="#3b82f6"
-                        isLast={false}
-                        isEven={true}
-                    />
-                    <ModernMetricItem 
-                        icon="📉" 
-                        label="Min Price" 
-                        value={formatCurrency(metrics.minPrice)} 
-                        iconColor="#f59e0b"
-                        isLast={false}
-                        isEven={false}
-                    />
-                    <ModernMetricItem 
-                        icon="📈" 
-                        label="Max Price" 
-                        value={formatCurrency(metrics.maxPrice)} 
-                        iconColor="#ef4444"
-                        isLast={false}
-                        isEven={true}
-                    />
-                    <ModernMetricItem 
-                        icon="🏷️" 
-                        label="Categories" 
-                        value={metrics.categories.toString()} 
-                        iconColor="#8b5cf6"
-                        isLast={false}
-                        isEven={false}
-                    />
-                    <ModernMetricItem 
-                        icon="⚖️" 
-                        label="Avg Weight" 
-                        value={`${metrics.avgWeight} g`} 
-                        iconColor="#06b6d4"
-                        isLast={true}
-                        isEven={true}
-                    />
+                <div className="products-metrics-row">
+                    <ModernMetricItem icon="📦" label="Total Products" value={metrics.total.toLocaleString()} iconClass="products-metric-icon--green" isLast={false} isEven={false} />
+                    <ModernMetricItem icon="💰" label="Avg Price" value={formatCurrency(metrics.avgPrice)} iconClass="products-metric-icon--blue" isLast={false} isEven={true} />
+                    <ModernMetricItem icon="📉" label="Min Price" value={formatCurrency(metrics.minPrice)} iconClass="products-metric-icon--amber" isLast={false} isEven={false} />
+                    <ModernMetricItem icon="📈" label="Max Price" value={formatCurrency(metrics.maxPrice)} iconClass="products-metric-icon--red" isLast={false} isEven={true} />
+                    <ModernMetricItem icon="🏷️" label="Categories" value={metrics.categories.toString()} iconClass="products-metric-icon--violet" isLast={false} isEven={false} />
+                    <ModernMetricItem icon="📦" label="Avg Stock" value={metrics.avgStock.toLocaleString()} iconClass="products-metric-icon--cyan" isLast={true} isEven={true} />
                 </div>
             </div>
 
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card products-table-card">
+                <div className="products-count-bar">
+                    {loading ? 'Loading…' : `Showing ${groupedByProduct.length} products (${filteredRows.length} variants)`}
+                </div>
+                {loading ? (
+                    <div className="products-table-loading">
+                        <Spinner overlay message="Loading products…" />
+                    </div>
+                ) : (
                 <div className="table-scroll-wrapper">
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1300, tableLayout: 'auto' }}>
+                    <table className="products-table">
                         <colgroup>
-                            <col style={{ width: '140px', minWidth: '140px' }} />
-                            <col style={{ width: '250px', minWidth: '250px' }} />
-                            <col style={{ width: '160px', minWidth: '160px' }} />
-                            <col style={{ width: '120px', minWidth: '120px' }} />
-                            <col style={{ width: '140px', minWidth: '140px' }} />
-                            <col style={{ width: '140px', minWidth: '140px' }} />
-                            <col style={{ width: '180px', minWidth: '180px' }} />
-                            <col style={{ width: '120px', minWidth: '120px' }} />
-                            <col style={{ width: '120px', minWidth: '120px' }} />
+                            <col className="products-col-name" />
+                            <col className="products-col-category" />
+                            <col className="products-col-variant" />
+                            <col className="products-col-price" />
+                            <col className="products-col-actual" />
+                            <col className="products-col-shopify" />
+                            <col className="products-col-actions" />
                         </colgroup>
                         <thead>
-                            <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-                                <Th>Product ID</Th>
+                            <tr className="products-thead-row">
                                 <Th>Name</Th>
                                 <Th>Category</Th>
-                                <Th>Size</Th>
+                                <Th>Variant</Th>
                                 <Th>Price</Th>
                                 <Th>Actual Price</Th>
-                                <Th>Dimension (H × W × L)</Th>
-                                <Th>Weight</Th>
+                                <Th>Shopify</Th>
                                 <Th>Actions</Th>
                             </tr>
                         </thead>
                         <tbody>
-                            {groupedProducts.map((group) => (
-                                <Fragment key={`${group.name}::${group.category || 'uncategorised'}`}>
-                                    {group.variants.map((p, idx) => (
-                                        <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                            <Td>{p.id}</Td>
+                            {groupedByProduct.map((group) => (
+                                <Fragment key={group.productId}>
+                                    {group.rows.map((row, idx) => (
+                                        <tr key={`${row.productId}-${row.variantIndex}-${idx}`} className="products-tbody-row">
                                             {idx === 0 ? (
                                                 <>
-                                                    <td
-                                                        rowSpan={group.variants.length}
-                                                        style={{ padding: '12px', fontWeight: 600 }}
-                                                    >
-                                                        {group.name}
+                                                    <td rowSpan={group.rows.length} className="products-td products-td--name">
+                                                        {group.productName}
                                                     </td>
-                                                    <td
-                                                        rowSpan={group.variants.length}
-                                                        style={{ padding: '12px' }}
-                                                    >
-                                                        {group.category || '-'}
+                                                    <td rowSpan={group.rows.length} className="products-td">
+                                                        <span className="tag products-tag products-tag--category">
+                                                            {group.categoryName || '—'}
+                                                        </span>
                                                     </td>
                                                 </>
                                             ) : null}
-                                            <Td>{p.size}</Td>
-                                            <Td>{formatCurrency(p.price)}</Td>
-                                            <Td>
-                                                {((p as any).actualPrice ?? (p as any).actual_price) != null
-                                                    ? formatCurrency(
-                                                        (p as any).actualPrice ?? (p as any).actual_price
-                                                    )
-                                                    : '—'}
-                                            </Td>
-                                            <Td>{p.dimension.height} × {p.dimension.width} × {p.dimension.length} cm</Td>
-                                            <Td>{p.weight} g</Td>
-                                            <Td>
-                                                <div style={{ display: 'flex', gap: 8 }}>
-                                                    <button
-                                                        type="button"
-                                                        className="icon-btn"
-                                                        onClick={() => {
-                                                            setEditingProduct(p);
-                                                            setShowAddProduct(true);
-                                                        }}
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="icon-btn icon-btn--danger"
-                                                        onClick={() => handleDeleteProduct(p.id)}
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </Td>
+                                            <Td>{row.variantName}</Td>
+                                            <Td>{formatCurrency(row.price)}</Td>
+                                            <Td>{row.actualPrice != null ? formatCurrency(row.actualPrice) : '—'}</Td>
+                                            {idx === 0 ? (
+                                                <td rowSpan={group.rows.length} className="products-td">
+                                                    <span className={`tag products-tag ${group.rows[0]?.isShopify ? 'products-tag--shopify' : 'products-tag--no'}`}>
+                                                        {group.rows[0]?.isShopify ? 'Shopify' : 'No'}
+                                                    </span>
+                                                </td>
+                                            ) : null}
+                                            {idx === 0 ? (
+                                                <td rowSpan={group.rows.length} className="products-td">
+                                                    <div className="products-actions-cell">
+                                                        <button
+                                                            type="button"
+                                                            className="icon-btn"
+                                                            onClick={() => openEditProduct(row.productId)}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        {!group.rows[0]?.isShopify && (
+                                                            <button
+                                                                type="button"
+                                                                className="icon-btn icon-btn--danger"
+                                                                onClick={() => handleDeleteProduct(row.productId)}
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            ) : null}
                                         </tr>
                                     ))}
                                 </Fragment>
                             ))}
-                            {groupedProducts.length === 0 ? (
+                            {groupedByProduct.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+                                    <td colSpan={7} className="products-empty-cell">
                                         No products found
                                     </td>
                                 </tr>
@@ -342,18 +400,23 @@ export default function Products() {
                         </tbody>
                     </table>
                 </div>
+                )}
+            </div>
+                    </>
+                )}
             </div>
 
             {showAddProduct ? (
-                <AddProductModal
+                <ProductModal
                     mode={editingProduct ? 'edit' : 'add'}
                     initialProduct={editingProduct}
+                    categories={categoryOptionsWithId}
+                    restrictToActualPriceOnly={editingProduct?.isShopify === true}
                     onClose={() => {
                         setShowAddProduct(false);
                         setEditingProduct(null);
                     }}
                     onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
-                    categories={CATEGORY_OPTIONS}
                 />
             ) : null}
         </section>
@@ -361,22 +424,21 @@ export default function Products() {
 }
 
 function Th({ children }: { children: string }) {
-    return <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{children}</th>;
+    return <th className="products-th">{children}</th>;
 }
 
-function Td({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-    return <td style={{ padding: '12px', ...style }}>{children}</td>;
+function Td({ children, className }: { children: React.ReactNode; className?: string }) {
+    return <td className={className ? `products-td ${className}` : 'products-td'}>{children}</td>;
 }
 
 function CategoryFilter({ label, value, onChange, options }: { label: string; value: string; onChange: (val: string) => void; options: string[] }) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label className="label" style={{ fontSize: 11, margin: 0, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</label>
+        <div className="products-filter">
+            <label className="label products-filter-label">{label}</label>
             <select
-                className="input"
+                className="input products-filter-select"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                style={{ height: 32, minWidth: 160, cursor: 'pointer', fontSize: 13 }}
             >
                 <option value="">All</option>
                 {options.map((opt) => (
@@ -387,314 +449,29 @@ function CategoryFilter({ label, value, onChange, options }: { label: string; va
     );
 }
 
-function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { icon: string; label: string; value: string; iconColor: string; isLast: boolean; isEven: boolean }) {
+function ModernMetricItem({ icon, label, value, iconClass, isLast, isEven }: { icon: string; label: string; value: string; iconClass: string; isLast: boolean; isEven: boolean }) {
     return (
-        <div style={{ 
-            background: isEven ? '#f8f9fa' : 'transparent',
-            flex: 1,
-            padding: '12px 10px',
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: 6,
-            borderRight: isLast ? 'none' : '1px solid var(--border)',
-            transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--bg)';
-        }}
-        onMouseLeave={(e) => {
-            e.currentTarget.style.background = isEven ? '#f8f9fa' : 'transparent';
-        }}
-        >
-            <div style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                marginBottom: 2
-            }}>
-                <span style={{ fontSize: 16, opacity: 0.8 }}>{icon}</span>
-                <div style={{ 
-                    fontSize: 10, 
-                    color: 'var(--muted)', 
-                    fontWeight: 600, 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.4px',
-                }}>
-                    {label}
-                </div>
+        <div className={`products-metric-item ${isLast ? 'products-metric-item--last' : ''} ${isEven ? 'products-metric-item--even' : ''}`}>
+            <div className="products-metric-item__head">
+                <span className={`products-metric-item__icon ${iconClass}`}>{icon}</span>
+                <div className="products-metric-item__label">{label}</div>
             </div>
-            <div style={{ 
-                fontSize: 16, 
-                fontWeight: 700, 
-                color: 'var(--text)',
-                lineHeight: 1.2,
-                letterSpacing: '-0.2px'
-            }}>
-                {value}
-            </div>
-        </div>
-    );
-}
-
-function AddProductModal({
-    mode,
-    initialProduct,
-    onClose,
-    onSubmit,
-    categories,
-}: {
-    mode: 'add' | 'edit';
-    initialProduct: Product | null;
-    onClose: () => void;
-    onSubmit: (product: Product) => void;
-    categories: string[];
-}) {
-    const [name, setName] = useState('');
-    const [size, setSize] = useState('');
-    const [category, setCategory] = useState('');
-    const [price, setPrice] = useState<string>('');
-    const [actualPrice, setActualPrice] = useState<string>('');
-    const [height, setHeight] = useState<string>('');
-    const [width, setWidth] = useState<string>('');
-    const [length, setLength] = useState<string>('');
-    const [weight, setWeight] = useState<string>('');
-
-    useEffect(() => {
-        if (initialProduct) {
-            setName(initialProduct.name);
-            setSize(initialProduct.size);
-            setCategory((initialProduct as any).category || '');
-            setPrice(String(initialProduct.price ?? ''));
-            setActualPrice(
-                String(
-                    (initialProduct as any).actualPrice ??
-                    (initialProduct as any).actual_price ??
-                    ''
-                )
-            );
-            setHeight(String(initialProduct.dimension?.height ?? ''));
-            setWidth(String(initialProduct.dimension?.width ?? ''));
-            setLength(String(initialProduct.dimension?.length ?? ''));
-            setWeight(String(initialProduct.weight ?? ''));
-        } else {
-            setName('');
-            setSize('');
-            setCategory('');
-            setPrice('');
-            setActualPrice('');
-            setHeight('');
-            setWidth('');
-            setLength('');
-            setWeight('');
-        }
-    }, [initialProduct, mode]);
-
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-
-        const base = {
-            name,
-            category,
-            size,
-            price: parseFloat(price) || 0,
-            actualPrice: actualPrice === '' ? undefined : (parseFloat(actualPrice) || 0),
-            dimension: {
-                height: parseFloat(height) || 0,
-                width: parseFloat(width) || 0,
-                length: parseFloat(length) || 0,
-            },
-            weight: parseFloat(weight) || 0,
-        };
-
-        const product: Product =
-            mode === 'edit' && initialProduct
-                ? { ...base, id: initialProduct.id }
-                : { ...base, id: '' as string };
-
-        onSubmit(product);
-    }
-
-    useEffect(() => {
-        const prev = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = prev; };
-    }, []);
-
-    return (
-        <div
-            role="dialog"
-            aria-modal="true"
-            onClick={onClose}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.45)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', zIndex: 60 }}
-        >
-            <div
-                className="card"
-                onClick={(e) => e.stopPropagation()}
-                style={{ width: '100%', maxWidth: 720, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: '1px solid var(--border)' }}>
-                    <h3 style={{ margin: 0 }}>{mode === 'edit' ? 'Edit Product' : 'Add Product'}</h3>
-                    <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
-                </div>
-                <form onSubmit={submit} style={{ display: 'grid', gap: 20, padding: 20, maxHeight: '70vh', overflow: 'auto' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
-                        <div style={{ gridColumn: '1 / -1' }}>
-                            <label className="label">Product Name</label>
-                            <input
-                                className="input"
-                                style={{ width: '100%', marginTop: 6 }}
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="Enter product name"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="label">Category</label>
-                            <select
-                                className="input"
-                                style={{ width: '100%', marginTop: 6 }}
-                                value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                                required
-                            >
-                                <option value="">Select category</option>
-                                {categories.map((cat) => (
-                                    <option key={cat} value={cat}>
-                                        {cat}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="label">Size</label>
-                            <input
-                                className="input"
-                                style={{ width: '100%', marginTop: 6 }}
-                                value={size}
-                                onChange={(e) => setSize(e.target.value)}
-                                placeholder="e.g., 500ml, 1L"
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="label">Price (₹)</label>
-                            <input
-                                className="input"
-                                style={{ width: '100%', marginTop: 6 }}
-                                type="number"
-                                min={0}
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label className="label">Actual Price (₹)</label>
-                            <input
-                                className="input"
-                                style={{ width: '100%', marginTop: 6 }}
-                                type="number"
-                                min={0}
-                                value={actualPrice}
-                                onChange={(e) => setActualPrice(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="label" style={{ marginBottom: 8, display: 'block' }}>Dimensions</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
-                            <div>
-                                <label className="label" style={{ fontSize: 12 }}>Height (cm)</label>
-                                <input
-                                    className="input"
-                                    style={{ width: '100%', marginTop: 6 }}
-                                    type="number"
-                                    min={0}
-                                    value={height}
-                                    onChange={(e) => setHeight(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="label" style={{ fontSize: 12 }}>Width (cm)</label>
-                                <input
-                                    className="input"
-                                    style={{ width: '100%', marginTop: 6 }}
-                                    type="number"
-                                    min={0}
-                                    value={width}
-                                    onChange={(e) => setWidth(e.target.value)}
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="label" style={{ fontSize: 12 }}>Length (cm)</label>
-                                <input
-                                    className="input"
-                                    style={{ width: '100%', marginTop: 6 }}
-                                    type="number"
-                                    min={0}
-                                    value={length}
-                                    onChange={(e) => setLength(e.target.value)}
-                                    required
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="label">Weight (g)</label>
-                        <input
-                            className="input"
-                            style={{ width: '100%', marginTop: 6 }}
-                            type="number"
-                            min={0}
-                            value={weight}
-                            onChange={(e) => setWeight(e.target.value)}
-                            required
-                        />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                        <button type="button" className="icon-btn" onClick={onClose}>Cancel</button>
-                        <button type="submit" className="button" style={{ width: 'auto', padding: '0 16px' }}>
-                            {mode === 'edit' ? 'Save Changes' : 'Create'}
-                        </button>
-                    </div>
-                </form>
-            </div>
+            <div className="products-metric-item__value">{value}</div>
         </div>
     );
 }
 
 function ToastContainer({ toasts }: { toasts: Toast[] }) {
     return (
-        <div
-            style={{
-                position: 'fixed',
-                top: 20,
-                right: 20,
-                zIndex: 1000,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                pointerEvents: 'none',
-            }}
-        >
+        <div className="products-toast-container">
             {toasts.map((toast) => (
                 <div
                     key={toast.id}
-                    className="toast"
-                    style={{
-                        pointerEvents: 'auto',
-                        animation: 'slideInRight 0.3s ease-out',
-                    }}
+                    className="toast products-toast"
                     data-type={toast.type}
                 >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ fontSize: 18 }}>
+                    <div className="products-toast-content">
+                        <span className="products-toast-icon">
                             {toast.type === 'success' ? '✓' : toast.type === 'delete' ? '🗑' : '✕'}
                         </span>
                         <span>{toast.message}</span>

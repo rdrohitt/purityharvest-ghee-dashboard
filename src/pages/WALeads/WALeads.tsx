@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { apiFetch } from '../../api';
+import { Spinner } from '../../components/Spinner';
 
 type LeadStatus = 'New' | 'Contacted' | 'Converted' | 'Not Interested' | 'No Answer' | 'Potential Customer' | 'Very Interested' | 'CBA';
 type Platform = 'Maatripure' | 'STW' | 'Abandoned' | 'Whatsapp';
@@ -40,7 +42,7 @@ export default function WALeads() {
 
     useEffect(() => {
         let cancelled = false;
-        fetch('/api/wa-leads-orders')
+        apiFetch('/api/wa-leads-orders')
             .then((res) => {
                 if (!res.ok) throw new Error('Failed to load Leads');
                 return res.json();
@@ -222,7 +224,12 @@ export default function WALeads() {
                 </div>
             </div>
 
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
+                {loading ? (
+                    <div style={{ position: 'relative', minHeight: 280 }}>
+                        <Spinner overlay message="Loading leads…" />
+                    </div>
+                ) : (
                 <div className="table-scroll-wrapper">
                     <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000, tableLayout: 'auto' }}>
                         <colgroup>
@@ -250,13 +257,7 @@ export default function WALeads() {
                             </tr>
                         </thead>
                         <tbody>
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
-                                        Loading leads…
-                                    </td>
-                                </tr>
-                            ) : filtered.length === 0 ? (
+                            {filtered.length === 0 ? (
                                 <tr>
                                     <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
                                         No leads found. Click "Add Lead" to create your first lead.
@@ -366,7 +367,7 @@ export default function WALeads() {
                                                         onClick={async () => {
                                                             if (confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
                                                                 try {
-                                                                    const response = await fetch(`/api/wa-leads-orders/${lead.id}`, {
+                                                                    const response = await apiFetch(`/api/wa-leads-orders/${lead.id}`, {
                                                                         method: 'DELETE',
                                                                     });
                                                                     if (!response.ok) throw new Error('Failed to delete lead');
@@ -390,6 +391,7 @@ export default function WALeads() {
                         </tbody>
                     </table>
                 </div>
+                )}
             </div>
 
             {showAddLead ? (
@@ -404,7 +406,7 @@ export default function WALeads() {
                         try {
                             if (editingLead) {
                                 // Update existing lead
-                                const response = await fetch(`/api/wa-leads-orders/${editingLead.id}`, {
+                                const response = await apiFetch(`/api/wa-leads-orders/${editingLead.id}`, {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(lead),
@@ -415,7 +417,7 @@ export default function WALeads() {
                                 showToast('Lead updated successfully!', 'success');
                             } else {
                                 // Create new lead
-                            const response = await fetch('/api/wa-leads-orders', {
+                            const response = await apiFetch('/api/wa-leads-orders', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(lead),

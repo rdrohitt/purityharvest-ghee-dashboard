@@ -1,0 +1,70 @@
+/* Spinner ring */
+.spinner__ring-wrapper {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.spinner__ring {
+	width: 100%;
+	height: 100%;
+	border: 3px solid var(--border, #c9e5d6);
+	border-top-color: var(--primary, #2e7d5b);
+	border-radius: 50%;
+	animation: spinner-spin 0.75s linear infinite;
+}
+
+@keyframes spinner-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Inline (e.g. inside button) */
+.spinner-inline {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	vertical-align: middle;
+}
+
+/* Overlay: dimmed backdrop + centered spinner */
+.spinner-overlay {
+	position: absolute;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.spinner-overlay.spinner-overlay--fixed {
+	position: fixed;
+}
+
+.spinner-overlay__backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.35);
+	backdrop-filter: blur(2px);
+}
+
+.spinner-overlay__content {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+	padding: 24px;
+	background: var(--bg-elev, #ffffff);
+	border-radius: 12px;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.spinner-overlay__message {
+	margin: 0;
+	font-size: 14px;
+	color: var(--muted, #537a66);
+	font-weight: 500;
+}

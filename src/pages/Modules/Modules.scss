@@ -20,18 +20,23 @@
 
 .modules-header-row {
   display: flex;
-  gap: 10px;
-  align-items: center;
+  gap: 12px;
+  align-items: flex-end;
   flex-wrap: wrap;
   width: 100%;
 }
 
-.modules-header-spacer {
-  flex: 1;
+.modules-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  margin-left: auto;
 }
 
 .modules-search {
   width: 260px;
+  flex-shrink: 0;
 }
 
 .modules-create-btn {
@@ -42,6 +47,12 @@
 .modules-table-card {
   padding: 0;
   overflow: hidden;
+  position: relative;
+}
+
+.modules-table-loading {
+  position: relative;
+  min-height: 280px;
 }
 
 .modules-count-bar {
@@ -234,6 +245,14 @@
   overflow: auto;
 }
 
+.modules-modal-error {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--error, #dc2626) 12%, transparent);
+  color: var(--error, #dc2626);
+  font-size: 13px;
+}
+
 .modules-form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -242,6 +261,21 @@
 
 .modules-form-full-row {
   grid-column: 1 / -1;
+}
+
+.modules-form-checkbox-row {
+  display: flex;
+  align-items: center;
+}
+
+.modules-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
 }
 
 .modules-input {
