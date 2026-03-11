@@ -4,6 +4,14 @@ import { Spinner } from '../../components/Spinner';
 import type { ModuleApiItem, ModuleCreatePayload, ModuleRecord } from '../../types/modules';
 import { ModuleModal } from './ModuleModal';
 import './Modules.scss';
+import {
+  useAppDispatch,
+  useAppSelector,
+  setModules as setModulesInStore,
+  setModulesLoading,
+  updateModuleInStore,
+  removeModuleFromStore,
+} from '../../store';
 
 type Toast = {
   id: string;
@@ -25,8 +33,9 @@ function normalizeModules(data: unknown): ModuleRecord[] {
 }
 
 export default function Modules() {
-  const [modules, setModules] = useState<ModuleRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useAppDispatch();
+  const modules = useAppSelector((state) => state.modules.modules);
+  const loading = useAppSelector((state) => state.modules.loading);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -36,7 +45,10 @@ export default function Modules() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    if (modules && modules.length > 0) {
+      return;
+    }
+    dispatch(setModulesLoading(true));
     setLoadError(null);
     apiFetch('/api/modules')
       .then((res) => {
@@ -46,24 +58,26 @@ export default function Modules() {
       })
       .then((data: unknown) => {
         if (cancelled) return;
-        setModules(normalizeModules(data));
+        dispatch(setModulesInStore(normalizeModules(data)));
       })
       .catch((err: Error) => {
-        if (!cancelled) setLoadError(err.message || 'Failed to load modules');
-        setModules([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoadError(err.message || 'Failed to load modules');
+          dispatch(setModulesInStore([]));
+        }
       });
-    return () => { cancelled = true; };
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, modules]);
 
   const refetchModules = useCallback(() => {
+    dispatch(setModulesLoading(true));
     apiFetch('/api/modules')
       .then((res) => (res.ok ? res.json() : []))
-      .then((data: unknown) => setModules(normalizeModules(data)))
-      .catch(() => setModules([]));
-  }, []);
+      .then((data: unknown) => dispatch(setModulesInStore(normalizeModules(data))))
+      .catch(() => dispatch(setModulesInStore([])));
+  }, [dispatch]);
 
   function showToast(message: string, type: 'success' | 'error' = 'success') {
     const id = `toast-${Date.now()}-${Math.random()}`;
@@ -92,7 +106,7 @@ export default function Modules() {
         active: payload.active,
         icon: payload.icon,
       };
-      setModules((prev) => prev.map((m) => (m.id === editing.id ? updated : m)));
+      dispatch(updateModuleInStore(updated));
       showToast('Module updated successfully', 'success');
     } else {
       showToast('Module created successfully', 'success');
@@ -105,7 +119,7 @@ export default function Modules() {
     try {
       const res = await apiFetch(`/api/modules/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(res.statusText || 'Failed to delete module');
-      setModules((prev) => prev.filter((m) => m.id !== id));
+      dispatch(removeModuleFromStore(id));
       showToast('Module deleted successfully', 'success');
     } catch (err) {
       console.error('Failed to delete module', err);
@@ -178,13 +192,14 @@ export default function Modules() {
                       }}
                     >
                       <span className="modules-name">{m.name}</span>
-                      <span className="modules-meta">{m.id}</span>
                     </button>
                   </ModulesTd>
                   <ModulesTd>
                     <span className="modules-key-pill">{m.key}</span>
                   </ModulesTd>
-                  <ModulesTd>{m.description || '—'}</ModulesTd>
+                  <ModulesTd>
+                    {m.description || '—'}
+                  </ModulesTd>
                   <ModulesTd>
                     <div className="modules-actions">
                       <button

@@ -119,7 +119,7 @@
 
 .users-td {
   padding: 12px;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .users-td--strong {
@@ -137,8 +137,18 @@
 }
 
 .users-name {
-  display: block;
+  display: inline-block;
   font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.users-name-btn:hover .users-name,
+.users-name-btn:focus-visible .users-name {
+  color: color-mix(in srgb, var(--primary) 80%, #000);
+  border-color: color-mix(in srgb, var(--primary) 60%, transparent);
 }
 
 .users-meta {
@@ -204,12 +214,14 @@
   z-index: 60;
 }
 
-.users-modal {
+.card.users-modal {
   width: 100%;
   max-width: 800px;
   padding: 0;
   background: #f1f3f5;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .users-modal-header {
@@ -217,7 +229,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+  background: #e5e7eb;
+  border-bottom: none;
 }
 
 .users-modal-title {
@@ -227,7 +240,8 @@
 .users-modal-body {
   display: grid;
   gap: 14px;
-  padding: 14px;
+  padding: 14px 14px 0 14px;
+  background: #f9fafb;
   max-height: 70vh;
   overflow: auto;
 }
@@ -315,14 +329,17 @@
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
-  margin-top: 2px;
+  background: #e5e7eb;
+  padding: 12px 14px;
+  margin: 0 -14px;
 }
 
-.users-modal-primary-btn {
+.button.users-modal-primary-btn {
   width: auto;
-  padding: 0 16px;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .users-row-actions {

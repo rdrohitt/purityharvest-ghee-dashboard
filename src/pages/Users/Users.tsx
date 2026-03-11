@@ -4,6 +4,14 @@ import { Spinner } from '../../components/Spinner';
 import type { CreateUserPayload, UserRecord } from '../../types/users';
 import { CreateUserModal } from './CreateUserModal';
 import './Users.scss';
+import {
+    useAppDispatch,
+    useAppSelector,
+    setUsers as setUsersInStore,
+    setUsersLoading,
+    updateUserInStore,
+    removeUserFromStore,
+} from '../../store';
 
 type Toast = {
     id: string;
@@ -28,8 +36,9 @@ const ACTIONS = [
 ] as const;
 
 export default function Users() {
-    const [users, setUsers] = useState<UserRecord[]>([]);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useAppDispatch();
+    const users = useAppSelector((state) => state.usersTable.users);
+    const loading = useAppSelector((state) => state.usersTable.loading);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState<string>('');
@@ -53,7 +62,10 @@ export default function Users() {
 
     useEffect(() => {
         let cancelled = false;
-        setLoading(true);
+        if (users && users.length > 0) {
+            return;
+        }
+        dispatch(setUsersLoading(true));
         setLoadError(null);
         apiFetch('/api/users')
             .then((res) => {
@@ -63,17 +75,18 @@ export default function Users() {
             })
             .then((data: unknown) => {
                 if (cancelled) return;
-                setUsers(normalizeUsers(data));
+                dispatch(setUsersInStore(normalizeUsers(data)));
             })
             .catch((err: Error) => {
-                if (!cancelled) setLoadError(err.message || 'Failed to load users');
-                setUsers([]);
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false);
+                if (!cancelled) {
+                    setLoadError(err.message || 'Failed to load users');
+                    dispatch(setUsersInStore([]));
+                }
             });
-        return () => { cancelled = true; };
-    }, [normalizeUsers]);
+        return () => {
+            cancelled = true;
+        };
+    }, [dispatch, normalizeUsers, users]);
 
     function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
         const id = `toast-${Date.now()}-${Math.random()}`;
@@ -99,11 +112,12 @@ export default function Users() {
     }, [users, search, roleFilter]);
 
     const refetchUsers = useCallback(() => {
+        dispatch(setUsersLoading(true));
         apiFetch('/api/users')
             .then((res) => (res.ok ? res.json() : []))
-            .then((data: unknown) => setUsers(normalizeUsers(data)))
-            .catch(() => setUsers([]));
-    }, [normalizeUsers]);
+            .then((data: unknown) => dispatch(setUsersInStore(normalizeUsers(data))))
+            .catch(() => dispatch(setUsersInStore([])));
+    }, [dispatch, normalizeUsers]);
 
     function payloadToUserRecord(payload: CreateUserPayload): Omit<UserRecord, 'id'> {
         return {
@@ -124,11 +138,7 @@ export default function Users() {
     function handleSubmitUser(payload: CreateUserPayload) {
         if (editingUser) {
             const updated = payloadToUserRecord(payload);
-            setUsers((prev) =>
-                prev.map((u) =>
-                    u.id === editingUser.id ? { id: u.id, ...updated } : u
-                )
-            );
+            dispatch(updateUserInStore({ id: editingUser.id, ...updated }));
             showToast('User updated successfully', 'success');
             setEditingUser(null);
             setShowCreate(false);
@@ -140,7 +150,7 @@ export default function Users() {
         try {
             const res = await apiFetch(`/api/users/${userToDelete.id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error(res.statusText || 'Failed to delete user');
-            setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+            dispatch(removeUserFromStore(userToDelete.id));
             showToast('User deleted successfully!', 'delete');
             setUserToDelete(null);
         } catch (err) {

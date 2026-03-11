@@ -379,7 +379,7 @@
 .shopify-add-modal-input {
   width: 100%;
   margin-top: 6px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   background: #ffffff;
@@ -395,6 +395,12 @@
 .shopify-add-modal-card .shopify-add-modal-notes-textarea,
 .shopify-add-modal-card .shopify-add-modal-tracking-input {
   background: #ffffff !important;
+  color: #000000 !important;
+}
+
+/* Darker grey labels inside Add Order modal */
+.shopify-add-modal-card .label {
+  color: #374151;
 }
 
 .shopify-add-modal-input:focus-visible {
@@ -428,13 +434,12 @@
   z-index: 60;
 }
 
-.shopify-add-modal-card {
+.card.shopify-add-modal-card {
   width: 100%;
   max-width: 1350px;
   max-height: 90vh;
   padding: 0;
-  /* Match body background so header/footer sit on a subtle grey surface */
-  background: #f3f4f6;
+  background: #f1f3f5;
   box-shadow: 0 24px 48px rgba(15, 79, 60, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
@@ -446,10 +451,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 18px 24px;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+  border-bottom: none;
   flex-shrink: 0;
-  background: var(--bg-elev);
+  background: #e5e7eb;
 }
 
 .shopify-add-modal-title {
@@ -475,23 +480,23 @@
 }
 
 .shopify-add-modal-body {
-  padding: 24px;
+  padding: 18px 18px 0 18px;
   overflow-y: auto;
   flex: 1;
-  /* Light grey canvas behind white input fields */
-  background: #f3f4f6;
+  /* Light canvas behind white input fields */
+  background: #f9fafb;
 }
 
 .shopify-add-modal-grid {
   display: grid;
   grid-template-columns: minmax(0, 4fr) minmax(280px, 1.4fr);
-  gap: 24px;
+  gap: 16px;
   align-items: flex-start;
 }
 
 .shopify-add-modal-left {
   display: grid;
-  gap: 24px;
+  gap: 16px;
 }
 
 .shopify-add-modal-single-column {
@@ -512,12 +517,12 @@
 .shopify-add-modal-item-row {
   display: grid;
   grid-template-columns: 1fr 140px 140px 44px;
-  gap: 10px;
+  gap: 8px;
   align-items: flex-end;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 12px;
+  padding: 8px 10px;
 }
 
 .shopify-add-modal-label-hidden {
@@ -541,7 +546,7 @@
  .shopify-add-modal-section-grid {
    display: grid;
    grid-template-columns: repeat(4, minmax(0, 1fr));
-   gap: 16px;
+  gap: 12px;
  }
 
  .shopify-add-modal-notes {
@@ -562,10 +567,10 @@
 
  .shopify-add-modal-sidebar {
    border-left: 1px solid var(--border);
-   padding-left: 24px;
+  padding-left: 18px;
    display: flex;
    flex-direction: column;
-   gap: 20px;
+  gap: 14px;
  }
 
  .shopify-add-modal-tracking-card {
@@ -2226,16 +2231,18 @@
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  border-top: 1px solid var(--border);
-  padding: 16px 24px;
+  border-top: none;
+  padding: 12px 14px;
   flex-shrink: 0;
-  background: var(--bg-elev);
-  box-shadow: 0 -2px 8px rgba(15, 79, 60, 0.04);
+  background: #e5e7eb;
   .icon-btn { padding: 0 20px; }
 }
-.shopify-add-modal-submit {
+.button.shopify-add-modal-submit {
   width: auto;
   padding: 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 0.15s ease, box-shadow 0.2s ease;
   &:hover {
     transform: translateY(-1px);

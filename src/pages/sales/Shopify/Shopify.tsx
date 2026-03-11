@@ -33,7 +33,7 @@ type ShopifyProps = {
 };
 
 export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps) {
-    const [range, setRange] = useState<UiRange>('all');
+    const [range, setRange] = useState<UiRange>('currentMonth');
     const [customerFilter, setCustomerFilter] = useState('');
     const [customStart, setCustomStart] = useState<string>(toInputDate(new Date()));
     const [customEnd, setCustomEnd] = useState<string>(toInputDate(new Date()));
@@ -270,7 +270,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             const paymentStatus = o.paymentMode === 'PAID' ? 'PAID' : 'COD';
             const matchesPayment = !paymentStatusFilter || paymentStatus === paymentStatusFilter;
             const matchesFulfillment = !fulfillmentStatusFilter || mapFulfillmentStatus(o.fulfillmentStatus) === fulfillmentStatusFilter;
-            const deliveryStatus = mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus);
+            const deliveryStatus = o.returnStatus ? 'RTO' : mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus);
             const matchesDelivery = !deliveryStatusFilter || deliveryStatus === deliveryStatusFilter;
             const matchesPlatform = !platformFilter || (o.platform && o.platform.toLowerCase() === platformFilter.toLowerCase());
             const matchesType = !typeFilter || mapOrderType(o.type) === typeFilter;
@@ -324,7 +324,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         const quantity = filtered.reduce((s, o) => s + (o.products || []).reduce((sum, p) => sum + p.quantity, 0), 0);
         const codCharges = filtered.reduce((s, o) => s + (o.codCharges || 0), 0);
         const shippingCharges = filtered.reduce((s, o) => s + (o.shippingCharges || 0), 0);
-        const deliveryStatusFor = (o: ShopifyOrderApi) => mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus);
+        const deliveryStatusFor = (o: ShopifyOrderApi) =>
+            o.returnStatus ? 'RTO' : mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus);
         const deliveredOrders = filtered.filter(o => deliveryStatusFor(o) === 'Delivered');
         const delivered = deliveredOrders.length;
         const deliveredAmount = deliveredOrders.reduce((s, o) => s + o.totalAmount, 0);
@@ -638,7 +639,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                         getOrderCustomerPhone(order),
                                         totalQuantityLiters,
                                         order.totalAmount,
-                                        order.shippingDetails?.trackingStatus || mapDeliveryStatusFromTracking(order.shippingDetails?.trackingStatus) || '',
+                                        order.returnStatus
+                                            ? 'RTO'
+                                            : order.shippingDetails?.trackingStatus ||
+                                              mapDeliveryStatusFromTracking(order.shippingDetails?.trackingStatus) ||
+                                              '',
                                         order.state || ''
                                     ];
                                 });

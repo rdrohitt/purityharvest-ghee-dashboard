@@ -1,7 +1,14 @@
 import { apiFetch } from '../api';
 import type { MarketingSpendApiItem } from '../types/marketing-spend';
 
-export type SpendRecord = { id: string; date: string; amount: number; note?: string };
+export type SpendRecord = {
+    id: string;
+    date: string;
+    amount: number;
+    note?: string;
+    createdByName?: string;
+    updatedByName?: string;
+};
 export type MiscRecord = { id: string; date: string; amount: number; where: string; note?: string };
 
 export interface CreateMarketingSpendPayload {

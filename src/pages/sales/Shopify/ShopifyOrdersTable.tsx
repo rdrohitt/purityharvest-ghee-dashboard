@@ -59,7 +59,7 @@ export function ShopifyOrdersTable({
                                 <Th>Platform</Th>
                                 <Th>Shipping Status</Th>
                                 <Th>Type</Th>
-                                <Th>Added by</Th>
+                                <Th>Updated by</Th>
                                 <Th>Actions</Th>
                             </tr>
                         </thead>
@@ -126,10 +126,19 @@ export function ShopifyOrdersTable({
                                                 <div className="shopify-items-cell">
                                                     {(o.products ?? []).length === 0 ? <span>—</span> : null}
                                                     {(o.products ?? []).map((p, i) => {
-                                                        const productName = p.productId && typeof p.productId === 'object' && 'name' in p.productId ? (p.productId as { name?: string }).name : null;
+                                                        const productName =
+                                                            p.productId &&
+                                                            typeof p.productId === 'object' &&
+                                                            'name' in p.productId
+                                                                ? (p.productId as { name?: string }).name
+                                                                : null;
+                                                        const displayName = productName
+                                                            ? String(productName).split('|')[0].trim()
+                                                            : null;
                                                         return (
                                                             <div key={i}>
-                                                                {productName ? `${productName} – ` : ''}{p.variantName} × {p.quantity}
+                                                                {displayName ? `${displayName} – ` : ''}
+                                                                {p.variantName} × {p.quantity}
                                                             </div>
                                                         );
                                                     })}
@@ -183,7 +192,13 @@ export function ShopifyOrdersTable({
                                                 <TypeTag type={mapOrderType(o.type)} />
                                             </Td>
                                             <Td>
-                                                <span className="shopify-added-by shopify-added-by--empty">—</span>
+                                                <span className="tag info">
+                                                    {o.updatedBy &&
+                                                    typeof o.updatedBy === 'object' &&
+                                                    'name' in o.updatedBy
+                                                        ? (o.updatedBy as { name?: string }).name || 'Shopify'
+                                                        : 'Shopify'}
+                                                </span>
                                             </Td>
                                             <Td>
                                                 <div className="shopify-row-actions">

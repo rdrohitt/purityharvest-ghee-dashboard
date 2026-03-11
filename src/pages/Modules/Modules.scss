@@ -48,6 +48,17 @@
   padding: 0;
   overflow: hidden;
   position: relative;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+.modules-table-card .table-scroll-wrapper {
+  padding: 0;
+}
+
+/* Override global card padding just for modules table card */
+.card.modules-table-card {
+  padding: 0;
 }
 
 .modules-table-loading {
@@ -58,7 +69,7 @@
 .modules-count-bar {
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.02), rgba(15, 23, 42, 0));
   font-size: 13px;
   color: var(--muted);
 }
@@ -71,31 +82,51 @@
 }
 
 .modules-row-header {
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, #ecfdf3, #d1fae5);
 }
 
 .modules-row {
   border-bottom: 1px solid var(--border);
+  transition: background-color 0.15s ease;
+}
+
+.modules-row:nth-child(even) {
+  background-color: rgba(15, 23, 42, 0.01);
+}
+
+.modules-row:hover {
+  background-color: color-mix(in srgb, var(--primary, #2563eb) 4%, transparent);
 }
 
 .modules-th {
   text-align: left;
-  padding: 10px 12px;
-  font-size: 12px;
-  color: var(--muted);
+  padding: 12px 14px;
+  font-size: 11px;
+  color: #064e3b;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  border-bottom: none;
+}
+
+.modules-th:first-child {
+  border-top-left-radius: 12px;
+}
+
+.modules-th:last-child {
+  border-top-right-radius: 12px;
 }
 
 .modules-td {
   padding: 12px;
-  vertical-align: top;
+  vertical-align: middle;
+  text-align: left;
+  font-size: 13px;
 }
 
 .modules-td--strong {
   font-weight: 600;
+  color: #0f172a;
 }
 
 .modules-name-btn {
@@ -109,16 +140,21 @@
 }
 
 .modules-name {
-  display: block;
+  display: inline-block;
   font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
-.modules-meta {
-  display: block;
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--muted);
+.modules-name-btn:hover .modules-name,
+.modules-name-btn:focus-visible .modules-name {
+  color: color-mix(in srgb, var(--primary) 80%, #000);
+  border-color: color-mix(in srgb, var(--primary) 60%, transparent);
 }
+
+/* modules-meta removed from table for cleaner, orders-style look */
 
 .modules-key-pill {
   display: inline-flex;
@@ -223,14 +259,22 @@
   max-width: 640px;
   padding: 0;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  background: #f3f4f6;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.card.modules-modal {
+  padding: 0;
 }
 
 .modules-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--border);
+  background: #f3f4f6;
 }
 
 .modules-modal-title {
@@ -240,9 +284,10 @@
 .modules-modal-body {
   display: grid;
   gap: 20px;
-  padding: 20px;
+  padding: 20px 24px;
   max-height: 70vh;
   overflow: auto;
+  background: #ffffff;
 }
 
 .modules-modal-error {
@@ -295,11 +340,13 @@
   gap: 8px;
   justify-content: flex-end;
   border-top: 1px solid var(--border);
-  padding-top: 12px;
+  padding: 12px 24px 16px;
+  background: #f3f4f6;
 }
 
-.modules-modal-primary-btn {
+.modules-modal-footer .button.modules-modal-primary-btn {
   width: auto;
-  padding: 0 16px;
+  flex: 0 0 auto;
+  padding: 0 24px;
 }
 

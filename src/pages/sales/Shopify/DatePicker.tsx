@@ -22,7 +22,15 @@ export function DatePicker({
     const popupRef = useRef<HTMLDivElement>(null);
 
     const selectedDate = value ? new Date(value) : null;
-    const displayValue = selectedDate ? selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+    const displayValue = selectedDate
+        ? (() => {
+              const day = String(selectedDate.getDate()).padStart(2, '0');
+              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              const month = months[selectedDate.getMonth()];
+              const year = selectedDate.getFullYear();
+              return `${day}-${month}-${year}`;
+          })()
+        : '';
 
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {

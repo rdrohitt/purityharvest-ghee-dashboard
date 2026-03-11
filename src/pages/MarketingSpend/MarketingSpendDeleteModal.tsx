@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { UnifiedRecord } from './MarketingSpend';
-import type { Platform } from './types';
+import type { UnifiedRecord, Platform } from './MarketingSpend';
 
 export interface MarketingSpendDeleteModalProps {
   record: UnifiedRecord | null;

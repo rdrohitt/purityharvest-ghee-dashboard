@@ -38,6 +38,7 @@ function normalizeOrder(raw: unknown): ShopifyOrderApi | null {
     const phoneNumber = String(o.phoneNumber ?? cust?.phoneNumber ?? '');
     const address = String(o.address ?? cust?.address ?? '');
     const state = String(o.state ?? cust?.state ?? '');
+    const updatedBy = o.updatedBy as ShopifyOrderApi['updatedBy'] | undefined;
     const pincode = String(o.pincode ?? cust?.pincode ?? '');
     return {
         _id,
@@ -60,6 +61,7 @@ function normalizeOrder(raw: unknown): ShopifyOrderApi | null {
         discount: Number(o.discount) || 0,
         totalAmount: Number(o.totalAmount ?? o.amount) || 0,
         notes: String(o.notes ?? ''),
+        updatedBy,
         shippingDetails: o.shippingDetails as ShopifyOrderApi['shippingDetails'],
         createdAt: o.createdAt as string | undefined,
         updatedAt: o.updatedAt as string | undefined,

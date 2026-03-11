@@ -73,48 +73,52 @@ export function MarketingSpendEditModal({ platform, record, onClose, onSubmit }:
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="marketing-spend-modal__form">
-          <div className="marketing-spend-modal__grid">
-            <div>
-              <label className="label">Platform</label>
-              <input
-                className="input marketing-spend-modal__input"
-                value={platform}
-                readOnly
-                disabled
-              />
-            </div>
-            <div>
-              <label className="label">Date</label>
-              <DatePicker value={date} onChange={setDate} placeholder="Select date" />
+        <form onSubmit={handleSubmit}>
+          <div className="marketing-spend-modal__body">
+            <div className="marketing-spend-modal__form">
+              <div className="marketing-spend-modal__grid">
+                <div>
+                  <label className="label">Platform</label>
+                  <input
+                    className="input marketing-spend-modal__input"
+                    value={platform}
+                    readOnly
+                    disabled
+                  />
+                </div>
+                <div>
+                  <label className="label">Date</label>
+                  <DatePicker value={date} onChange={setDate} placeholder="Select date" />
+                </div>
+              </div>
+
+              <div className="marketing-spend-modal__grid">
+                <div>
+                  <label className="label">Amount (₹)</label>
+                  <input
+                    className="input marketing-spend-modal__input"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">Note</label>
+                  <input
+                    className="input marketing-spend-modal__input"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Optional description"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="marketing-spend-modal__grid">
-            <div>
-              <label className="label">Amount (₹)</label>
-              <input
-                className="input marketing-spend-modal__input"
-                type="number"
-                min={0}
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Note</label>
-              <input
-                className="input marketing-spend-modal__input"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Optional description"
-              />
-            </div>
-          </div>
-
-          <div className="marketing-spend-modal__actions">
+          <div className="marketing-spend-modal__footer">
             <button
               type="button"
               className="icon-btn"

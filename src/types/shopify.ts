@@ -66,6 +66,11 @@ export interface ShopifyOrderProduct {
 /**
  * Shopify order as returned by GET /api/orders (customer may be populated object or id).
  */
+export interface ShopifyOrderUserRef {
+    _id: string;
+    name: string;
+}
+
 export interface ShopifyOrderApi {
     _id: string;
     shopifyOrderId?: string;
@@ -87,6 +92,7 @@ export interface ShopifyOrderApi {
     discount: number;
     totalAmount: number;
     notes: string;
+    updatedBy?: ShopifyOrderUserRef;
     shippingDetails?: ShopifyShippingDetails;
     createdAt?: string;
     updatedAt?: string;

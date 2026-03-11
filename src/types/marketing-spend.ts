@@ -13,12 +13,19 @@
  *   "__v": 0
  * }
  */
+export interface MarketingSpendUserRef {
+  _id: string;
+  name: string;
+}
+
 export interface MarketingSpendApiItem {
   _id: string;
   platform: string;
   date: string;
   note?: string;
   amount: number;
+  createdBy?: MarketingSpendUserRef;
+  updatedBy?: MarketingSpendUserRef;
   createdAt: string;
   updatedAt: string;
   __v?: number;

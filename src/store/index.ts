@@ -2,11 +2,15 @@ import { useDispatch, useSelector, type TypedUseSelectorHook } from 'react-redux
 import { configureStore } from '@reduxjs/toolkit';
 import userReducer from './userSlice';
 import productReducer from './productSlice';
+import modulesReducer from './moduleSlice';
+import usersTableReducer from './usersTableSlice';
 
 export const store = configureStore({
 	reducer: {
 		user: userReducer,
 		products: productReducer,
+		modules: modulesReducer,
+		usersTable: usersTableReducer,
 	},
 });
 
@@ -26,3 +30,19 @@ export {
 	removeProduct,
 	clearProducts,
 } from './productSlice';
+
+export {
+	setModules,
+	setModulesLoading,
+	updateModuleInStore,
+	removeModuleFromStore,
+	clearModules,
+} from './moduleSlice';
+
+export {
+	setUsers,
+	setUsersLoading,
+	updateUserInStore,
+	removeUserFromStore,
+	clearUsers,
+} from './usersTableSlice';

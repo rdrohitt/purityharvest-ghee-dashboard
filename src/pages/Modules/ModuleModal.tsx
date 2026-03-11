@@ -96,65 +96,67 @@ export function ModuleModal({ mode, initialModule, onClose, onSubmit, onSuccess 
             ✕
           </button>
         </div>
-        <form className="modules-modal-body" onSubmit={handleSubmit}>
-          {error ? <div className="modules-modal-error">{error}</div> : null}
-          <div className="modules-form-grid">
-            <div className="modules-form-full-row">
-              <label className="label">Module Name (Label)</label>
-              <input
-                className="input modules-input"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="e.g. Orders"
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Key</label>
-              <input
-                className="input modules-input"
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder="e.g. orders"
-              />
-            </div>
-            <div>
-              <label className="label">Path</label>
-              <input
-                className="input modules-input"
-                value={path}
-                onChange={(e) => setPath(e.target.value)}
-                placeholder="e.g. /orders"
-              />
-            </div>
-            <div>
-              <label className="label">Icon</label>
-              <input
-                className="input modules-input"
-                value={icon}
-                onChange={(e) => setIcon(e.target.value)}
-                placeholder="e.g. arrow"
-              />
-            </div>
-            <div>
-              <label className="label">Order</label>
-              <input
-                className="input modules-input"
-                type="number"
-                min={0}
-                value={order}
-                onChange={(e) => setOrder(Number(e.target.value) || 0)}
-              />
-            </div>
-            <div className="modules-form-checkbox-row">
-              <label className="modules-checkbox-label">
+        <form onSubmit={handleSubmit}>
+          <div className="modules-modal-body">
+            {error ? <div className="modules-modal-error">{error}</div> : null}
+            <div className="modules-form-grid">
+              <div className="modules-form-full-row">
+                <label className="label">Module Name (Label)</label>
                 <input
-                  type="checkbox"
-                  checked={active}
-                  onChange={(e) => setActive(e.target.checked)}
+                  className="input modules-input"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder="e.g. Orders"
+                  required
                 />
-                <span>Active</span>
-              </label>
+              </div>
+              <div>
+                <label className="label">Key</label>
+                <input
+                  className="input modules-input"
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  placeholder="e.g. orders"
+                />
+              </div>
+              <div>
+                <label className="label">Path</label>
+                <input
+                  className="input modules-input"
+                  value={path}
+                  onChange={(e) => setPath(e.target.value)}
+                  placeholder="e.g. /orders"
+                />
+              </div>
+              <div>
+                <label className="label">Icon</label>
+                <input
+                  className="input modules-input"
+                  value={icon}
+                  onChange={(e) => setIcon(e.target.value)}
+                  placeholder="e.g. arrow"
+                />
+              </div>
+              <div>
+                <label className="label">Order</label>
+                <input
+                  className="input modules-input"
+                  type="number"
+                  min={0}
+                  value={order}
+                  onChange={(e) => setOrder(Number(e.target.value) || 0)}
+                />
+              </div>
+              <div className="modules-form-checkbox-row">
+                <label className="modules-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={(e) => setActive(e.target.checked)}
+                  />
+                  <span>Active</span>
+                </label>
+              </div>
             </div>
           </div>
 

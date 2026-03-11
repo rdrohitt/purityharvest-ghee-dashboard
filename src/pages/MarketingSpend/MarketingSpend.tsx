@@ -61,6 +61,8 @@ export default function MarketingSpend() {
             date: item.date,
             amount: item.amount,
             note: item.note,
+            createdByName: item.createdBy?.name,
+            updatedByName: item.updatedBy?.name,
         });
 
         const metaItems = all.filter((i) => i.platform === 'meta1').map(toSpendRecord);
@@ -414,7 +416,9 @@ function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { i
     );
 }
 
-export type UnifiedRecord = (SpendRecord & { _source: Platform; _type: 'spend' }) | (MiscRecord & { _source: 'Miscellaneous'; _type: 'misc' });
+export type UnifiedRecord =
+    | (SpendRecord & { _source: Platform; _type: 'spend' })
+    | (MiscRecord & { _source: 'Miscellaneous'; _type: 'misc'; updatedByName?: string });
 
 function UnifiedSpendSection({ meta, amazon, flipkart, checkout, engage, dolchi, delhivery, misc, onAdd, onUpdate, onDelete, mode, customFrom, customTo, loading }: { 
     meta: SpendRecord[]; 
@@ -608,14 +612,15 @@ function UnifiedTable({ rows, onEdit, onDelete, loading }: {
         );
     }
     return (
-        <div className="marketing-spend-table__wrapper">
+        <div className="table-scroll-wrapper marketing-spend-table__wrapper">
             <table className="marketing-spend-table">
                 <thead>
-                    <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                    <tr>
                         <Th>Date</Th>
                         <Th>Platform</Th>
                         <Th>Amount</Th>
                         <Th>Note</Th>
+                        <Th>Updated By</Th>
                         <Th>Actions</Th>
                     </tr>
                 </thead>
@@ -626,6 +631,7 @@ function UnifiedTable({ rows, onEdit, onDelete, loading }: {
                             <Td><PlatformTag platform={r._source} /></Td>
                             <Td>{formatCurrency(r.amount)}</Td>
                             <Td>{r.note || '—'}</Td>
+                            <Td>{(r as any).updatedByName || '—'}</Td>
                             <Td>
                                 <div className="marketing-spend-table__row-actions">
                                     <button
