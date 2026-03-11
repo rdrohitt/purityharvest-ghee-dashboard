@@ -1,15 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiFetch } from '../../api';
 import type { CreateUserPayload, UserRecord } from '../../types/users';
+import { useAppDispatch, useAppSelector, setModules as setModulesInStore, setModulesLoading } from '../../store';
+import type { ModuleApiItem, ModuleRecord } from '../../types/modules';
 import './Users.scss';
-
-const MODULES = [
-    { key: 'orders', label: 'Orders' },
-    { key: 'products', label: 'Products' },
-    { key: 'marts', label: 'Marts' },
-    { key: 'reports', label: 'Reports' },
-    { key: 'users', label: 'Users & Roles' },
-] as const;
 
 const ACTIONS = [
     { key: 'view', label: 'View' },
@@ -27,6 +21,9 @@ type Props = {
 };
 
 export function CreateUserModal({ mode, initialUser, roles, onClose, onSubmit, onSuccess }: Props) {
+    const dispatch = useAppDispatch();
+    const modules = useAppSelector((state) => state.modules.modules);
+
     const [name, setName] = useState(initialUser?.name ?? '');
     const [phoneNumber, setPhoneNumber] = useState(
         initialUser?.mobile ?? ''
@@ -37,10 +34,53 @@ export function CreateUserModal({ mode, initialUser, roles, onClose, onSubmit, o
         initialUser?.role ?? roles[0] ?? ''
     );
     const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
-        initialUser?.permissions ?? ['orders:view']
+        initialUser?.permissions ?? []
     );
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        if (modules && modules.length > 0) {
+            return;
+        }
+        dispatch(setModulesLoading(true));
+        apiFetch('/api/modules')
+            .then((res) => {
+                if (cancelled) return;
+                if (!res.ok) throw new Error(res.statusText || 'Failed to load modules');
+                return res.json();
+            })
+            .then((data: unknown) => {
+                if (cancelled) return;
+                const list = (Array.isArray(data) ? data : []) as ModuleApiItem[];
+                const normalized: ModuleRecord[] = list.map((item) => ({
+                    id: item._id,
+                    key: item.key,
+                    name: item.label,
+                    description: item.path || undefined,
+                    order: item.order,
+                    active: item.active,
+                    icon: item.icon,
+                }));
+                dispatch(setModulesInStore(normalized));
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    dispatch(setModulesInStore([]));
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [dispatch, modules]);
+
+    useEffect(() => {
+        if (mode === 'create' && selectedPermissions.length === 0 && modules.length > 0) {
+            const firstKey = modules[0].key || modules[0].name || 'orders';
+            setSelectedPermissions([`${firstKey}:view`]);
+        }
+    }, [mode, modules, selectedPermissions.length]);
 
     function togglePermission(value: string) {
         setSelectedPermissions((prev) =>
@@ -206,17 +246,22 @@ export function CreateUserModal({ mode, initialUser, roles, onClose, onSubmit, o
                             Permissions
                         </label>
                         <div className="users-permissions-grid">
-                            {MODULES.map((mod) => (
+                            {modules.map((mod) => {
+                                const anyMod = mod as any;
+                                const moduleKey: string | undefined = anyMod.key || anyMod.name;
+                                const moduleLabel: string = anyMod.label || anyMod.name || anyMod.key;
+                                if (!moduleKey) return null;
+                                return (
                                 <div
-                                    key={mod.key}
+                                    key={mod.id ?? moduleKey}
                                     className="users-permissions-module"
                                 >
                                     <div className="users-permissions-module-name">
-                                        {mod.label}
+                                        {moduleLabel}
                                     </div>
                                     <div className="users-permissions-actions">
                                         {ACTIONS.map((action) => {
-                                            const permKey = `${mod.key}:${action.key}`;
+                                            const permKey = `${moduleKey}:${action.key}`;
                                             return (
                                                 <label
                                                     key={permKey}
@@ -233,7 +278,8 @@ export function CreateUserModal({ mode, initialUser, roles, onClose, onSubmit, o
                                         })}
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
 

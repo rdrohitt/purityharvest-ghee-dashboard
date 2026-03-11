@@ -21,14 +21,6 @@ type Toast = {
 
 const ROLE_OPTIONS = ['Admin', 'Manager', 'Agent'];
 
-const MODULES = [
-    { key: 'orders', label: 'Orders' },
-    { key: 'products', label: 'Products' },
-    { key: 'marts', label: 'Marts' },
-    { key: 'reports', label: 'Reports' },
-    { key: 'users', label: 'Users & Roles' },
-] as const;
-
 const ACTIONS = [
     { key: 'view', label: 'View' },
     { key: 'add', label: 'Add' },
@@ -39,6 +31,7 @@ export default function Users() {
     const dispatch = useAppDispatch();
     const users = useAppSelector((state) => state.usersTable.users);
     const loading = useAppSelector((state) => state.usersTable.loading);
+    const modules = useAppSelector((state) => state.modules.modules);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState<string>('');
@@ -95,6 +88,14 @@ export default function Users() {
             setToasts((prev) => prev.filter((t) => t.id !== id));
         }, 2500);
     }
+
+    const moduleLabelMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        modules.forEach((m) => {
+            map[m.key] = m.name || m.key;
+        });
+        return map;
+    }, [modules]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -254,20 +255,31 @@ export default function Users() {
                                     <Td>{u.mobile || '—'}</Td>
                                     <Td>
                                         <div className="users-permissions">
-                                            {MODULES.flatMap((mod) => {
-                                                const actions = ACTIONS.filter((a) =>
-                                                    u.permissions.includes(`${mod.key}:${a.key}`)
-                                                );
-                                                if (actions.length === 0) return [];
-                                                const label = `${mod.label}: ${actions
-                                                    .map((a) => a.label)
-                                                    .join(', ')}`;
-                                                return (
-                                                    <span key={mod.key} className="tag users-permission-tag">
-                                                        {label}
-                                                    </span>
-                                                );
-                                            })}
+                                            {(() => {
+                                                const byModule: Record<string, string[]> = {};
+                                                for (const perm of u.permissions) {
+                                                    const [modKey, actionKey] = perm.split(':');
+                                                    if (!modKey || !actionKey) continue;
+                                                    const action = ACTIONS.find((a) => a.key === actionKey);
+                                                    const actionLabel = action ? action.label : actionKey;
+                                                    if (!byModule[modKey]) byModule[modKey] = [];
+                                                    if (!byModule[modKey].includes(actionLabel)) {
+                                                        byModule[modKey].push(actionLabel);
+                                                    }
+                                                }
+                                                const entries = Object.entries(byModule);
+                                                if (entries.length === 0) {
+                                                    return <span className="users-permissions-empty">—</span>;
+                                                }
+                                                return entries.map(([modKey, actionLabels]) => {
+                                                    const label = `${moduleLabelMap[modKey] ?? modKey}: ${actionLabels.join(', ')}`;
+                                                    return (
+                                                        <span key={modKey} className="tag users-permission-tag">
+                                                            {label}
+                                                        </span>
+                                                    );
+                                                });
+                                            })()}
                                         </div>
                                     </Td>
                                     <Td>
