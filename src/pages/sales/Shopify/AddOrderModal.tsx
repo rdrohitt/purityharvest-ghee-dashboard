@@ -425,7 +425,12 @@ function AddOrderModal({
     >(
         initialOrder?.items && initialOrder.items.length > 0
             ? initialOrder.items.map((it) => {
-                  const price = it.quantity > 0 ? it.lineAmount / it.quantity : 0;
+                  const price =
+                      mode === 'edit'
+                          ? it.lineAmount
+                          : it.quantity > 0
+                          ? it.lineAmount / it.quantity
+                          : 0;
                   return { variant: it.variant, quantity: it.quantity, price };
               })
             : [{ variant: '', quantity: 1, price: 0 }]
@@ -473,10 +478,11 @@ function AddOrderModal({
     useEffect(() => {
         const itemsTotal = items.reduce((sum, it) => sum + it.price * it.quantity, 0);
         const codChargesAmount = Number(codCharges) || 0;
+        const shippingChargesAmount = Number(shippingCharges) || 0;
         const discountAmount = Number(discount) || 0;
-        const total = itemsTotal + codChargesAmount - discountAmount;
+        const total = itemsTotal + codChargesAmount + shippingChargesAmount - discountAmount;
         setAmount(String(total));
-    }, [items, codCharges, discount]);
+    }, [items, codCharges, shippingCharges, discount]);
 
     useEffect(() => {
         const trimmed = awb.trim();

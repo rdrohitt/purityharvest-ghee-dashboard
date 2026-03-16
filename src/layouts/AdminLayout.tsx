@@ -1,11 +1,13 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { logout } from '../auth';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useAppSelector } from '../store';
 import { applyTheme, getInitialTheme, type Theme } from '../theme';
 import './AdminLayout.scss';
 
 export default function AdminLayout() {
     const location = useLocation();
+    const menu = useAppSelector((state) => state.user.menu);
     const [collapsed, setCollapsed] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [theme, setTheme] = useState<Theme>(getInitialTheme());
@@ -34,6 +36,16 @@ export default function AdminLayout() {
         }
     }, [location.pathname]);
 
+    const enabledLabels = useMemo(() => {
+        const set = new Set<string>();
+        menu.forEach((m) => {
+            if (m.label) set.add(m.label);
+        });
+        return set;
+    }, [menu]);
+
+    const hasMenuLabel = (label: string) => enabledLabels.has(label);
+
     function handleLogout() {
         logout();
         window.location.replace('/login');
@@ -56,96 +68,114 @@ export default function AdminLayout() {
             <aside className={sidebarClass}>
                 <div className="brand">🔷 <span>Purity Harvest</span></div>
                 <nav className="menu">
-                    <NavLink to="/admin" end className={({ isActive }) => (isActive ? 'active' : '')}>
-                        <span className="mi-icon">🏠</span>
-                        <span className="mi-label">Dashboard</span>
-                    </NavLink>
+                    {hasMenuLabel('Dashboard') && (
+                        <NavLink to="/admin" end className={({ isActive }) => (isActive ? 'active' : '')}>
+                            <span className="mi-icon">🏠</span>
+                            <span className="mi-label">Dashboard</span>
+                        </NavLink>
+                    )}
 
-                    <NavLink to="/admin/wa-leads" className={({ isActive }) => (isActive ? 'active' : '')}>
-                        <span className="mi-icon">📱</span>
-                        <span className="mi-label">Leads</span>
-                    </NavLink>
+                    {hasMenuLabel('Leads') && (
+                        <NavLink to="/admin/wa-leads" className={({ isActive }) => (isActive ? 'active' : '')}>
+                            <span className="mi-icon">📱</span>
+                            <span className="mi-label">Leads</span>
+                        </NavLink>
+                    )}
 
                     {/* Sales group */}
-                    <div className="menu-group">
-                        <button
-                            type="button"
-                            className="menu-group-label"
-                            onClick={() => setSalesOpen((open) => !open)}
-                            aria-expanded={salesOpen}
-                        >
-                            <span className="mi-icon">💹</span>
-                            <span className="mi-label">Sales</span>
-                            <span className={salesOpen ? 'menu-group-chevron open' : 'menu-group-chevron'}>
-                                ▸
-                            </span>
-                        </button>
-                        {salesOpen ? (
-                            <div className="menu-group-items">
-                                <NavLink to="/admin/shopify" className={({ isActive }) => (isActive ? 'active' : '')}>
-                                    <span className="mi-icon">•</span>
-                                    <span className="mi-label">Shopify</span>
-                                </NavLink>
-                                <NavLink to="/admin/amazon" className={({ isActive }) => (isActive ? 'active' : '')}>
-                                    <span className="mi-icon">•</span>
-                                    <span className="mi-label">Amazon</span>
-                                </NavLink>
-                                <NavLink to="/admin/flipkart" className={({ isActive }) => (isActive ? 'active' : '')}>
-                                    <span className="mi-icon">•</span>
-                                    <span className="mi-label">Flipkart</span>
-                                </NavLink>
-                            </div>
-                        ) : null}
-                    </div>
+                    {hasMenuLabel('Sales') && (
+                        <div className="menu-group">
+                            <button
+                                type="button"
+                                className="menu-group-label"
+                                onClick={() => setSalesOpen((open) => !open)}
+                                aria-expanded={salesOpen}
+                            >
+                                <span className="mi-icon">💹</span>
+                                <span className="mi-label">Sales</span>
+                                <span className={salesOpen ? 'menu-group-chevron open' : 'menu-group-chevron'}>
+                                    ▸
+                                </span>
+                            </button>
+                            {salesOpen ? (
+                                <div className="menu-group-items">
+                                    <NavLink to="/admin/shopify" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                        <span className="mi-icon">•</span>
+                                        <span className="mi-label">Shopify</span>
+                                    </NavLink>
+                                    <NavLink to="/admin/amazon" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                        <span className="mi-icon">•</span>
+                                        <span className="mi-label">Amazon</span>
+                                    </NavLink>
+                                    <NavLink to="/admin/flipkart" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                        <span className="mi-icon">•</span>
+                                        <span className="mi-label">Flipkart</span>
+                                    </NavLink>
+                                </div>
+                            ) : null}
+                        </div>
+                    )}
 
-                    <NavLink to="/admin/marketing-spend" className={({ isActive }) => (isActive ? 'active' : '')}>
-                        <span className="mi-icon">💳</span>
-                        <span className="mi-label">Marketing Spend</span>
-                    </NavLink>
-                    <NavLink to="/admin/users-and-roles" className={({ isActive }) => (isActive ? 'active' : '')}>
-                        <span className="mi-icon">👤</span>
-                        <span className="mi-label">Users &amp; Roles</span>
-                    </NavLink>
-                    <NavLink to="/admin/modules" className={({ isActive }) => (isActive ? 'active' : '')}>
-                        <span className="mi-icon">🧩</span>
-                        <span className="mi-label">Modules</span>
-                    </NavLink>
-                    <NavLink to="/admin/products" className={({ isActive }) => (isActive ? 'active' : '')}>
-                        <span className="mi-icon">📦</span>
-                        <span className="mi-label">Products</span>
-                    </NavLink>
-                    <NavLink to="/admin/followups" className={({ isActive }) => (isActive ? 'active' : '')}>
-                        <span className="mi-icon">📋</span>
-                        <span className="mi-label">Follow-ups</span>
-                    </NavLink>
+                    {hasMenuLabel('Marketing Spend') && (
+                        <NavLink to="/admin/marketing-spend" className={({ isActive }) => (isActive ? 'active' : '')}>
+                            <span className="mi-icon">💳</span>
+                            <span className="mi-label">Marketing Spend</span>
+                        </NavLink>
+                    )}
+                    {hasMenuLabel('Users and Roles') && (
+                        <NavLink to="/admin/users-and-roles" className={({ isActive }) => (isActive ? 'active' : '')}>
+                            <span className="mi-icon">👤</span>
+                            <span className="mi-label">Users &amp; Roles</span>
+                        </NavLink>
+                    )}
+                    {hasMenuLabel('Modules') && (
+                        <NavLink to="/admin/modules" className={({ isActive }) => (isActive ? 'active' : '')}>
+                            <span className="mi-icon">🧩</span>
+                            <span className="mi-label">Modules</span>
+                        </NavLink>
+                    )}
+                    {hasMenuLabel('Products') && (
+                        <NavLink to="/admin/products" className={({ isActive }) => (isActive ? 'active' : '')}>
+                            <span className="mi-icon">📦</span>
+                            <span className="mi-label">Products</span>
+                        </NavLink>
+                    )}
+                    {hasMenuLabel('Follow-Ups') && (
+                        <NavLink to="/admin/followups" className={({ isActive }) => (isActive ? 'active' : '')}>
+                            <span className="mi-icon">📋</span>
+                            <span className="mi-label">Follow-ups</span>
+                        </NavLink>
+                    )}
 
                     {/* Marts group */}
-                    <div className="menu-group">
-                        <button
-                            type="button"
-                            className="menu-group-label"
-                            onClick={() => setMartsOpen((open) => !open)}
-                            aria-expanded={martsOpen}
-                        >
-                            <span className="mi-icon">🏬</span>
-                            <span className="mi-label">Marts</span>
-                            <span className={martsOpen ? 'menu-group-chevron open' : 'menu-group-chevron'}>
-                                ▸
-                            </span>
-                        </button>
-                        {martsOpen ? (
-                            <div className="menu-group-items">
-                                <NavLink to="/admin/gurugram-marts" className={({ isActive }) => (isActive ? 'active' : '')}>
-                                    <span className="mi-icon">•</span>
-                                    <span className="mi-label">Gurugram Marts</span>
-                                </NavLink>
-                                <NavLink to="/admin/delhi-marts" className={({ isActive }) => (isActive ? 'active' : '')}>
-                                    <span className="mi-icon">•</span>
-                                    <span className="mi-label">Delhi Marts</span>
-                                </NavLink>
-                            </div>
-                        ) : null}
-                    </div>
+                    {hasMenuLabel('Marts') && (
+                        <div className="menu-group">
+                            <button
+                                type="button"
+                                className="menu-group-label"
+                                onClick={() => setMartsOpen((open) => !open)}
+                                aria-expanded={martsOpen}
+                            >
+                                <span className="mi-icon">🏬</span>
+                                <span className="mi-label">Marts</span>
+                                <span className={martsOpen ? 'menu-group-chevron open' : 'menu-group-chevron'}>
+                                    ▸
+                                </span>
+                            </button>
+                            {martsOpen ? (
+                                <div className="menu-group-items">
+                                    <NavLink to="/admin/gurugram-marts" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                        <span className="mi-icon">•</span>
+                                        <span className="mi-label">Gurugram Marts</span>
+                                    </NavLink>
+                                    <NavLink to="/admin/delhi-marts" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                        <span className="mi-icon">•</span>
+                                        <span className="mi-label">Delhi Marts</span>
+                                    </NavLink>
+                                </div>
+                            ) : null}
+                        </div>
+                    )}
                 </nav>
                 <div className="admin-sidebar-footer">
                     <button className="button" onClick={handleLogout}>Logout</button>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import Login from './pages/Login/index';
@@ -17,6 +17,7 @@ import GurugramMarts from './pages/Marts/GurugramMarts/index';
 import DelhiMarts from './pages/Marts/DelhiMarts/index';
 import Modules from './pages/Modules/index';
 import { isAuthenticated, hydrateUserFromToken } from './auth';
+import { Spinner } from './components/Spinner';
 
 function PrivateRoute({ children }: { children: ReactElement }) {
 	const location = useLocation();
@@ -39,44 +40,65 @@ function RootRedirect() {
 }
 
 export default function App() {
+	const [hydratingUser, setHydratingUser] = useState<boolean>(isAuthenticated());
+
 	useEffect(() => {
-		if (isAuthenticated()) hydrateUserFromToken();
+		if (!isAuthenticated()) {
+			setHydratingUser(false);
+			return;
+		}
+		let cancelled = false;
+		(async () => {
+			try {
+				await hydrateUserFromToken();
+			} finally {
+				if (!cancelled) {
+					setHydratingUser(false);
+				}
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
 	return (
-		<Routes>
-			<Route path="/" element={<RootRedirect />} />
-			<Route 
-				path="/login" 
-				element={
-					isAuthenticated() ? <Navigate to="/admin" replace /> : <Login />
-				} 
-			/>
-				<Route
-					path="/admin"
+		<>
+			{hydratingUser && <Spinner overlay fixed message="Loading dashboard…" />}
+			<Routes>
+				<Route path="/" element={<RootRedirect />} />
+				<Route 
+					path="/login" 
 					element={
-						<PrivateRoute>
-							<AdminLayout />
-						</PrivateRoute>
-					}
-				>
-					<Route index element={<Dashboard />} />
-					<Route path="shopify" element={<Shopify />} />
-					<Route path="wa-leads" element={<WALeads />} />
-					<Route path="amazon" element={<Amazon />} />
-					<Route path="flipkart" element={<Flipkart />} />
-					<Route path="users-and-roles" element={<Users />} />
-					<Route path="modules" element={<Modules />} />
-					<Route path="products" element={<Products />} />
-					<Route path="followups" element={<Followups />} />
-					<Route path="marketing-spend" element={<MarketingSpend />} />
-					<Route path="gurugram-marts" element={<GurugramMarts />} />
-					<Route path="delhi-marts" element={<DelhiMarts />} />
-					<Route path="users" element={<Users />} />
-					<Route path="settings" element={<Settings />} />
-				</Route>
-			<Route path="*" element={<Navigate to="/login" replace />} />
-		</Routes>
+						isAuthenticated() ? <Navigate to="/admin" replace /> : <Login />
+					} 
+				/>
+					<Route
+						path="/admin"
+						element={
+							<PrivateRoute>
+								<AdminLayout />
+							</PrivateRoute>
+						}
+					>
+						<Route index element={<Dashboard />} />
+						<Route path="shopify" element={<Shopify />} />
+						<Route path="wa-leads" element={<WALeads />} />
+						<Route path="amazon" element={<Amazon />} />
+						<Route path="flipkart" element={<Flipkart />} />
+						<Route path="users-and-roles" element={<Users />} />
+						<Route path="modules" element={<Modules />} />
+						<Route path="products" element={<Products />} />
+						<Route path="followups" element={<Followups />} />
+						<Route path="marketing-spend" element={<MarketingSpend />} />
+						<Route path="gurugram-marts" element={<GurugramMarts />} />
+						<Route path="delhi-marts" element={<DelhiMarts />} />
+						<Route path="users" element={<Users />} />
+						<Route path="settings" element={<Settings />} />
+					</Route>
+				<Route path="*" element={<Navigate to="/login" replace />} />
+			</Routes>
+		</>
 	);
 }
 

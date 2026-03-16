@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../../api';
 import type { CreateUserPayload, UserRecord } from '../../types/users';
-import { useAppDispatch, useAppSelector, setModules as setModulesInStore, setModulesLoading } from '../../store';
-import type { ModuleApiItem, ModuleRecord } from '../../types/modules';
+import { useAppSelector } from '../../store';
 import './Users.scss';
 
 const ACTIONS = [
@@ -21,7 +20,6 @@ type Props = {
 };
 
 export function CreateUserModal({ mode, initialUser, roles, onClose, onSubmit, onSuccess }: Props) {
-    const dispatch = useAppDispatch();
     const modules = useAppSelector((state) => state.modules.modules);
 
     const [name, setName] = useState(initialUser?.name ?? '');
@@ -38,42 +36,6 @@ export function CreateUserModal({ mode, initialUser, roles, onClose, onSubmit, o
     );
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        let cancelled = false;
-        if (modules && modules.length > 0) {
-            return;
-        }
-        dispatch(setModulesLoading(true));
-        apiFetch('/api/modules')
-            .then((res) => {
-                if (cancelled) return;
-                if (!res.ok) throw new Error(res.statusText || 'Failed to load modules');
-                return res.json();
-            })
-            .then((data: unknown) => {
-                if (cancelled) return;
-                const list = (Array.isArray(data) ? data : []) as ModuleApiItem[];
-                const normalized: ModuleRecord[] = list.map((item) => ({
-                    id: item._id,
-                    key: item.key,
-                    name: item.label,
-                    description: item.path || undefined,
-                    order: item.order,
-                    active: item.active,
-                    icon: item.icon,
-                }));
-                dispatch(setModulesInStore(normalized));
-            })
-            .catch(() => {
-                if (!cancelled) {
-                    dispatch(setModulesInStore([]));
-                }
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [dispatch, modules]);
 
     useEffect(() => {
         if (mode === 'create' && selectedPermissions.length === 0 && modules.length > 0) {

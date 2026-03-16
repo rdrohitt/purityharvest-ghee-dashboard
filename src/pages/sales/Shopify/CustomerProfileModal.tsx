@@ -1,35 +1,110 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Order, OrderItem } from '../../../utils/orders';
+import type { CustomerOrdersResponse } from '../../../types/shopify';
+import type { DeliveryStatus, PaymentStatus } from '../../../utils/orders';
+import { mapDeliveryStatusFromTracking } from '../../../utils/shopify-orders';
+import { apiFetch } from '../../../api';
 import { formatCurrency, formatDate, Th, Td, StatusTag } from './ShopifyShared';
 
+type CustomerOrder = {
+    id: string;
+    date: string;
+    items: { name?: string | null; variant: string; quantity: number }[];
+    amount: number;
+    paymentStatus: PaymentStatus;
+    deliveryStatus: DeliveryStatus;
+};
+
 export function CustomerProfileModal({
+    customerId,
     customerPhone,
-    orders,
     onClose,
     onCopyPhone,
+    onLoaded,
 }: {
+    customerId: string;
     customerPhone: string;
-    orders: Order[];
     onClose: () => void;
     onCopyPhone?: (phone: string) => void;
+    onLoaded?: () => void;
 }) {
-    const customerOrders = useMemo(() => {
-        return orders
-            .filter((o) => o.customerPhone === customerPhone)
+    const [data, setData] = useState<CustomerOrdersResponse | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function loadCustomer() {
+            if (!customerId) return;
+            setLoading(true);
+            setError(null);
+            try {
+                const res = await apiFetch(`/api/orders/customer/${encodeURIComponent(customerId)}`);
+                if (!res.ok) {
+                    throw new Error('Failed to load customer orders');
+                }
+                const json = (await res.json()) as CustomerOrdersResponse;
+                if (!cancelled) {
+                    setData(json);
+                    if (onLoaded) onLoaded();
+                }
+            } catch (e) {
+                if (!cancelled) {
+                    setError(e instanceof Error ? e.message : 'Failed to load customer orders');
+                    setData(null);
+                    if (onLoaded) onLoaded();
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        }
+        loadCustomer();
+        return () => {
+            cancelled = true;
+        };
+    }, [customerId]);
+
+    const customerOrders: CustomerOrder[] = useMemo(() => {
+        if (!data) return [];
+        return [...data.orders]
+            .map((o) => {
+                const paymentStatus: PaymentStatus = o.paymentMode === 'PAID' ? 'PAID' : 'COD';
+                const deliveryStatus: DeliveryStatus = o.returnStatus
+                    ? 'RTO'
+                    : mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus);
+                return {
+                    id: o._id,
+                    date: o.date,
+                    items: (o.products || []).map((p) => ({
+                        name:
+                            p.productId &&
+                            typeof p.productId === 'object' &&
+                            'name' in p.productId
+                                ? (p.productId as { name?: string }).name ?? null
+                                : null,
+                        variant: p.variantName,
+                        quantity: p.quantity,
+                    })),
+                    amount: o.totalAmount,
+                    paymentStatus,
+                    deliveryStatus,
+                };
+            })
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [orders, customerPhone]);
+    }, [data]);
 
     const customerProfile = useMemo(() => {
-        if (customerOrders.length === 0) return null;
-        const latestOrder = customerOrders[0];
+        if (!data) return null;
+        const c = data.customer;
         return {
-            name: latestOrder.customer,
-            phone: latestOrder.customerPhone,
-            address: latestOrder.customerAddress,
-            state: latestOrder.state,
-            pincode: latestOrder.pincode || '—',
+            name: c.name,
+            phone: c.phoneNumber || customerPhone,
+            address: c.address,
+            state: c.state,
+            pincode: c.pincode || '—',
         };
-    }, [customerOrders]);
+    }, [data, customerPhone]);
 
     const totalOrders = customerOrders.length;
     const totalAmount = customerOrders.reduce((sum, o) => sum + o.amount, 0);
@@ -74,7 +149,7 @@ export function CustomerProfileModal({
         setTimeout(() => setCopyFeedback(false), 1800);
     };
 
-    if (!customerProfile) {
+    if (!customerProfile || (loading && !data) || error) {
         return null;
     }
 
@@ -219,8 +294,9 @@ export function CustomerProfileModal({
                                                         <Td>
                                                             <div className="customer-orders-items">
                                                                 {(order.items ?? []).length === 0 ? <span>—</span> : null}
-                                                                {(order.items ?? []).map((it: OrderItem, idx: number) => (
+                                                                {(order.items ?? []).map((it, idx: number) => (
                                                                     <div key={idx} className="customer-orders-item-line">
+                                                                        {it.name ? `${String(it.name).split('|')[0].trim()} – ` : ''}
                                                                         {it.variant} × {it.quantity}
                                                                     </div>
                                                                 ))}

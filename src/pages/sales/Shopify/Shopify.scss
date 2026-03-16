@@ -212,6 +212,10 @@
    border-bottom: 1px solid var(--border);
  }
 
+.shopify-orders-row--group-start:not(:first-child) td {
+  border-top: 4px solid #e5e7eb;
+}
+
  .shopify-orders-date-cell {
    padding: 12px;
    vertical-align: top;

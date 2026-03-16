@@ -44,6 +44,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
     const [showCustomerProfile, setShowCustomerProfile] = useState(false);
     const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
+    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+    const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
     const [orders, setOrders] = useState<ShopifyOrderApi[]>([]);
     const dispatch = useAppDispatch();
@@ -780,7 +782,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 marketingSpend={[]}
                 loading={loading}
                 orderCount={filtered.length}
-                onCustomerClick={(phone) => {
+                onCustomerClick={(customerId, phone) => {
+                    setCustomerProfileLoading(true);
+                    setSelectedCustomerId(customerId);
                     setSelectedCustomerPhone(phone);
                     setShowCustomerProfile(true);
                 }}
@@ -790,6 +794,10 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
             {loadingOrderDetail ? (
                 <Spinner overlay fixed message="Loading order…" />
+            ) : null}
+
+            {customerProfileLoading ? (
+                <Spinner overlay fixed message="Loading customer…" />
             ) : null}
 
             {showAddOrder || editingOrder ? (
@@ -918,15 +926,18 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 />
             ) : null}
 
-            {showCustomerProfile && selectedCustomerPhone ? (
+            {showCustomerProfile && selectedCustomerPhone && selectedCustomerId ? (
                 <CustomerProfileModal
+                    customerId={selectedCustomerId}
                     customerPhone={selectedCustomerPhone}
-                    orders={orders.map(shopifyOrderToOrder)}
                     onClose={() => {
                         setShowCustomerProfile(false);
                         setSelectedCustomerPhone(null);
+                        setSelectedCustomerId(null);
+                        setCustomerProfileLoading(false);
                     }}
                     onCopyPhone={copyPhoneToClipboard}
+                    onLoaded={() => setCustomerProfileLoading(false)}
                 />
             ) : null}
 

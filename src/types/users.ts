@@ -34,3 +34,44 @@ export interface UpdateUserPayload {
   role?: string;
   permissions?: string[];
 }
+
+/**
+ * User object returned from GET /api/users/me.
+ */
+export interface MeUser {
+  _id: string;
+  name: string;
+  username: string;
+  phoneNumber: string;
+  role: string;
+  permissions: string[];
+  createdAt?: string;
+  updatedAt?: string;
+  __v?: number;
+  createdBy?: {
+    _id: string;
+    name?: string;
+  };
+  updatedBy?: {
+    _id: string;
+    name?: string;
+  };
+}
+
+/**
+ * Menu item returned from GET /api/users/me.
+ */
+export interface MeMenuItem {
+  module: string;
+  label: string;
+  path: string;
+}
+
+/**
+ * Full payload from GET /api/users/me.
+ */
+export interface MeResponse {
+  user: MeUser;
+  menu: MeMenuItem[];
+}
+

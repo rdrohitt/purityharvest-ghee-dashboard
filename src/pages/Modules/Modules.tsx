@@ -63,7 +63,8 @@ export default function Modules() {
       .catch((err: Error) => {
         if (!cancelled) {
           setLoadError(err.message || 'Failed to load modules');
-          dispatch(setModulesInStore([]));
+          // Stop loading but don't keep retrying in a tight loop
+          dispatch(setModulesLoading(false));
         }
       });
     return () => {
@@ -76,7 +77,10 @@ export default function Modules() {
     apiFetch('/api/modules')
       .then((res) => (res.ok ? res.json() : []))
       .then((data: unknown) => dispatch(setModulesInStore(normalizeModules(data))))
-      .catch(() => dispatch(setModulesInStore([])));
+      .catch(() => {
+        // On refetch error, just stop loading
+        dispatch(setModulesLoading(false));
+      });
   }, [dispatch]);
 
   function showToast(message: string, type: 'success' | 'error' = 'success') {

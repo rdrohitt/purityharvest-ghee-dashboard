@@ -98,3 +98,12 @@ export interface ShopifyOrderApi {
     updatedAt?: string;
     __v?: number;
 }
+
+/**
+ * Response from GET /api/orders/customer/:id.
+ */
+export interface CustomerOrdersResponse {
+    customer: ShopifyOrderCustomer;
+    count: number;
+    orders: ShopifyOrderApi[];
+}

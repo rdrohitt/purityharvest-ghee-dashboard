@@ -107,7 +107,9 @@ export function hydrateUserFromToken(): Promise<void> {
 				return;
 			}
 			const me = (await res.json()) as MeResponse;
-			if (me?.user) store.dispatch(setMe(me));
+			if (me?.user) {
+				store.dispatch(setMe(me));
+			}
 		})
 		.catch(() => {
 			setToken(null);
