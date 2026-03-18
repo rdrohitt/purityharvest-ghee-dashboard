@@ -53,6 +53,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const productsLoading = useAppSelector((state) => state.products.loading);
     const [loading, setLoading] = useState(true);
     const [categoryTab, setCategoryTab] = useState<CategoryTab>('ghee');
+    const [syncingShopify, setSyncingShopify] = useState(false);
     
     // Toast notifications
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -168,14 +169,22 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const syncShopifyOrders = async () => {
         try {
             setLoading(true);
-            await apiFetch('/api/orders/sync-shopify', { method: 'POST' });
+            setSyncingShopify(true);
+            const res = await apiFetch('/api/orders/sync-shopify', { method: 'POST' });
+            if (!res.ok) {
+                console.error('Sync Shopify failed with status', res.status);
+                showToast('Failed to Sync', 'error');
+                return;
+            }
             const toInclusive = addOneDay(dateRangeForApi.to);
             const ordersData = await loadOrdersFromApi({ from: dateRangeForApi.from, to: toInclusive });
             setOrders(ordersData);
         } catch (err) {
             console.error('Failed to sync Shopify orders', err);
+            showToast('Failed to Sync', 'error');
         } finally {
             setLoading(false);
+            setSyncingShopify(false);
         }
     };
 
@@ -792,13 +801,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 onDelete={setOrderToDelete}
             />
 
-            {loadingOrderDetail ? (
-                <Spinner overlay fixed message="Loading order…" />
-            ) : null}
-
-            {customerProfileLoading ? (
-                <Spinner overlay fixed message="Loading customer…" />
-            ) : null}
+            {loadingOrderDetail && <Spinner overlay fixed message="Loading order…" />}
+            {customerProfileLoading && <Spinner overlay fixed message="Loading customer…" />}
+            {syncingShopify && <Spinner overlay fixed message="Syncing Shopify orders…" />}
 
             {showAddOrder || editingOrder ? (
                 <AddOrderModal 
@@ -904,6 +909,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                         trackingCompany: o.shippingTrackingCompany ?? '',
                                     },
                                     totalAmount: o.amount,
+                                    codCharges: o.codCharges ?? 0,
+                                    discount: o.discountAmount ?? 0,
+                                    notes: o.notes ?? '',
                                 };
 
                                 await apiFetch('/api/orders', {

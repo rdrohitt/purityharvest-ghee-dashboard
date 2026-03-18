@@ -26,7 +26,7 @@ function buildOrderWhatsAppMessage(o: ShopifyOrderApi): string {
     const lines: string[] = [];
     lines.push(`Dear ${name},`, '');
     // Use Unicode escape sequences so emojis render correctly across environments
-    lines.push('Your order has been shipped! \U+2764 U+FE0F'); // 🚚
+    lines.push('Your order has been shipped!'); // 🚚
 
     if (awb) {
         lines.push(`\uD83D\uDCE6 AWB No: ${awb}`); // 📦

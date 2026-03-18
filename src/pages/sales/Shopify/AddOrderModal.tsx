@@ -385,6 +385,16 @@ function AddOrderModal({
     onClose: () => void;
     onCreate: (o: Order) => void | Promise<void>;
 }) {
+    const normalizePlatform = (p?: Platform | ''): Platform | '' => {
+        if (!p) return '';
+        const lower = String(p).toLowerCase();
+        if (lower === 'shopify') return 'Shopify';
+        if (lower === 'abandoned') return 'Abandoned';
+        if (lower === 'whatsapp') return 'Whatsapp';
+        if (lower === 'amazon') return 'Amazon';
+        if (lower === 'flipkart') return 'Flipkart';
+        return p;
+    };
     const [date, setDate] = useState<string>(
         initialOrder ? toInputDate(new Date(initialOrder.date)) : toInputDate(new Date())
     );
@@ -407,7 +417,9 @@ function AddOrderModal({
     const [delivery, setDelivery] = useState<DeliveryStatus>(
         initialOrder?.deliveryStatus || 'In Transit'
     );
-    const [platform, setPlatform] = useState<Platform | ''>(initialOrder?.platform || '');
+    const [platform, setPlatform] = useState<Platform | ''>(
+        normalizePlatform(initialOrder?.platform as Platform | '')
+    );
     const [codCharges, setCodCharges] = useState<string>(
         initialOrder?.codCharges?.toString() ||
             initialOrder?.shippingAmount?.toString() ||

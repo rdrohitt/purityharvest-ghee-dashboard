@@ -154,12 +154,24 @@ export function StatusTag({ kind, type }: { kind: string; type: 'payment' | 'del
 
 export function PlatformTag({ platform }: { platform?: Platform | string }) {
     if (!platform) return <span>—</span>;
+
+    const raw = String(platform);
+    const lower = raw.toLowerCase();
+
     const modifier =
-        platform === 'Shopify' ? 'shopify-platform-tag--shopify' :
-        platform === 'Whatsapp' ? 'shopify-platform-tag--whatsapp' :
-        platform === 'Abandoned' ? 'shopify-platform-tag--abandoned' :
+        lower === 'shopify' ? 'shopify-platform-tag--shopify' :
+        lower === 'whatsapp' ? 'shopify-platform-tag--whatsapp' :
+        lower === 'abandoned' ? 'shopify-platform-tag--abandoned' :
         'shopify-platform-tag--default';
-    return <span className={`shopify-platform-tag ${modifier}`}>{platform}</span>;
+
+    // Normalize label casing in UI (e.g. "abandoned" -> "Abandoned")
+    const label =
+        lower === 'shopify' ? 'Shopify' :
+        lower === 'whatsapp' ? 'Whatsapp' :
+        lower === 'abandoned' ? 'Abandoned' :
+        raw;
+
+    return <span className={`shopify-platform-tag ${modifier}`}>{label}</span>;
 }
 
 export function TypeTag({ type }: { type?: OrderType | string }) {

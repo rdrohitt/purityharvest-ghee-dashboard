@@ -115,6 +115,15 @@ export async function fetchOrderById(id: string): Promise<ShopifyOrderApi> {
  */
 export function orderDetailToOrder(o: ShopifyOrderApi): Order {
     const paymentStatus: PaymentStatus = o.paymentMode === 'PAID' ? 'PAID' : 'COD';
+    const platformLabel = (() => {
+        const lower = (o.platform || '').toLowerCase();
+        if (lower === 'shopify') return 'Shopify';
+        if (lower === 'abandoned') return 'Abandoned';
+        if (lower === 'whatsapp') return 'Whatsapp';
+        if (lower === 'amazon') return 'Amazon';
+        if (lower === 'flipkart') return 'Flipkart';
+        return (o.platform || '') as any;
+    })();
     return {
         id: o._id,
         date: o.date,
@@ -144,7 +153,7 @@ export function orderDetailToOrder(o: ShopifyOrderApi): Order {
         discountAmount: o.discount,
         awbNumber: o.shippingDetails?.trackingNumber,
         notes: o.notes,
-        platform: 'Shopify',
+        platform: platformLabel,
         type: mapOrderType(o.type),
         shippingTrackingUrl: o.shippingDetails?.trackingUrl,
         shippingTrackingCompany: o.shippingDetails?.trackingCompany,
@@ -350,6 +359,15 @@ export async function updateShopifyOrderFromForm(
  */
 export function shopifyOrderToOrder(o: ShopifyOrderApi): Order {
     const paymentStatus: PaymentStatus = o.paymentMode === 'PAID' ? 'PAID' : 'COD';
+    const platformLabel = (() => {
+        const lower = (o.platform || '').toLowerCase();
+        if (lower === 'shopify') return 'Shopify';
+        if (lower === 'abandoned') return 'Abandoned';
+        if (lower === 'whatsapp') return 'Whatsapp';
+        if (lower === 'amazon') return 'Amazon';
+        if (lower === 'flipkart') return 'Flipkart';
+        return (o.platform || '') as any;
+    })();
     return {
         id: o._id,
         date: o.date,
@@ -372,7 +390,7 @@ export function shopifyOrderToOrder(o: ShopifyOrderApi): Order {
         discountAmount: o.discount,
         awbNumber: o.shippingDetails?.trackingNumber,
         notes: o.notes,
-        platform: 'Shopify',
+        platform: platformLabel,
         type: mapOrderType(o.type),
         shippingTrackingUrl: o.shippingDetails?.trackingUrl,
         shippingTrackingCompany: o.shippingDetails?.trackingCompany,
