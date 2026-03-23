@@ -23,7 +23,14 @@ export interface CustomerSearchResult {
     createdAt?: string;
     updatedAt?: string;
     __v?: number;
+    countryCode?: string;
 }
+
+/**
+ * Customer as returned by GET /api/customers.
+ * Same shape as search result, but modelled separately for clarity.
+ */
+export interface CustomerApi extends CustomerSearchResult {}
 
 /**
  * Customer as returned in Shopify order (populated or ref).

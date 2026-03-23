@@ -122,6 +122,10 @@ export default function AdminLayout() {
                             <span className="mi-label">Marketing Spend</span>
                         </NavLink>
                     )}
+                    <NavLink to="/admin/customers" className={({ isActive }) => (isActive ? 'active' : '')}>
+                        <span className="mi-icon">👥</span>
+                        <span className="mi-label">Customers</span>
+                    </NavLink>
                     {hasMenuLabel('Users and Roles') && (
                         <NavLink to="/admin/users-and-roles" className={({ isActive }) => (isActive ? 'active' : '')}>
                             <span className="mi-icon">👤</span>

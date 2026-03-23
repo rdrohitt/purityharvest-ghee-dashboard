@@ -4,7 +4,9 @@ import { updateOrder, deleteOrder, type Order, type OrderItem, type PaymentStatu
 import { loadOrdersFromApi, shopifyOrderToOrder, fetchOrderById, orderDetailToOrder, mapDeliveryStatusFromTracking, mapFulfillmentStatus, mapOrderType, getOrderCustomerName, getOrderCustomerPhone, updateShopifyOrderFromForm } from '../../../utils/shopify-orders';
 import type { ShopifyOrderApi, ShopifyOrderCustomer } from '../../../types/shopify';
 import { loadProducts, type ProductApiItem } from '../../../utils/products';
-import { useAppDispatch, useAppSelector, setProducts, setProductsLoading } from '../../../store';
+import type { MarketingSpendApiItem } from '../../../types/marketing-spend';
+import { loadAllMarketingSpend } from '../../../utils/marketing-spend';
+import { useAppDispatch, useAppSelector, setProducts, setProductsLoading, setMarketingSpendLoading, setMarketingSpendRecords } from '../../../store';
 import AddOrderModal, { type ProductVariantOption } from './AddOrderModal';
 import { CustomerProfileModal } from './CustomerProfileModal';
 import { DatePicker } from './DatePicker';
@@ -51,6 +53,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const dispatch = useAppDispatch();
     const products = useAppSelector((state) => state.products.products);
     const productsLoading = useAppSelector((state) => state.products.loading);
+    const marketingSpendRecords = useAppSelector((state) => state.marketingSpend.records);
+    const marketingSpendLoading = useAppSelector((state) => state.marketingSpend.loading);
     const [loading, setLoading] = useState(true);
     const [categoryTab, setCategoryTab] = useState<CategoryTab>('ghee');
     const [syncingShopify, setSyncingShopify] = useState(false);
@@ -113,6 +117,31 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             cancelled = true;
         };
     }, [dispatch, products]);
+
+    useEffect(() => {
+        let cancelled = false;
+        if (marketingSpendRecords.length > 0 || marketingSpendLoading) {
+            return;
+        }
+
+        dispatch(setMarketingSpendLoading(true));
+        loadAllMarketingSpend()
+            .then((data) => {
+                if (!cancelled) {
+                    dispatch(setMarketingSpendRecords(data));
+                }
+            })
+            .catch((err) => {
+                console.error('Failed to load marketing spend data', err);
+                if (!cancelled) {
+                    dispatch(setMarketingSpendLoading(false));
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [dispatch, marketingSpendRecords.length, marketingSpendLoading]);
 
     const getLocalDateString = (date: Date): string => {
         const year = date.getFullYear();
@@ -334,19 +363,110 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         const totalSales = filtered.reduce((s, o) => s + o.totalAmount, 0);
         const quantity = filtered.reduce((s, o) => s + (o.products || []).reduce((sum, p) => sum + p.quantity, 0), 0);
         const codCharges = filtered.reduce((s, o) => s + (o.codCharges || 0), 0);
-        const shippingCharges = filtered.reduce((s, o) => s + (o.shippingCharges || 0), 0);
         const deliveryStatusFor = (o: ShopifyOrderApi) =>
             o.returnStatus ? 'RTO' : mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus);
         const deliveredOrders = filtered.filter(o => deliveryStatusFor(o) === 'Delivered');
+        const inTransitOrders = filtered.filter(o => deliveryStatusFor(o) === 'In Transit');
         const delivered = deliveredOrders.length;
         const deliveredAmount = deliveredOrders.reduce((s, o) => s + o.totalAmount, 0);
+        const deliveredShippingCharges = deliveredOrders.reduce((s, o) => s + (o.shippingCharges || 0), 0);
 
-        // Marketing spend, misc cost, ROAS, manufacturing cost, EBITA — hardcoded 0 (no API)
-        const totalMarketingSpend = 0;
-        const totalMiscCost = 0;
-        const roas = 0;
-        const manufacturingCost = 0;
-        const ebita = 0;
+        const inTransit = inTransitOrders.length;
+        const inTransitAmount = inTransitOrders.reduce((s, o) => s + o.totalAmount, 0);
+
+        // Marketing spend from Redux store; if store was empty we fetched and populated it above.
+        const fromDate = new Date(`${dateRangeForApi.from}T00:00:00`);
+        const toDate = new Date(`${dateRangeForApi.to}T23:59:59.999`);
+        const spendInRange = marketingSpendRecords.filter((rec) => {
+            const d = new Date(rec.date);
+            return !Number.isNaN(d.getTime()) && d >= fromDate && d <= toDate;
+        });
+        const metaSpend = spendInRange
+            .filter((rec) => String(rec.platform).toLowerCase() === 'meta1')
+            .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
+        // "Misc" here means all platforms except meta1 and delhivery.
+        // (e.g. misc, engage, checkout, amazon, flipkart, dolchi, etc.)
+        const miscSpend = spendInRange
+            .filter((rec) => {
+                const platform = String(rec.platform).toLowerCase();
+                return platform !== 'meta1' && platform !== 'delhivery';
+            })
+            .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
+        const delhiverySpend = spendInRange
+            .filter((rec) => String(rec.platform).toLowerCase() === 'delhivery')
+            .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
+
+        // ROAS denominator: all ad/marketing expenses in range (Meta + other non-Delhivery platforms)
+        const totalMarketingSpend = metaSpend + miscSpend;
+        const totalMiscCost = miscSpend;
+        const roasCurrent = totalMarketingSpend > 0 ? deliveredAmount / totalMarketingSpend : 0;
+        const roasExpected = totalMarketingSpend > 0 ? (deliveredAmount + inTransitAmount) / totalMarketingSpend : 0;
+
+        // Manufacturing cost based on delivered lines and product actual cost from /api/products.
+        const productMap = new Map<string, ProductApiItem>();
+        products.forEach((p) => {
+            if (p?._id) productMap.set(p._id, p);
+        });
+
+        const resolveUnitActualCost = (line: ShopifyOrderApi['products'][number]): number => {
+            const rawProductId = line.productId;
+            const productId =
+                rawProductId && typeof rawProductId === 'object' && '_id' in rawProductId
+                    ? String(rawProductId._id ?? '')
+                    : typeof rawProductId === 'string'
+                    ? rawProductId
+                    : '';
+
+            const product = productMap.get(productId);
+            if (!product) {
+                return Number(line.price || line.variantPrice || 0);
+            }
+
+            const variantName = String(line.variantName || '').trim().toLowerCase();
+            const matchedVariant = (product.variants || []).find((v) => {
+                const vName = String(v.name || '').trim().toLowerCase();
+                return vName === variantName || vName.includes(variantName) || variantName.includes(vName);
+            });
+
+            const unitActual =
+                matchedVariant?.actualPrice ??
+                product.actualPrice ??
+                matchedVariant?.price ??
+                product.price ??
+                line.price ??
+                line.variantPrice ??
+                0;
+
+            return Number(unitActual || 0);
+        };
+
+        const manufacturingCost = deliveredOrders.reduce((sum, order) => {
+            const orderManufacturing = (order.products || []).reduce((lineSum, line) => {
+                const qty = Number(line.quantity || 0);
+                const unitActualCost = resolveUnitActualCost(line);
+                return lineSum + unitActualCost * qty;
+            }, 0);
+            return sum + orderManufacturing;
+        }, 0);
+
+        const shippingCharges = deliveredShippingCharges;
+        const manufacturingCostInTransit = inTransitOrders.reduce((sum, order) => {
+            const orderManufacturing = (order.products || []).reduce((lineSum, line) => {
+                const qty = Number(line.quantity || 0);
+                const unitActualCost = resolveUnitActualCost(line);
+                return lineSum + unitActualCost * qty;
+            }, 0);
+            return sum + orderManufacturing;
+        }, 0);
+
+        const expectedManufacturingCost = manufacturingCost + manufacturingCostInTransit;
+        const ebita = deliveredAmount - manufacturingCost - metaSpend - delhiverySpend - miscSpend;
+        const expectedEbita =
+            (deliveredAmount + inTransitAmount) -
+            expectedManufacturingCost -
+            metaSpend -
+            delhiverySpend -
+            miscSpend;
         
         // Calculate quantities by size
         const quantityBySize: { [key: string]: number } = {
@@ -406,9 +526,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         const rtoOrders = filtered.filter((o: ShopifyOrderApi) => deliveryStatusFor(o) === 'RTO');
         const rto = rtoOrders.length;
         const rtoAmount = rtoOrders.reduce((s, o) => s + o.totalAmount, 0);
-        const inTransitOrders = filtered.filter((o: ShopifyOrderApi) => deliveryStatusFor(o) === 'In Transit');
-        const inTransit = inTransitOrders.length;
-        const inTransitAmount = inTransitOrders.reduce((s, o) => s + o.totalAmount, 0);
         
         return {
             totalSales,
@@ -419,7 +536,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             inTransitQuantityBySize,
             codCharges,
             shippingCharges,
-            roas,
+            roasCurrent,
+            roasExpected,
             delivered,
             deliveredAmount,
             rto,
@@ -428,11 +546,27 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             inTransitAmount,
             totalOrders: filtered.length,
             ebita,
+            expectedEbita,
             manufacturingCost,
+            expectedManufacturingCost,
             totalMiscCost,
-            totalMarketingSpend
+            totalMarketingSpend,
+            metaSpend,
+            miscSpend,
+            delhiverySpend,
         };
-    }, [filtered]);
+    }, [filtered, products, marketingSpendRecords, dateRangeForApi.from, dateRangeForApi.to]);
+
+    const marketingSpendForSummary = useMemo(() => {
+        return marketingSpendRecords.map((rec) => ({
+            id: rec._id,
+            date: rec.date,
+            amount: rec.amount,
+            note: rec.note,
+            createdByName: rec.createdBy?.name,
+            updatedByName: rec.updatedBy?.name,
+        }));
+    }, [marketingSpendRecords]);
 
     useEffect(() => {
         function onDocClick(e: MouseEvent) {
@@ -708,13 +842,16 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     <ModernSalesWithEBITAMetric 
                         totalSales={metrics.totalSales}
                         ebita={metrics.ebita}
+                        expectedEbita={metrics.expectedEbita}
                         manufacturingCost={metrics.manufacturingCost}
-                        metaSpend={metrics.totalMarketingSpend}
-                        miscCost={metrics.totalMiscCost}
-                        shippingCost={metrics.shippingCharges}
+                        expectedManufacturingCost={metrics.expectedManufacturingCost}
+                        metaSpend={metrics.metaSpend}
+                        miscCost={metrics.miscSpend}
+                        delhiveryCost={metrics.delhiverySpend}
                         iconColor="#16a34a"
                         isLast={false}
                         isEven={false}
+                        isWide={true}
                     />
                     <ModernQuantityMetric 
                         quantityBySize={metrics.quantityBySize}
@@ -735,18 +872,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         isLast={false}
                         isEven={false}
                     />
-                    <ModernMetricItem 
-                        icon="📦" 
-                        label="Shipping Charges" 
-                        value={formatCurrency(metrics.shippingCharges)} 
-                        iconColor="#8b5cf6"
-                        isLast={false}
-                        isEven={true}
-                    />
-                    <ModernMetricItem 
-                        icon="📊" 
-                        label="ROAS" 
-                        value={metrics.roas > 0 ? metrics.roas.toFixed(2) : '—'} 
+                    <ModernRoasMetric
+                        currentRoas={metrics.roasCurrent}
+                        expectedRoas={metrics.roasExpected}
                         iconColor="#ec4899"
                         isLast={true}
                         isEven={true}
@@ -788,7 +916,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
             <ShopifyOrdersTable
                 groupedByDate={groupedByDate}
-                marketingSpend={[]}
+                marketingSpend={marketingSpendForSummary}
                 loading={loading}
                 orderCount={filtered.length}
                 onCustomerClick={(customerId, phone) => {
@@ -986,9 +1114,67 @@ function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { i
     );
 }
 
-function ModernSalesWithEBITAMetric({ totalSales, ebita, manufacturingCost, metaSpend, miscCost, shippingCost, iconColor, isLast, isEven }: { totalSales: number; ebita: number; manufacturingCost: number; metaSpend: number; miscCost: number; shippingCost: number; iconColor: string; isLast: boolean; isEven: boolean }) {
+function ModernRoasMetric({
+    currentRoas,
+    expectedRoas,
+    iconColor,
+    isLast,
+    isEven,
+}: {
+    currentRoas: number;
+    expectedRoas: number;
+    iconColor: string;
+    isLast: boolean;
+    isEven: boolean;
+}) {
+    const formatRoas = (v: number): string => {
+        if (!Number.isFinite(v) || v <= 0) return '—';
+        return v.toFixed(2);
+    };
+
     return (
         <div className={`shopify-metric ${isEven ? 'shopify-metric--even' : ''} ${isLast ? 'shopify-metric--last' : ''}`}>
+            <div className="shopify-metric-header">
+                <span className="shopify-metric-icon" style={{ color: iconColor }}>📊</span>
+                <div className="shopify-metric-label">ROAS</div>
+            </div>
+            <div className="shopify-metric-body">
+                <div className="shopify-metric-value">{formatRoas(currentRoas)}</div>
+                <div className="shopify-metric-amount">Expected: {formatRoas(expectedRoas)}</div>
+            </div>
+        </div>
+    );
+}
+
+function ModernSalesWithEBITAMetric({
+    totalSales,
+    ebita,
+    expectedEbita,
+    manufacturingCost,
+    expectedManufacturingCost,
+    metaSpend,
+    miscCost,
+    delhiveryCost,
+    iconColor,
+    isLast,
+    isEven,
+    isWide,
+}: {
+    totalSales: number;
+    ebita: number;
+    expectedEbita: number;
+    manufacturingCost: number;
+    expectedManufacturingCost: number;
+    metaSpend: number;
+    miscCost: number;
+    delhiveryCost: number;
+    iconColor: string;
+    isLast: boolean;
+    isEven: boolean;
+    isWide?: boolean;
+}) {
+    return (
+        <div className={`shopify-metric ${isWide ? 'shopify-metric--wide' : ''} ${isEven ? 'shopify-metric--even' : ''} ${isLast ? 'shopify-metric--last' : ''}`}>
             <div className="shopify-metric-header">
                 <span className="shopify-metric-icon">💰</span>
                 <div className="shopify-metric-label">Total Sales / EBITA</div>
@@ -998,11 +1184,15 @@ function ModernSalesWithEBITAMetric({ totalSales, ebita, manufacturingCost, meta
                 <div className={`shopify-metric-ebita-row ${ebita >= 0 ? 'shopify-metric-ebita--positive' : 'shopify-metric-ebita--negative'}`}>
                     EBITA: {formatCurrency(ebita)}
                 </div>
+                <div className={`shopify-metric-ebita-row ${expectedEbita >= 0 ? 'shopify-metric-ebita--positive' : 'shopify-metric-ebita--negative'}`}>
+                    Expected EBITA (incl. In Transit): {formatCurrency(expectedEbita)}
+                </div>
                 <div className="shopify-metric-breakdown">
-                    <div className="shopify-metric-breakdown-row"><span>Manufacturing:</span><span>{formatCurrency(manufacturingCost)}</span></div>
+                    <div className="shopify-metric-breakdown-row"><span>Manufacturing (Delivered):</span><span>{formatCurrency(manufacturingCost)}</span></div>
+                    <div className="shopify-metric-breakdown-row"><span>Manufacturing (Expected):</span><span>{formatCurrency(expectedManufacturingCost)}</span></div>
                     <div className="shopify-metric-breakdown-row"><span>Meta:</span><span>{formatCurrency(metaSpend)}</span></div>
                     <div className="shopify-metric-breakdown-row"><span>Misc:</span><span>{formatCurrency(miscCost)}</span></div>
-                    <div className="shopify-metric-breakdown-row"><span>Shipping:</span><span>{formatCurrency(shippingCost)}</span></div>
+                    <div className="shopify-metric-breakdown-row"><span>Delhivery:</span><span>{formatCurrency(delhiveryCost)}</span></div>
                 </div>
             </div>
         </div>

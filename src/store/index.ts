@@ -4,6 +4,7 @@ import userReducer from './userSlice';
 import productReducer from './productSlice';
 import modulesReducer from './moduleSlice';
 import usersTableReducer from './usersTableSlice';
+import marketingSpendReducer from './marketingSpendSlice';
 
 export const store = configureStore({
 	reducer: {
@@ -11,6 +12,7 @@ export const store = configureStore({
 		products: productReducer,
 		modules: modulesReducer,
 		usersTable: usersTableReducer,
+		marketingSpend: marketingSpendReducer,
 	},
 });
 
@@ -46,3 +48,9 @@ export {
 	removeUserFromStore,
 	clearUsers,
 } from './usersTableSlice';
+
+export {
+	setMarketingSpendRecords,
+	setMarketingSpendLoading,
+	clearMarketingSpendRecords,
+} from './marketingSpendSlice';

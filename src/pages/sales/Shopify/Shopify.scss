@@ -1757,6 +1757,10 @@
   &:not(.shopify-metric--last) { border-right: 1px solid var(--border); }
   &:hover { background: var(--bg); }
 }
+
+.shopify-metric--wide {
+  flex: 2;
+}
 .shopify-metric-header {
   display: flex;
   align-items: center;

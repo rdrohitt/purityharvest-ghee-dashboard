@@ -12,6 +12,7 @@ import Flipkart from './pages/sales/Flipkart/index';
 import WALeads from './pages/WALeads/index';
 import Followups from './pages/Followups/index';
 import MarketingSpend from './pages/MarketingSpend/index';
+import Customers from './pages/Customers/index';
 import Products from './pages/Products/index';
 import GurugramMarts from './pages/Marts/GurugramMarts/index';
 import DelhiMarts from './pages/Marts/DelhiMarts/index';
@@ -93,6 +94,7 @@ export default function App() {
 						<Route path="marketing-spend" element={<MarketingSpend />} />
 						<Route path="gurugram-marts" element={<GurugramMarts />} />
 						<Route path="delhi-marts" element={<DelhiMarts />} />
+						<Route path="customers" element={<Customers />} />
 						<Route path="users" element={<Users />} />
 						<Route path="settings" element={<Settings />} />
 					</Route>

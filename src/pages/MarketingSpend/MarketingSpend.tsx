@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '../../components/Spinner';
 import { loadAllMarketingSpend, createMarketingSpend, addMarketingSpend, updateMarketingSpend, deleteMarketingSpend, type SpendRecord, type MiscRecord } from '../../utils/marketing-spend';
 import type { MarketingSpendApiItem } from '../../types/marketing-spend';
+import { useAppDispatch, setMarketingSpendLoading, setMarketingSpendRecords } from '../../store';
 import './MarketingSpend.scss';
 import { MarketingSpendEditModal } from './MarketingSpendEditModal';
 import { MarketingSpendDeleteModal } from './MarketingSpendDeleteModal';
@@ -31,6 +32,7 @@ function formatDate(date: string | Date): string {
 
 export default function MarketingSpend() {
     const today = toInputDate(new Date());
+    const dispatch = useAppDispatch();
 
     const [meta, setMeta] = useState<SpendRecord[]>([]);
     const [amazon, setAmazon] = useState<SpendRecord[]>([]);
@@ -97,11 +99,14 @@ export default function MarketingSpend() {
     async function refreshFromServer() {
         try {
             setLoading(true);
+            dispatch(setMarketingSpendLoading(true));
             const all = await loadAllMarketingSpend();
+            dispatch(setMarketingSpendRecords(all));
             applyApiData(all);
         } catch (err) {
             console.error('Failed to reload marketing spend data', err);
             showToast('Failed to reload marketing spend data. Please check that the server is running.', 'error');
+            dispatch(setMarketingSpendLoading(false));
         } finally {
             setLoading(false);
         }
@@ -113,12 +118,14 @@ export default function MarketingSpend() {
         loadAllMarketingSpend()
             .then((all: MarketingSpendApiItem[]) => {
                 if (cancelled) return;
+                dispatch(setMarketingSpendRecords(all));
                 applyApiData(all);
             })
             .catch((err) => {
                 console.error('Failed to load marketing spend data', err);
                 if (!cancelled) {
                     showToast('Failed to load marketing spend data. Please check that the server is running.', 'error');
+                    dispatch(setMarketingSpendLoading(false));
                 }
             })
             .finally(() => {
@@ -128,7 +135,7 @@ export default function MarketingSpend() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [dispatch]);
 
     const filteredMeta = useFilterRows(meta, mode, customFrom, customTo);
     const filteredAmazon = useFilterRows(amazon, mode, customFrom, customTo);
@@ -148,6 +155,15 @@ export default function MarketingSpend() {
         dolchi: filteredDolchi.reduce((s, r) => s + r.amount, 0),
         delhivery: filteredDelhivery.reduce((s, r) => s + r.amount, 0),
         misc: filteredMisc.reduce((s, r) => s + r.amount, 0),
+        totalExpense:
+            filteredMeta.reduce((s, r) => s + r.amount, 0) +
+            filteredAmazon.reduce((s, r) => s + r.amount, 0) +
+            filteredFlipkart.reduce((s, r) => s + r.amount, 0) +
+            filteredCheckout.reduce((s, r) => s + r.amount, 0) +
+            filteredEngage.reduce((s, r) => s + r.amount, 0) +
+            filteredDolchi.reduce((s, r) => s + r.amount, 0) +
+            filteredDelhivery.reduce((s, r) => s + r.amount, 0) +
+            filteredMisc.reduce((s, r) => s + r.amount, 0),
     }), [filteredMeta, filteredAmazon, filteredFlipkart, filteredCheckout, filteredEngage, filteredDolchi, filteredDelhivery, filteredMisc]);
 
     return (
@@ -164,27 +180,27 @@ export default function MarketingSpend() {
                     setCustomTo={setCustomTo}
                 />
                 <div className="marketing-spend-metrics">
+                    <ModernMetricItem
+                        icon="🧾"
+                        label="Total Expense"
+                        value={formatCurrency(totals.totalExpense)}
+                        iconColor="#dc2626"
+                        isLast={false}
+                        isEven={false}
+                    />
                     <ModernMetricItem 
                         icon="📱" 
                         label="Meta Wallet" 
                         value={formatCurrency(totals.meta)} 
                         iconColor="#1877f2"
                         isLast={false}
-                        isEven={false}
+                        isEven={true}
                     />
                     <ModernMetricItem 
                         icon="📦" 
                         label="Amazon Wallet" 
                         value={formatCurrency(totals.amazon)} 
                         iconColor="#ff9900"
-                        isLast={false}
-                        isEven={true}
-                    />
-                    <ModernMetricItem 
-                        icon="🛒" 
-                        label="Flipkart Wallet" 
-                        value={formatCurrency(totals.flipkart)} 
-                        iconColor="#2874f0"
                         isLast={false}
                         isEven={false}
                     />
