@@ -455,8 +455,8 @@ export default function GurugramMarts() {
                                                                 borderRadius: 16,
                                                                 fontSize: 11,
                                                                 fontWeight: 600,
-                                                                background: 'linear-gradient(135deg, var(--bg-elev) 0%, rgba(22, 163, 74, 0.08) 100%)',
-                                                                border: '1px solid rgba(22, 163, 74, 0.2)',
+                                                                background: 'linear-gradient(135deg, var(--bg-elev) 0%, rgba(37, 99, 235, 0.08) 100%)',
+                                                                border: '1px solid rgba(37, 99, 235, 0.2)',
                                                                 color: 'var(--text)',
                                                                 whiteSpace: 'nowrap',
                                                                 boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
@@ -552,7 +552,7 @@ export default function GurugramMarts() {
                                             display: 'block',
                                             fontSize: 13,
                                             fontWeight: 700,
-                                            color: '#166534',
+                                            color: 'var(--primary-strong)',
                                             marginBottom: 6,
                                         }}
                                     >
@@ -596,7 +596,7 @@ export default function GurugramMarts() {
                                             display: 'block',
                                             fontSize: 13,
                                             fontWeight: 700,
-                                            color: '#166534',
+                                            color: 'var(--primary-strong)',
                                             marginBottom: 6,
                                         }}
                                     >
@@ -637,7 +637,7 @@ export default function GurugramMarts() {
                                         display: 'block',
                                         fontSize: 13,
                                         fontWeight: 700,
-                                        color: '#166534',
+                                        color: 'var(--primary-strong)',
                                         marginBottom: 6,
                                     }}
                                 >
@@ -680,7 +680,7 @@ export default function GurugramMarts() {
                                             display: 'block',
                                             fontSize: 13,
                                             fontWeight: 700,
-                                            color: '#166534',
+                                            color: 'var(--primary-strong)',
                                             marginBottom: 6,
                                         }}
                                     >
@@ -718,7 +718,7 @@ export default function GurugramMarts() {
                                             display: 'block',
                                             fontSize: 13,
                                             fontWeight: 700,
-                                            color: '#166534',
+                                            color: 'var(--primary-strong)',
                                             marginBottom: 6,
                                         }}
                                     >
@@ -739,7 +739,7 @@ export default function GurugramMarts() {
                                         display: 'block',
                                         fontSize: 13,
                                         fontWeight: 700,
-                                        color: '#166534',
+                                        color: 'var(--primary-strong)',
                                         marginBottom: 6,
                                     }}
                                 >
@@ -1280,7 +1280,7 @@ function DatePicker({ value, onChange, required, placeholder }: { value: string;
                 }}
             >
                 <span>{displayValue || placeholder || 'Select date'}</span>
-                <span style={{ fontSize: 16, color: '#166534' }}>📅</span>
+                <span style={{ fontSize: 16, color: 'var(--primary-strong)' }}>📅</span>
             </div>
             <input
                 type="date"
@@ -1385,8 +1385,8 @@ function DatePicker({ value, onChange, required, placeholder }: { value: string;
                                     style={{
                                         padding: '10px 4px',
                                         border: 'none',
-                                        background: isSelected ? '#16a34a' : isToday ? '#dcfce7' : 'transparent',
-                                        color: isSelected ? '#ffffff' : isToday ? '#16a34a' : '#111827',
+                                        background: isSelected ? '#2563eb' : isToday ? '#dbeafe' : 'transparent',
+                                        color: isSelected ? '#ffffff' : isToday ? '#1d4ed8' : '#111827',
                                         borderRadius: 8,
                                         cursor: 'pointer',
                                         fontSize: 14,
@@ -1402,7 +1402,7 @@ function DatePicker({ value, onChange, required, placeholder }: { value: string;
                                         if (!isSelected && !isToday) {
                                             e.currentTarget.style.background = 'transparent';
                                         } else if (isToday && !isSelected) {
-                                            e.currentTarget.style.background = '#dcfce7';
+                                            e.currentTarget.style.background = '#dbeafe';
                                         }
                                     }}
                                 >
@@ -1697,13 +1697,13 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                                 borderRadius: 8,
                                                 fontSize: 13,
                                                 fontWeight: 600,
-                                                background: 'linear-gradient(135deg, var(--bg-elev) 0%, rgba(22, 163, 74, 0.1) 100%)',
-                                                border: '1px solid rgba(22, 163, 74, 0.25)',
+                                                background: 'linear-gradient(135deg, var(--bg-elev) 0%, rgba(37, 99, 235, 0.1) 100%)',
+                                                border: '1px solid rgba(37, 99, 235, 0.25)',
                                                 color: 'var(--text)',
                                                 boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
                                             }}
                                         >
-                                            <span style={{ fontWeight: 700, marginRight: 6, color: '#166534' }}>{tag.label}:</span>
+                                            <span style={{ fontWeight: 700, marginRight: 6, color: 'var(--primary-strong)' }}>{tag.label}:</span>
                                             <span style={{ color: 'var(--muted)' }}>{tag.value}</span>
                                         </div>
                                     )) : (
@@ -1732,7 +1732,7 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                     fontSize: 12,
                                     fontWeight: 600,
                                     color: '#ffffff',
-                                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                                     border: 'none',
                                     borderRadius: 6,
                                     cursor: 'pointer',
@@ -1741,11 +1741,11 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                     marginRight: 20,
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'linear-gradient(135deg, #15803d 0%, #166534 100%)';
+                                    e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)';
                                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)';
+                                    e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
                                     e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
                                 }}
                             >
@@ -1838,8 +1838,8 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                                                             borderRadius: 16,
                                                                             fontSize: 11,
                                                                             fontWeight: 600,
-                                                                            background: 'linear-gradient(135deg, var(--bg-elev) 0%, rgba(22, 163, 74, 0.08) 100%)',
-                                                                            border: '1px solid rgba(22, 163, 74, 0.2)',
+                                                                            background: 'linear-gradient(135deg, var(--bg-elev) 0%, rgba(37, 99, 235, 0.08) 100%)',
+                                                                            border: '1px solid rgba(37, 99, 235, 0.2)',
                                                                             color: 'var(--text)',
                                                                             whiteSpace: 'nowrap',
                                                                             boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
@@ -1972,7 +1972,7 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                     fontSize: 12,
                                     fontWeight: 600,
                                     color: '#ffffff',
-                                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                                     border: 'none',
                                     borderRadius: 6,
                                     cursor: 'pointer',
@@ -1981,11 +1981,11 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                     marginRight: 20,
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'linear-gradient(135deg, #15803d 0%, #166534 100%)';
+                                    e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)';
                                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)';
+                                    e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
                                     e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
                                 }}
                             >
@@ -2074,8 +2074,8 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                                                             borderRadius: 16,
                                                                             fontSize: 11,
                                                                             fontWeight: 600,
-                                                                            background: 'linear-gradient(135deg, var(--bg-elev) 0%, rgba(22, 163, 74, 0.08) 100%)',
-                                                                            border: '1px solid rgba(22, 163, 74, 0.2)',
+                                                                            background: 'linear-gradient(135deg, var(--bg-elev) 0%, rgba(37, 99, 235, 0.08) 100%)',
+                                                                            border: '1px solid rgba(37, 99, 235, 0.2)',
                                                                             color: 'var(--text)',
                                                                             whiteSpace: 'nowrap',
                                                                             boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',

@@ -112,17 +112,21 @@ export function StatusFilter<T extends string>({
     value,
     onChange,
     options,
+    layout = 'default',
 }: {
     label: string;
     value: T | '';
     onChange: (val: T | '') => void;
     options: T[];
+    /** `ribbon`: compact pill used on Shopify filter bar */
+    layout?: 'default' | 'ribbon';
 }) {
+    const ribbon = layout === 'ribbon';
     return (
-        <div className="shopify-status-filter">
-            <label className="label">{label}</label>
+        <div className={`shopify-status-filter${ribbon ? ' shopify-status-filter--ribbon' : ''}`}>
+            <label className={ribbon ? 'shopify-status-filter__label' : 'label'}>{label}</label>
             <select
-                className="input"
+                className={ribbon ? 'shopify-status-filter__control' : 'input'}
                 value={value}
                 onChange={(e) => onChange(e.target.value as T | '')}
             >

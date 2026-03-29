@@ -1193,7 +1193,7 @@ function ShippingTimeline({
                             activeColor = '#2563eb';
                             glowColor = 'rgba(37,99,235,0.20)';
                         } else if (step === 'Delivered') {
-                            activeColor = '#16a34a';
+                            activeColor = '#2563eb';
                             glowColor = 'rgba(22,163,74,0.20)';
                         } else if (step === 'RTO') {
                             activeColor = '#b91c1c';

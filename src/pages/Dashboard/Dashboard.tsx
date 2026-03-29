@@ -30,7 +30,7 @@ export default function Dashboard() {
 		labels: monthLabels,
 		datasets: [
 			{ label: 'Sales', data: monthSales, backgroundColor: '#3b82f6' },
-			{ label: 'Delivered', data: monthDelivered, backgroundColor: '#10b981' },
+			{ label: 'Delivered', data: monthDelivered, backgroundColor: '#2563eb' },
 			{ label: 'RTO', data: monthRto, backgroundColor: '#f59e0b' },
 		],
 	};
@@ -38,7 +38,7 @@ export default function Dashboard() {
 	const barData = {
 		labels: ['Sales', 'Delivered', 'In Transit', 'RTO'],
 		datasets: [
-			{ label: 'Count', data: [totals.salesCount, totals.deliveredCount, totals.inTransitCount, totals.rtoCount], backgroundColor: ['#3b82f6', '#10b981', '#60a5fa', '#f59e0b'] }
+			{ label: 'Count', data: [totals.salesCount, totals.deliveredCount, totals.inTransitCount, totals.rtoCount], backgroundColor: ['#1d4ed8', '#2563eb', '#38bdf8', '#f59e0b'] }
 		]
 	};
 
@@ -137,7 +137,7 @@ export default function Dashboard() {
 			{/* Summary KPIs - Compact Row */}
 			<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
 				<CompactMetricCard title="Total Sales" count={totals.salesCount} amount={totals.salesAmount} color="var(--primary)" />
-				<CompactMetricCard title="Delivered" count={totals.deliveredCount} amount={totals.deliveredAmount} color="#10b981" />
+				<CompactMetricCard title="Delivered" count={totals.deliveredCount} amount={totals.deliveredAmount} color="#2563eb" />
 				<CompactMetricCard title="In Transit" count={totals.inTransitCount} amount={totals.inTransitAmount} color="#60a5fa" />
 				<CompactMetricCard title="RTO" count={totals.rtoCount} amount={totals.rtoAmount} color="#f59e0b" />
 				<CompactMetricCard title="Shipping" count={0} amount={Math.round(totals.salesAmount * 0.05)} color="#60a5fa" />

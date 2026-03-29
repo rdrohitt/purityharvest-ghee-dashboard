@@ -61,9 +61,9 @@ function getFeedbackStyle(feedback: string): { background: string; border: strin
     }
     if (value.includes('excellent')) {
         return {
-            background: '#dcfce7',
-            border: '#4ade80',
-            color: '#166534',
+            background: '#dbeafe',
+            border: '#60a5fa',
+            color: 'var(--primary-strong)',
         };
     }
     if (value.includes('average')) {
@@ -547,7 +547,7 @@ export default function Followups() {
                                                     transition: 'color 0.2s'
                                                 }}
                                                 onMouseEnter={(e) => {
-                                                    e.currentTarget.style.color = '#10b981';
+                                                    e.currentTarget.style.color = 'var(--primary)';
                                                     e.currentTarget.style.textDecoration = 'underline';
                                                 }}
                                                 onMouseLeave={(e) => {
@@ -580,9 +580,9 @@ export default function Followups() {
                                                     padding: '2px 6px',
                                                     borderRadius: 4,
                                                     backgroundColor: getCustomerType(f.totalOrders) === 'new' ? '#dbeafe' : 
-                                                                   getCustomerType(f.totalOrders) === 'repeat' ? '#dcfce7' : '#fef3c7',
+                                                                   getCustomerType(f.totalOrders) === 'repeat' ? '#dbeafe' : '#fef3c7',
                                                     color: getCustomerType(f.totalOrders) === 'new' ? '#1e40af' : 
-                                                           getCustomerType(f.totalOrders) === 'repeat' ? '#166534' : '#92400e',
+                                                           getCustomerType(f.totalOrders) === 'repeat' ? 'var(--primary-strong)' : '#92400e',
                                                 }}>
                                                     {getCustomerType(f.totalOrders)}
                                                 </span>
@@ -959,8 +959,8 @@ function DateInput({ value, onChange }: { value: string | null; onChange: (value
                                     style={{
                                         padding: '10px 4px',
                                         border: 'none',
-                                        background: isSelected ? '#16a34a' : isToday ? '#dcfce7' : 'transparent',
-                                        color: isSelected ? '#ffffff' : isToday ? '#16a34a' : '#111827',
+                                        background: isSelected ? '#2563eb' : isToday ? '#dbeafe' : 'transparent',
+                                        color: isSelected ? '#ffffff' : isToday ? '#1d4ed8' : '#111827',
                                         borderRadius: 8,
                                         cursor: 'pointer',
                                         fontSize: 14,
@@ -976,7 +976,7 @@ function DateInput({ value, onChange }: { value: string | null; onChange: (value
                                         if (!isSelected && !isToday) {
                                             e.currentTarget.style.background = 'transparent';
                                         } else if (isToday && !isSelected) {
-                                            e.currentTarget.style.background = '#dcfce7';
+                                            e.currentTarget.style.background = '#dbeafe';
                                         }
                                     }}
                                 >

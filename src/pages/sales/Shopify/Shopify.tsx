@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { apiFetch } from '../../../api';
 import { updateOrder, deleteOrder, type Order, type OrderItem, type PaymentStatus, type FulfillmentStatus, type DeliveryStatus, type Platform, type OrderType } from '../../../utils/orders';
 import { loadOrdersFromApi, shopifyOrderToOrder, fetchOrderById, orderDetailToOrder, mapDeliveryStatusFromTracking, mapFulfillmentStatus, mapOrderType, getOrderCustomerName, getOrderCustomerPhone, updateShopifyOrderFromForm } from '../../../utils/shopify-orders';
-import type { ShopifyOrderApi, ShopifyOrderCustomer } from '../../../types/shopify';
+import type { ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../../../types/shopify';
 import { loadProducts, type ProductApiItem } from '../../../utils/products';
 import type { MarketingSpendApiItem } from '../../../types/marketing-spend';
 import { loadAllMarketingSpend } from '../../../utils/marketing-spend';
-import { useAppDispatch, useAppSelector, setProducts, setProductsLoading, setMarketingSpendLoading, setMarketingSpendRecords } from '../../../store';
+import { useAppDispatch, useAppSelector, setProducts, setProductsLoading } from '../../../store';
 import AddOrderModal, { type ProductVariantOption } from './AddOrderModal';
 import { CustomerProfileModal } from './CustomerProfileModal';
 import { DatePicker } from './DatePicker';
@@ -19,6 +19,60 @@ import './Shopify.scss';
 
 type UiRange = 'all' | 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
 type CategoryTab = 'all' | 'milk' | 'ghee' | 'oils';
+
+/** Liters sold for each ghee product line (matched by product name from API / catalog). */
+export type GheeLitersByKind = { gir: number; desi: number; buffalo: number };
+
+function getShopifyLineProductName(line: ShopifyOrderProduct, productMap: Map<string, ProductApiItem>): string {
+    const raw = line.productId;
+    if (raw && typeof raw === 'object' && 'name' in raw) {
+        return String((raw as { name?: string }).name || '').trim();
+    }
+    const id = typeof raw === 'string' ? raw : '';
+    if (id) {
+        const p = productMap.get(id);
+        if (p?.name) return String(p.name).trim();
+    }
+    return '';
+}
+
+/** Map Gir / Desi / Buffalo from product name or from a full variant label. */
+function classifyGheeKindFromText(text: string): keyof GheeLitersByKind | null {
+    const n = text.toLowerCase();
+    if (!n) return null;
+    if (n.includes('buffalo')) return 'buffalo';
+    if (n.includes('gir')) return 'gir';
+    if (n.includes('desi')) return 'desi';
+    return null;
+}
+
+/**
+ * Pack-size bucket used by the quantity table and headline "total liters" (must stay in sync).
+ * Only 500 ml, 1 L, 5 L (plus 250 ml → same bucket as 500 ml for counting).
+ */
+function resolveShopifyVariantSizeKey(variantName: string): '' | '500ml' | '1ltr' | '5ltr' {
+    const sizeMatch = variantName.match(/-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|L)/i);
+    if (!sizeMatch) return '';
+    const sizeValue = parseFloat(sizeMatch[1]);
+    const sizeUnit = sizeMatch[2].toLowerCase();
+    let sizeKey: '' | '500ml' | '1ltr' | '5ltr' = '';
+    if (sizeUnit === 'ml') {
+        if (sizeValue === 500) sizeKey = '500ml';
+        else if (sizeValue === 1000) sizeKey = '1ltr';
+        else if (sizeValue === 5000) sizeKey = '5ltr';
+        else if (sizeValue === 250) sizeKey = '500ml';
+    } else if (sizeUnit === 'l' || sizeUnit === 'ltr') {
+        if (sizeValue === 1) sizeKey = '1ltr';
+        else if (sizeValue === 5) sizeKey = '5ltr';
+    }
+    return sizeKey;
+}
+
+function litersInTableBucket(sizeKey: '500ml' | '1ltr' | '5ltr', quantity: number): number {
+    if (sizeKey === '500ml') return 0.5 * quantity;
+    if (sizeKey === '1ltr') return quantity;
+    return 5 * quantity;
+}
 
 type ShopifyProps = {
     /**
@@ -53,8 +107,10 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const dispatch = useAppDispatch();
     const products = useAppSelector((state) => state.products.products);
     const productsLoading = useAppSelector((state) => state.products.loading);
-    const marketingSpendRecords = useAppSelector((state) => state.marketingSpend.records);
-    const marketingSpendLoading = useAppSelector((state) => state.marketingSpend.loading);
+    // Marketing spend must come directly from the API (not Redux),
+    // otherwise EBITA + misc/shipping values can be stale when navigating modules.
+    const [marketingSpendRecords, setMarketingSpendRecords] = useState<MarketingSpendApiItem[]>([]);
+    const [marketingSpendLoading, setMarketingSpendLoading] = useState(true);
     const [loading, setLoading] = useState(true);
     const [categoryTab, setCategoryTab] = useState<CategoryTab>('ghee');
     const [syncingShopify, setSyncingShopify] = useState(false);
@@ -120,28 +176,27 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
     useEffect(() => {
         let cancelled = false;
-        if (marketingSpendRecords.length > 0 || marketingSpendLoading) {
-            return;
-        }
+        setMarketingSpendLoading(true);
 
-        dispatch(setMarketingSpendLoading(true));
         loadAllMarketingSpend()
             .then((data) => {
                 if (!cancelled) {
-                    dispatch(setMarketingSpendRecords(data));
+                    setMarketingSpendRecords(data);
                 }
             })
             .catch((err) => {
                 console.error('Failed to load marketing spend data', err);
+            })
+            .finally(() => {
                 if (!cancelled) {
-                    dispatch(setMarketingSpendLoading(false));
+                    setMarketingSpendLoading(false);
                 }
             });
 
         return () => {
             cancelled = true;
         };
-    }, [dispatch, marketingSpendRecords.length, marketingSpendLoading]);
+    }, []);
 
     const getLocalDateString = (date: Date): string => {
         const year = date.getFullYear();
@@ -500,29 +555,32 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             const delStatus = deliveryStatusFor(o);
             (o.products || []).forEach(p => {
                 const variantName = p.variantName || '';
-                const sizeMatch = variantName.match(/-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|L)/i);
-                if (sizeMatch) {
-                    const sizeValue = parseFloat(sizeMatch[1]);
-                    const sizeUnit = sizeMatch[2].toLowerCase();
-                    let sizeKey = '';
-                    if (sizeUnit === 'ml') {
-                        if (sizeValue === 500) sizeKey = '500ml';
-                        else if (sizeValue === 1000) sizeKey = '1ltr';
-                        else if (sizeValue === 5000) sizeKey = '5ltr';
-                        else if (sizeValue === 250) sizeKey = '500ml';
-                    } else if (sizeUnit === 'l' || sizeUnit === 'ltr') {
-                        if (sizeValue === 1) sizeKey = '1ltr';
-                        else if (sizeValue === 5) sizeKey = '5ltr';
-                    }
-                    if (sizeKey && quantityBySize.hasOwnProperty(sizeKey)) {
-                        quantityBySize[sizeKey] += p.quantity;
-                        if (delStatus === 'Delivered') deliveredQuantityBySize[sizeKey] += p.quantity;
-                        if (delStatus === 'RTO') rtoQuantityBySize[sizeKey] += p.quantity;
-                        if (delStatus === 'In Transit') inTransitQuantityBySize[sizeKey] += p.quantity;
-                    }
+                const sizeKey = resolveShopifyVariantSizeKey(variantName);
+                if (sizeKey) {
+                    quantityBySize[sizeKey] += p.quantity;
+                    if (delStatus === 'Delivered') deliveredQuantityBySize[sizeKey] += p.quantity;
+                    if (delStatus === 'RTO') rtoQuantityBySize[sizeKey] += p.quantity;
+                    if (delStatus === 'In Transit') inTransitQuantityBySize[sizeKey] += p.quantity;
                 }
             });
         });
+
+        const gheeLitersByKind: GheeLitersByKind = { gir: 0, desi: 0, buffalo: 0 };
+        filtered.forEach((o: ShopifyOrderApi) => {
+            (o.products || []).forEach((p) => {
+                const productName = getShopifyLineProductName(p, productMap);
+                const variantLabel = String(p.variantName || '');
+                const kind =
+                    classifyGheeKindFromText(productName) ?? classifyGheeKindFromText(variantLabel);
+                if (!kind) return;
+                const sizeKey = resolveShopifyVariantSizeKey(variantLabel);
+                if (!sizeKey) return;
+                const L = litersInTableBucket(sizeKey, Number(p.quantity || 0));
+                if (L <= 0) return;
+                gheeLitersByKind[kind] += L;
+            });
+        });
+
         const rtoOrders = filtered.filter((o: ShopifyOrderApi) => deliveryStatusFor(o) === 'RTO');
         const rto = rtoOrders.length;
         const rtoAmount = rtoOrders.reduce((s, o) => s + o.totalAmount, 0);
@@ -534,6 +592,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             deliveredQuantityBySize,
             rtoQuantityBySize,
             inTransitQuantityBySize,
+            gheeLitersByKind,
             codCharges,
             shippingCharges,
             roasCurrent,
@@ -729,39 +788,45 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             </button>
                         </div>
                     </div>
-                    <div className="status-filters-row shopify-status-filters">
+                    <div className="status-filters-row shopify-status-filters shopify-status-filters--toolbar">
                         <StatusFilter
-                            label="Payment Mode"
+                            layout="ribbon"
+                            label="Payment"
                             value={paymentStatusFilter}
                             onChange={setPaymentStatusFilter}
                             options={['COD', 'PAID'] as PaymentStatus[]}
                         />
                         <StatusFilter
-                            label="Fulfillment"
+                            layout="ribbon"
+                            label="Fulfill"
                             value={fulfillmentStatusFilter}
                             onChange={setFulfillmentStatusFilter}
                             options={['Unfulfilled', 'Fulfilled', 'Partial'] as FulfillmentStatus[]}
                         />
                         <StatusFilter
+                            layout="ribbon"
                             label="Delivery"
                             value={deliveryStatusFilter}
                             onChange={setDeliveryStatusFilter}
                             options={['In Transit', 'Delivered', 'RTO', 'Pending Pickup'] as DeliveryStatus[]}
                         />
                         <StatusFilter
+                            layout="ribbon"
                             label="Platform"
                             value={platformFilter}
                             onChange={setPlatformFilter}
                             options={['Shopify', 'Abandoned', 'Whatsapp', 'Amazon', 'Flipkart'] as Platform[]}
                         />
                         <StatusFilter
+                            layout="ribbon"
                             label="Type"
                             value={typeFilter}
                             onChange={setTypeFilter}
                             options={['New', 'Repeat', 'Reference'] as OrderType[]}
                         />
-                        <button 
-                            className="filter-btn shopify-export-btn" 
+                        <button
+                            type="button"
+                            className="shopify-export-btn"
                             onClick={() => {
                                 // Export to CSV
                                 const headers = ['S.no', 'Name', 'Mobile', 'Quantity (L)', 'Amount', 'Shipping Status', 'State'];
@@ -819,12 +884,17 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                 showToast('Orders exported successfully!', 'success');
                             }}
                         >
-                            <span>📥</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
                             Export CSV
                         </button>
                         {(paymentStatusFilter || fulfillmentStatusFilter || deliveryStatusFilter || platformFilter || typeFilter) ? (
-                            <button 
-                                className="filter-btn shopify-clear-filters-btn" 
+                            <button
+                                type="button"
+                                className="shopify-clear-filters-btn"
                                 onClick={() => { 
                                     setPaymentStatusFilter(''); 
                                     setFulfillmentStatusFilter(''); 
@@ -838,8 +908,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         ) : null}
                     </div>
                 </div>
-                <div className="shopify-metrics-row">
-                    <ModernSalesWithEBITAMetric 
+                <div className="shopify-dash-grid">
+                    <ModernSalesWithEBITAMetric
                         totalSales={metrics.totalSales}
                         ebita={metrics.ebita}
                         expectedEbita={metrics.expectedEbita}
@@ -848,37 +918,23 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         metaSpend={metrics.metaSpend}
                         miscCost={metrics.miscSpend}
                         delhiveryCost={metrics.delhiverySpend}
-                        iconColor="#16a34a"
-                        isLast={false}
-                        isEven={false}
-                        isWide={true}
                     />
-                    <ModernQuantityMetric 
+                    <ModernQuantityMetric
                         quantityBySize={metrics.quantityBySize}
                         deliveredQuantityBySize={metrics.deliveredQuantityBySize}
                         rtoQuantityBySize={metrics.rtoQuantityBySize}
                         inTransitQuantityBySize={metrics.inTransitQuantityBySize}
-                        iconColor="#3b82f6"
-                        isLast={false}
-                        isEven={true}
+                        gheeLitersByKind={metrics.gheeLitersByKind}
                     />
-                    <ModernDeliveryStatusMetric 
+                    <ModernDeliveryStatusMetric
                         delivered={metrics.delivered}
                         deliveredAmount={metrics.deliveredAmount}
                         rto={metrics.rto}
                         rtoAmount={metrics.rtoAmount}
                         inTransit={metrics.inTransit}
                         inTransitAmount={metrics.inTransitAmount}
-                        isLast={false}
-                        isEven={false}
                     />
-                    <ModernRoasMetric
-                        currentRoas={metrics.roasCurrent}
-                        expectedRoas={metrics.roasExpected}
-                        iconColor="#ec4899"
-                        isLast={true}
-                        isEven={true}
-                    />
+                    <ModernRoasMetric currentRoas={metrics.roasCurrent} expectedRoas={metrics.roasExpected} />
                 </div>
 
                 {showCustom ? (
@@ -917,7 +973,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             <ShopifyOrdersTable
                 groupedByDate={groupedByDate}
                 marketingSpend={marketingSpendForSummary}
-                loading={loading}
+                loading={loading || marketingSpendLoading}
                 orderCount={filtered.length}
                 onCustomerClick={(customerId, phone) => {
                     setCustomerProfileLoading(true);
@@ -1101,48 +1157,106 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     );
 }
 
-
-function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { icon: string; label: string; value: string; iconColor: string; isLast: boolean; isEven: boolean }) {
+function IconWallet() {
     return (
-        <div className={`shopify-metric ${isEven ? 'shopify-metric--even' : ''} ${isLast ? 'shopify-metric--last' : ''}`}>
-            <div className="shopify-metric-header">
-                <span className="shopify-metric-icon">{icon}</span>
-                <div className="shopify-metric-label">{label}</div>
-            </div>
-            <div className="shopify-metric-value">{value}</div>
-        </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+            <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+        </svg>
     );
 }
 
-function ModernRoasMetric({
-    currentRoas,
-    expectedRoas,
-    iconColor,
-    isLast,
-    isEven,
-}: {
-    currentRoas: number;
-    expectedRoas: number;
-    iconColor: string;
-    isLast: boolean;
-    isEven: boolean;
-}) {
+function IconBars() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <line x1="12" y1="20" x2="12" y2="10" />
+            <line x1="18" y1="20" x2="18" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="16" />
+        </svg>
+    );
+}
+
+function IconPackage() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+            <line x1="12" y1="22.08" x2="12" y2="12" />
+        </svg>
+    );
+}
+
+function IconTrending() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+            <polyline points="16 7 22 7 22 13" />
+        </svg>
+    );
+}
+
+function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { icon: string; label: string; value: string; iconColor: string; isLast: boolean; isEven: boolean }) {
+    return (
+        <article className="shopify-dash-card shopify-dash-card--plain">
+            <header className="shopify-dash-card__head">
+                <span className="shopify-dash-card__icon shopify-dash-card__icon--plain" style={{ color: iconColor }} aria-hidden>
+                    {icon}
+                </span>
+                <h3 className="shopify-dash-card__heading">{label}</h3>
+            </header>
+            <p className="shopify-dash-card__figure shopify-dash-card__figure--sm">{value}</p>
+        </article>
+    );
+}
+
+function ModernRoasMetric({ currentRoas, expectedRoas }: { currentRoas: number; expectedRoas: number }) {
     const formatRoas = (v: number): string => {
         if (!Number.isFinite(v) || v <= 0) return '—';
         return v.toFixed(2);
     };
 
+    const gaugeDeg =
+        Number.isFinite(currentRoas) &&
+        currentRoas > 0 &&
+        Number.isFinite(expectedRoas) &&
+        expectedRoas > 0
+            ? Math.min(360, (currentRoas / expectedRoas) * 360)
+            : Number.isFinite(currentRoas) && currentRoas > 0
+              ? Math.min(360, (currentRoas / 5) * 360)
+              : 0;
+
     return (
-        <div className={`shopify-metric ${isEven ? 'shopify-metric--even' : ''} ${isLast ? 'shopify-metric--last' : ''}`}>
-            <div className="shopify-metric-header">
-                <span className="shopify-metric-icon" style={{ color: iconColor }}>📊</span>
-                <div className="shopify-metric-label">ROAS</div>
+        <article className="shopify-dash-card shopify-dash-card--roas">
+            <div className="shopify-dash-card__accent" aria-hidden />
+            <div className="shopify-dash-card__noise" aria-hidden />
+            <header className="shopify-dash-card__head">
+                <div className="shopify-dash-card__icon" aria-hidden>
+                    <IconTrending />
+                </div>
+                <div className="shopify-dash-card__titles">
+                    <p className="shopify-dash-card__eyebrow">Ads efficiency</p>
+                    <h3 className="shopify-dash-card__heading">Return on ad spend</h3>
+                </div>
+            </header>
+            <div className="shopify-dash-card__roas-body">
+                <div
+                    className="shopify-dash-card__gauge"
+                    style={{ '--shopify-gauge-deg': `${gaugeDeg}deg` } as CSSProperties}
+                    role="img"
+                    aria-label={`ROAS ${formatRoas(currentRoas)}, expected ${formatRoas(expectedRoas)}`}
+                >
+                    <div className="shopify-dash-card__gauge-cutout">
+                        <span className="shopify-dash-card__gauge-value">{formatRoas(currentRoas)}</span>
+                        <span className="shopify-dash-card__gauge-label">current</span>
+                    </div>
+                </div>
+                <div className="shopify-dash-card__roas-side">
+                    <p className="shopify-dash-card__compare-label">Target</p>
+                    <p className="shopify-dash-card__compare-value">{formatRoas(expectedRoas)}</p>
+                    <p className="shopify-dash-card__compare-hint">expected ROAS</p>
+                </div>
             </div>
-            <div className="shopify-metric-body">
-                <div className="shopify-metric-value">{formatRoas(currentRoas)}</div>
-                <div className="shopify-metric-amount">Expected: {formatRoas(expectedRoas)}</div>
-            </div>
-        </div>
+        </article>
     );
 }
 
@@ -1155,10 +1269,6 @@ function ModernSalesWithEBITAMetric({
     metaSpend,
     miscCost,
     delhiveryCost,
-    iconColor,
-    isLast,
-    isEven,
-    isWide,
 }: {
     totalSales: number;
     ebita: number;
@@ -1168,129 +1278,214 @@ function ModernSalesWithEBITAMetric({
     metaSpend: number;
     miscCost: number;
     delhiveryCost: number;
-    iconColor: string;
-    isLast: boolean;
-    isEven: boolean;
-    isWide?: boolean;
 }) {
     return (
-        <div className={`shopify-metric ${isWide ? 'shopify-metric--wide' : ''} ${isEven ? 'shopify-metric--even' : ''} ${isLast ? 'shopify-metric--last' : ''}`}>
-            <div className="shopify-metric-header">
-                <span className="shopify-metric-icon">💰</span>
-                <div className="shopify-metric-label">Total Sales / EBITA</div>
+        <article className="shopify-dash-card shopify-dash-card--sales">
+            <div className="shopify-dash-card__accent" aria-hidden />
+            <div className="shopify-dash-card__noise" aria-hidden />
+            <header className="shopify-dash-card__head">
+                <div className="shopify-dash-card__icon" aria-hidden>
+                    <IconWallet />
+                </div>
+                <div className="shopify-dash-card__titles">
+                    <p className="shopify-dash-card__eyebrow">Revenue</p>
+                    <h3 className="shopify-dash-card__heading">Sales & EBITA</h3>
+                </div>
+            </header>
+            <div className="shopify-dash-card__hero">
+                <p className="shopify-dash-card__figure">{formatCurrency(totalSales)}</p>
+                <p className="shopify-dash-card__caption">Total sales in range</p>
             </div>
-            <div className="shopify-metric-body">
-                <div className="shopify-metric-value">{formatCurrency(totalSales)}</div>
-                <div className={`shopify-metric-ebita-row ${ebita >= 0 ? 'shopify-metric-ebita--positive' : 'shopify-metric-ebita--negative'}`}>
-                    EBITA: {formatCurrency(ebita)}
+            <div className="shopify-dash-card__stat-row">
+                <div className={`shopify-dash-card__stat ${ebita >= 0 ? 'shopify-dash-card__stat--pos' : 'shopify-dash-card__stat--neg'}`}>
+                    <span className="shopify-dash-card__stat-k">EBITA</span>
+                    <span className="shopify-dash-card__stat-v">{formatCurrency(ebita)}</span>
                 </div>
-                <div className={`shopify-metric-ebita-row ${expectedEbita >= 0 ? 'shopify-metric-ebita--positive' : 'shopify-metric-ebita--negative'}`}>
-                    Expected EBITA (incl. In Transit): {formatCurrency(expectedEbita)}
-                </div>
-                <div className="shopify-metric-breakdown">
-                    <div className="shopify-metric-breakdown-row"><span>Manufacturing (Delivered):</span><span>{formatCurrency(manufacturingCost)}</span></div>
-                    <div className="shopify-metric-breakdown-row"><span>Manufacturing (Expected):</span><span>{formatCurrency(expectedManufacturingCost)}</span></div>
-                    <div className="shopify-metric-breakdown-row"><span>Meta:</span><span>{formatCurrency(metaSpend)}</span></div>
-                    <div className="shopify-metric-breakdown-row"><span>Misc:</span><span>{formatCurrency(miscCost)}</span></div>
-                    <div className="shopify-metric-breakdown-row"><span>Delhivery:</span><span>{formatCurrency(delhiveryCost)}</span></div>
+                <div className={`shopify-dash-card__stat ${expectedEbita >= 0 ? 'shopify-dash-card__stat--pos' : 'shopify-dash-card__stat--neg'}`}>
+                    <span className="shopify-dash-card__stat-k">Expected</span>
+                    <span className="shopify-dash-card__stat-v">{formatCurrency(expectedEbita)}</span>
+                    <span className="shopify-dash-card__stat-h">Incl. in-transit orders</span>
                 </div>
             </div>
-        </div>
+            <section className="shopify-dash-card__panel" aria-label="Cost breakdown">
+                <div className="shopify-dash-card__panel-head">
+                    <span className="shopify-dash-card__panel-title">Costs</span>
+                </div>
+                <ul className="shopify-dash-card__cost-list">
+                    <li><span>Mfg · delivered</span><span>{formatCurrency(manufacturingCost)}</span></li>
+                    <li><span>Mfg · expected</span><span>{formatCurrency(expectedManufacturingCost)}</span></li>
+                    <li><span>Meta ads</span><span>{formatCurrency(metaSpend)}</span></li>
+                    <li><span>Misc</span><span>{formatCurrency(miscCost)}</span></li>
+                    <li><span>Delhivery</span><span>{formatCurrency(delhiveryCost)}</span></li>
+                </ul>
+            </section>
+        </article>
     );
 }
 
-function ModernDeliveryStatusMetric({ delivered, deliveredAmount, rto, rtoAmount, inTransit, inTransitAmount, isLast, isEven }: { delivered: number; deliveredAmount: number; rto: number; rtoAmount: number; inTransit: number; inTransitAmount: number; isLast: boolean; isEven: boolean }) {
+function ModernDeliveryStatusMetric({
+    delivered,
+    deliveredAmount,
+    rto,
+    rtoAmount,
+    inTransit,
+    inTransitAmount,
+}: {
+    delivered: number;
+    deliveredAmount: number;
+    rto: number;
+    rtoAmount: number;
+    inTransit: number;
+    inTransitAmount: number;
+}) {
     return (
-        <div className={`shopify-metric ${isEven ? 'shopify-metric--even' : ''} ${isLast ? 'shopify-metric--last' : ''}`}>
-            <div className="shopify-metric-header">
-                <span className="shopify-metric-icon">📦</span>
-                <div className="shopify-metric-label">Shipping Status</div>
-            </div>
-            <div className="shopify-metric-body">
-                <div className="shopify-metric-delivery-row"><span className="shopify-metric-delivery--delivered">✅ Delivered</span><span>{delivered} - {formatCurrency(deliveredAmount)}</span></div>
-                <div className="shopify-metric-delivery-row"><span className="shopify-metric-delivery--rto">↩️ RTO</span><span>{rto} - {formatCurrency(rtoAmount)}</span></div>
-                <div className="shopify-metric-delivery-row"><span className="shopify-metric-delivery--transit">🚚 In Transit</span><span>{inTransit} - {formatCurrency(inTransitAmount)}</span></div>
-            </div>
-        </div>
+        <article className="shopify-dash-card shopify-dash-card--ship">
+            <div className="shopify-dash-card__accent" aria-hidden />
+            <div className="shopify-dash-card__noise" aria-hidden />
+            <header className="shopify-dash-card__head">
+                <div className="shopify-dash-card__icon" aria-hidden>
+                    <IconPackage />
+                </div>
+                <div className="shopify-dash-card__titles">
+                    <p className="shopify-dash-card__eyebrow">Fulfillment</p>
+                    <h3 className="shopify-dash-card__heading">Shipping pipeline</h3>
+                </div>
+            </header>
+            <ul className="shopify-dash-card__ship-list">
+                <li className="shopify-dash-card__ship-item shopify-dash-card__ship-item--delivered">
+                    <div className="shopify-dash-card__ship-track" />
+                    <div className="shopify-dash-card__ship-body">
+                        <span className="shopify-dash-card__ship-name">Delivered</span>
+                        <span className="shopify-dash-card__ship-count">{delivered} orders</span>
+                    </div>
+                    <span className="shopify-dash-card__ship-amt">{formatCurrency(deliveredAmount)}</span>
+                </li>
+                <li className="shopify-dash-card__ship-item shopify-dash-card__ship-item--rto">
+                    <div className="shopify-dash-card__ship-track" />
+                    <div className="shopify-dash-card__ship-body">
+                        <span className="shopify-dash-card__ship-name">RTO</span>
+                        <span className="shopify-dash-card__ship-count">{rto} orders</span>
+                    </div>
+                    <span className="shopify-dash-card__ship-amt">{formatCurrency(rtoAmount)}</span>
+                </li>
+                <li className="shopify-dash-card__ship-item shopify-dash-card__ship-item--transit">
+                    <div className="shopify-dash-card__ship-track" />
+                    <div className="shopify-dash-card__ship-body">
+                        <span className="shopify-dash-card__ship-name">In transit</span>
+                        <span className="shopify-dash-card__ship-count">{inTransit} orders</span>
+                    </div>
+                    <span className="shopify-dash-card__ship-amt">{formatCurrency(inTransitAmount)}</span>
+                </li>
+            </ul>
+        </article>
     );
 }
 
-function ModernQuantityMetric({ quantityBySize, deliveredQuantityBySize, rtoQuantityBySize, inTransitQuantityBySize, iconColor, isLast, isEven }: { quantityBySize: { [key: string]: number }; deliveredQuantityBySize: { [key: string]: number }; rtoQuantityBySize: { [key: string]: number }; inTransitQuantityBySize: { [key: string]: number }; iconColor: string; isLast: boolean; isEven: boolean }) {
+function ModernQuantityMetric({
+    quantityBySize,
+    deliveredQuantityBySize,
+    rtoQuantityBySize,
+    inTransitQuantityBySize,
+    gheeLitersByKind,
+}: {
+    quantityBySize: { [key: string]: number };
+    deliveredQuantityBySize: { [key: string]: number };
+    rtoQuantityBySize: { [key: string]: number };
+    inTransitQuantityBySize: { [key: string]: number };
+    gheeLitersByKind: GheeLitersByKind;
+}) {
     const totalQuantityInLiters = (quantityBySize['500ml'] || 0) * 0.5 + (quantityBySize['1ltr'] || 0) * 1 + (quantityBySize['5ltr'] || 0) * 5;
     const totalDeliveredInLiters = (deliveredQuantityBySize['500ml'] || 0) * 0.5 + (deliveredQuantityBySize['1ltr'] || 0) * 1 + (deliveredQuantityBySize['5ltr'] || 0) * 5;
     const formatLiters = (liters: number): string => (liters % 1 === 0 ? liters.toLocaleString() + ' L' : liters.toFixed(1).replace(/\.?0+$/, '') + ' L');
 
+    const sizeRows: { key: '500ml' | '1ltr' | '5ltr'; label: string }[] = [
+        { key: '500ml', label: '500 ml' },
+        { key: '1ltr', label: '1 L' },
+        { key: '5ltr', label: '5 L' },
+    ];
+
     return (
-        <div className={`shopify-metric ${isEven ? 'shopify-metric--even' : ''} ${isLast ? 'shopify-metric--last' : ''}`}>
-            <div className="shopify-metric-header">
-                <span className="shopify-metric-icon">📊</span>
-                <div className="shopify-metric-label">Quantity</div>
-            </div>
-            <div className="shopify-metric-body">
-                <div className="shopify-metric-qty-total">{formatLiters(totalQuantityInLiters)}</div>
-                <div className="shopify-metric-qty-delivered">Delivered: {formatLiters(totalDeliveredInLiters)}</div>
-                <div className="shopify-metric-qty-sizes">
-                    {quantityBySize['500ml'] > 0 && (
-                        <div className="shopify-metric-qty-row">
-                            <span className="shopify-metric-qty-size-label">500ml</span>
-                            <span className="shopify-metric-qty-size-vals">
-                                <span className="shopify-metric-qty-val--total">{quantityBySize['500ml'].toLocaleString()}</span>
-                                <span className="shopify-metric-qty-arrow">→</span>
-                                <span className="shopify-metric-qty-val--delivered">{(deliveredQuantityBySize['500ml'] || 0).toLocaleString()}</span>
-                                <span className="shopify-metric-qty-arrow">→</span>
-                                <span className="shopify-metric-qty-val--rto">{(rtoQuantityBySize['500ml'] || 0).toLocaleString()}</span>
-                                <span className="shopify-metric-qty-arrow">→</span>
-                                <span className="shopify-metric-qty-val--transit">{(inTransitQuantityBySize['500ml'] || 0).toLocaleString()}</span>
-                            </span>
-                        </div>
-                    )}
-                    {quantityBySize['1ltr'] > 0 && (
-                        <div className="shopify-metric-qty-row">
-                            <span className="shopify-metric-qty-size-label">1ltr</span>
-                            <span className="shopify-metric-qty-size-vals">
-                                <span className="shopify-metric-qty-val--total">{quantityBySize['1ltr'].toLocaleString()}</span>
-                                <span className="shopify-metric-qty-arrow">→</span>
-                                <span className="shopify-metric-qty-val--delivered">{(deliveredQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
-                                <span className="shopify-metric-qty-arrow">→</span>
-                                <span className="shopify-metric-qty-val--rto">{(rtoQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
-                                <span className="shopify-metric-qty-arrow">→</span>
-                                <span className="shopify-metric-qty-val--transit">{(inTransitQuantityBySize['1ltr'] || 0).toLocaleString()}</span>
-                            </span>
-                        </div>
-                    )}
-                    {quantityBySize['5ltr'] > 0 && (
-                        <div className="shopify-metric-qty-row">
-                            <span className="shopify-metric-qty-size-label">5ltr</span>
-                            <span className="shopify-metric-qty-size-vals">
-                                <span className="shopify-metric-qty-val--total">{quantityBySize['5ltr'].toLocaleString()}</span>
-                                <span className="shopify-metric-qty-arrow">→</span>
-                                <span className="shopify-metric-qty-val--delivered">{(deliveredQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
-                                <span className="shopify-metric-qty-arrow">→</span>
-                                <span className="shopify-metric-qty-val--rto">{(rtoQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
-                                <span className="shopify-metric-qty-arrow">→</span>
-                                <span className="shopify-metric-qty-val--transit">{(inTransitQuantityBySize['5ltr'] || 0).toLocaleString()}</span>
-                            </span>
-                        </div>
-                    )}
+        <article className="shopify-dash-card shopify-dash-card--qty">
+            <div className="shopify-dash-card__accent" aria-hidden />
+            <div className="shopify-dash-card__noise" aria-hidden />
+            <header className="shopify-dash-card__head">
+                <div className="shopify-dash-card__icon" aria-hidden>
+                    <IconBars />
                 </div>
-                {totalQuantityInLiters === 0 && <div className="shopify-metric-qty-zero">0 L</div>}
+                <div className="shopify-dash-card__titles">
+                    <p className="shopify-dash-card__eyebrow">Volume</p>
+                    <h3 className="shopify-dash-card__heading">Quantity</h3>
+                </div>
+            </header>
+            <div className="shopify-dash-card__hero shopify-dash-card__hero--split">
+                <div>
+                    <p className="shopify-dash-card__figure shopify-dash-card__figure--qty">{formatLiters(totalQuantityInLiters)}</p>
+                    <p className="shopify-dash-card__caption">Total liters</p>
+                </div>
+                <div className="shopify-dash-card__pill shopify-dash-card__pill--ok">
+                    <span className="shopify-dash-card__pill-k">Delivered</span>
+                    <span className="shopify-dash-card__pill-v">{formatLiters(totalDeliveredInLiters)}</span>
+                </div>
             </div>
-        </div>
+            <section className="shopify-dash-card__ghee-strip" aria-label="Ghee volume by type">
+                <p className="shopify-dash-card__ghee-strip-title">Ghee · total liters by type</p>
+                <div className="shopify-dash-card__ghee-cols">
+                    <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--gir">
+                        <span className="shopify-dash-card__ghee-label">Gir cow</span>
+                        <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.gir)}</span>
+                    </div>
+                    <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--desi">
+                        <span className="shopify-dash-card__ghee-label">Desi cow</span>
+                        <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.desi)}</span>
+                    </div>
+                    <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--buffalo">
+                        <span className="shopify-dash-card__ghee-label">Buffalo </span>
+                        <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.buffalo)}</span>
+                    </div>
+                </div>
+            </section>
+            {totalQuantityInLiters > 0 ? (
+                <div className="shopify-dash-card__table-wrap">
+                    <div className="shopify-dash-card__table" role="table" aria-label="Units by pack size and status">
+                        <div className="shopify-dash-card__tr shopify-dash-card__tr--head" role="row">
+                            <span role="columnheader">Size</span>
+                            <span role="columnheader" title="Total">Tot</span>
+                            <span role="columnheader" title="Delivered">Del</span>
+                            <span role="columnheader">RTO</span>
+                            <span role="columnheader" title="In transit">Trn</span>
+                        </div>
+                        {sizeRows.map(({ key, label }) =>
+                            quantityBySize[key] > 0 ? (
+                                <div key={key} className="shopify-dash-card__tr" role="row">
+                                    <span className="shopify-dash-card__td--lead" role="cell">{label}</span>
+                                    <span className="shopify-dash-card__td--t" role="cell">{quantityBySize[key].toLocaleString()}</span>
+                                    <span className="shopify-dash-card__td--d" role="cell">{(deliveredQuantityBySize[key] || 0).toLocaleString()}</span>
+                                    <span className="shopify-dash-card__td--r" role="cell">{(rtoQuantityBySize[key] || 0).toLocaleString()}</span>
+                                    <span className="shopify-dash-card__td--i" role="cell">{(inTransitQuantityBySize[key] || 0).toLocaleString()}</span>
+                                </div>
+                            ) : null,
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <p className="shopify-dash-card__empty">No volume in this range</p>
+            )}
+        </article>
     );
 }
 
 function ModernMetricItemWithAmount({ icon, label, count, amount, iconColor, isLast, isEven }: { icon: string; label: string; count: number; amount: number; iconColor: string; isLast: boolean; isEven: boolean }) {
     return (
-        <div className={`shopify-metric ${isEven ? 'shopify-metric--even' : ''} ${isLast ? 'shopify-metric--last' : ''}`}>
-            <div className="shopify-metric-header">
-                <span className="shopify-metric-icon">{icon}</span>
-                <div className="shopify-metric-label">{label}</div>
-            </div>
-            <div className="shopify-metric-body">
-                <div className="shopify-metric-value">{count.toLocaleString()}</div>
-                <div className="shopify-metric-amount">{formatCurrency(amount)}</div>
-            </div>
-        </div>
+        <article className="shopify-dash-card shopify-dash-card--plain">
+            <header className="shopify-dash-card__head">
+                <span className="shopify-dash-card__icon shopify-dash-card__icon--plain" style={{ color: iconColor }} aria-hidden>
+                    {icon}
+                </span>
+                <h3 className="shopify-dash-card__heading">{label}</h3>
+            </header>
+            <p className="shopify-dash-card__figure shopify-dash-card__figure--sm">{count.toLocaleString()}</p>
+            <p className="shopify-dash-card__sub">{formatCurrency(amount)}</p>
+        </article>
     );
 }
 

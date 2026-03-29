@@ -185,7 +185,7 @@ export default function WALeads() {
                         icon="👥" 
                         label="Total Leads" 
                         value={metrics.totalLeads.toLocaleString()} 
-                        iconColor="#16a34a"
+                        iconColor="var(--primary-strong)"
                         isLast={false}
                         isEven={false}
                     />
@@ -217,7 +217,7 @@ export default function WALeads() {
                         icon="✅" 
                         label="Converted" 
                         value={metrics.convertedLeads.toLocaleString()} 
-                        iconColor="#10b981"
+                        iconColor="var(--primary)"
                         isLast={true}
                         isEven={false}
                     />
@@ -296,7 +296,7 @@ export default function WALeads() {
                                                             background: 'transparent',
                                                             padding: '6px',
                                                             borderRadius: '6px',
-                                                            color: '#10b981',
+                                                            color: 'var(--primary)',
                                                         }}
                                                         onMouseEnter={(e) => {
                                                             e.currentTarget.style.background = '#f0fdf4';
@@ -305,11 +305,11 @@ export default function WALeads() {
                                                         }}
                                                         onMouseLeave={(e) => {
                                                             e.currentTarget.style.background = 'transparent';
-                                                            e.currentTarget.style.color = '#10b981';
+                                                            e.currentTarget.style.color = 'var(--primary)';
                                                             e.currentTarget.style.transform = 'scale(1)';
                                                         }}
                                                         onFocus={(e) => {
-                                                            e.currentTarget.style.outline = '2px solid #10b981';
+                                                            e.currentTarget.style.outline = '2px solid var(--primary)';
                                                             e.currentTarget.style.outlineOffset = '2px';
                                                             e.currentTarget.style.borderRadius = '6px';
                                                             e.currentTarget.style.background = '#f0fdf4';
@@ -456,7 +456,7 @@ function StatusFilter<T extends LeadStatus>({ label, value, onChange, options }:
     const statusConfig: Record<LeadStatus, { icon: string; color: string; bgColor: string }> = {
         'New': { icon: '🆕', color: '#075985', bgColor: '#e0f2fe' },
         'Contacted': { icon: '📞', color: '#854d0e', bgColor: '#fef9c3' },
-        'Converted': { icon: '✅', color: '#166534', bgColor: '#dcfce7' },
+        'Converted': { icon: '✅', color: 'var(--primary-strong)', bgColor: '#dbeafe' },
         'Not Interested': { icon: '❌', color: '#991b1b', bgColor: '#fee2e2' },
         'No Answer': { icon: '🔇', color: '#075985', bgColor: '#e0f2fe' },
         'Potential Customer': { icon: '⭐', color: '#854d0e', bgColor: '#fef9c3' },
@@ -905,8 +905,8 @@ function DatePicker({ value, onChange, required, placeholder }: { value: string;
                                     style={{
                                         padding: '10px 4px',
                                         border: 'none',
-                                        background: isSelected ? '#16a34a' : isToday ? '#dcfce7' : 'transparent',
-                                        color: isSelected ? '#ffffff' : isToday ? '#16a34a' : '#111827',
+                                        background: isSelected ? '#2563eb' : isToday ? '#dbeafe' : 'transparent',
+                                        color: isSelected ? '#ffffff' : isToday ? '#1d4ed8' : '#111827',
                                         borderRadius: 8,
                                         cursor: 'pointer',
                                         fontSize: 14,
@@ -922,7 +922,7 @@ function DatePicker({ value, onChange, required, placeholder }: { value: string;
                                         if (!isSelected && !isToday) {
                                             e.currentTarget.style.background = 'transparent';
                                         } else if (isToday && !isSelected) {
-                                            e.currentTarget.style.background = '#dcfce7';
+                                            e.currentTarget.style.background = '#dbeafe';
                                         }
                                     }}
                                 >
@@ -973,7 +973,7 @@ function StatusDropdown({ value, onChange, required }: { value: LeadStatus; onCh
     const statusConfig: Record<LeadStatus, { icon: string; color: string; bgColor: string }> = {
         'New': { icon: '🆕', color: '#075985', bgColor: '#e0f2fe' },
         'Contacted': { icon: '📞', color: '#854d0e', bgColor: '#fef9c3' },
-        'Converted': { icon: '✅', color: '#166534', bgColor: '#dcfce7' },
+        'Converted': { icon: '✅', color: 'var(--primary-strong)', bgColor: '#dbeafe' },
         'Not Interested': { icon: '❌', color: '#991b1b', bgColor: '#fee2e2' },
         'No Answer': { icon: '🔇', color: '#075985', bgColor: '#e0f2fe' },
         'Potential Customer': { icon: '⭐', color: '#854d0e', bgColor: '#fef9c3' },
