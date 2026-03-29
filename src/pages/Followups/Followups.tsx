@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Spinner } from '../../components/Spinner';
-import { type Followup, loadFollowupsData, updateFollowupData, type FollowupData } from '../../utils/followups';
+import { type Followup, type FollowupData, type CallingHistoryEntry, loadFollowupsData, updateFollowupData } from '../../utils/followups';
 import { loadOrders, type Order, type OrderItem } from '../../utils/orders';
+import './Followups.scss';
 
 type Toast = {
     id: string;
@@ -119,6 +120,333 @@ function getFeedbackEmoji(feedback: string): string {
     return '💬';
 }
 
+/**
+ * Static dummy call logs (newest first). Used for empty-state modal preview and in-memory UI seeding.
+ * Edit ISO dates / copy here only — no generator.
+ */
+const DUMMY_CALL_HISTORY_RECORDS: CallingHistoryEntry[] = [
+    {
+        id: 'dummy-log-1',
+        calledAt: '2026-03-27T06:30:00.000Z',
+        callerName: 'Monia',
+        detail: 'Very happy with Gir cow ghee; asked for 5L jar pricing and delivery to Gurgaon.',
+        callAgainDate: '2026-04-02T06:30:00.000Z',
+    },
+    {
+        id: 'dummy-log-2',
+        calledAt: '2026-03-18T06:30:00.000Z',
+        callerName: 'Sarita',
+        detail: 'Compared A2 vs buffalo — sent catalog PDF on WhatsApp. Will decide with family.',
+        callAgainDate: null,
+    },
+    {
+        id: 'dummy-log-3',
+        calledAt: '2026-03-05T06:30:00.000Z',
+        callerName: 'Monia',
+        detail: 'Routine post-delivery check-in; no quality issues reported.',
+        callAgainDate: '2026-03-20T06:30:00.000Z',
+    },
+    {
+        id: 'dummy-log-4',
+        calledAt: '2026-02-20T06:30:00.000Z',
+        callerName: 'Sarita',
+        detail: 'First purchase follow-up. Customer positive; interested in combo offers next time.',
+        callAgainDate: '2026-02-28T06:30:00.000Z',
+    },
+];
+
+/** First N customers with empty `callingHistory` get copies of `DUMMY_CALL_HISTORY_RECORDS` (IDs scoped per phone). */
+const UI_SEED_DUMMY_CALL_HISTORY_COUNT = 4;
+
+function dummyCallHistoryForPhone(phone: string): CallingHistoryEntry[] {
+    return DUMMY_CALL_HISTORY_RECORDS.map((e) => ({
+        ...e,
+        id: `${phone}-${e.id}`,
+    }));
+}
+
+/** Shown when there are no customers from orders — table was empty. IDs prefixed FU-DEMO-; saves skip the API. */
+function isDemoFollowupRow(f: Followup): boolean {
+    return f.id.startsWith('FU-DEMO-');
+}
+
+const DUMMY_FOLLOWUP_TABLE_ROWS: Followup[] = (() => {
+    const rows: Omit<Followup, 'callingHistory' | 'callingDate' | 'callerName' | 'callingDetail' | 'callAgainDate'>[] = [
+        {
+            id: 'FU-DEMO-1',
+            customerName: 'Priya Malhotra',
+            customerPhone: '9100000001',
+            lastOrder: '2026-03-26T10:00:00.000Z',
+            totalOrders: 3,
+            lastOrderDetail: '1L Gir cow ghee × 1, 500ml A2 × 2',
+            feedback: 'Excellent ghee',
+        },
+        {
+            id: 'FU-DEMO-2',
+            customerName: 'Arjun Mehta',
+            customerPhone: '9100000002',
+            lastOrder: '2026-03-22T14:30:00.000Z',
+            totalOrders: 1,
+            lastOrderDetail: '500ml Buffalo ghee × 2',
+            feedback: 'Average ghee',
+        },
+        {
+            id: 'FU-DEMO-3',
+            customerName: 'Neha Kapoor',
+            customerPhone: '9100000003',
+            lastOrder: '2026-03-18T09:15:00.000Z',
+            totalOrders: 5,
+            lastOrderDetail: '5L combo × 1',
+            feedback: 'High price',
+        },
+        {
+            id: 'FU-DEMO-4',
+            customerName: 'Rahul Verma',
+            customerPhone: '9100000004',
+            lastOrder: '2026-03-10T11:45:00.000Z',
+            totalOrders: 2,
+            lastOrderDetail: 'Organic honey 500g × 1, 1L Desi ghee × 1',
+            feedback: '',
+        },
+    ];
+    return rows.map((r) => {
+        const hist = dummyCallHistoryForPhone(r.customerPhone);
+        const latest = hist[0];
+        return {
+            ...r,
+            callingHistory: hist,
+            callingDate: latest.calledAt,
+            callerName: latest.callerName,
+            callingDetail: latest.detail,
+            callAgainDate: latest.callAgainDate,
+        };
+    });
+})();
+
+/** Fresh copies for React state so edits never mutate module-level demo rows. */
+function cloneDemoFollowups(): Followup[] {
+    return DUMMY_FOLLOWUP_TABLE_ROWS.map((row) => ({
+        ...row,
+        callingHistory: row.callingHistory.map((h) => ({ ...h })),
+    }));
+}
+
+function applyDummyCallHistoryForUiPreview(rows: Followup[]): Followup[] {
+    let seeded = 0;
+    return rows.map((f) => {
+        if (f.callingHistory.length > 0) return f;
+        if (seeded >= UI_SEED_DUMMY_CALL_HISTORY_COUNT) return f;
+        seeded += 1;
+        const hist = dummyCallHistoryForPhone(f.customerPhone);
+        const latest = hist[0];
+        return {
+            ...f,
+            callingHistory: hist,
+            callingDate: latest.calledAt,
+            callerName: latest.callerName,
+            callingDetail: latest.detail,
+            callAgainDate: latest.callAgainDate,
+        };
+    });
+}
+
+function FollowupCallHistoryModal({
+    followup,
+    onClose,
+    onAppend,
+}: {
+    followup: Followup;
+    onClose: () => void;
+    onAppend: (payload: { calledOn: string; callerName: string; detail: string; callAgainDate: string | null }) => Promise<void>;
+}) {
+    const [calledOn, setCalledOn] = useState(() => toInputDate(new Date().toISOString()));
+    const [callerName, setCallerName] = useState(followup.callerName || CALLER_OPTIONS[0] || '');
+    const [detail, setDetail] = useState('');
+    const [callAgainOn, setCallAgainOn] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const hasReal = followup.callingHistory.length > 0;
+    const timeline = hasReal
+        ? [...followup.callingHistory].sort(
+              (a, b) => new Date(b.calledAt).getTime() - new Date(a.calledAt).getTime(),
+          )
+        : DUMMY_CALL_HISTORY_RECORDS;
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!detail.trim() || !callerName.trim()) return;
+        setSaving(true);
+        try {
+            await onAppend({
+                calledOn,
+                callerName,
+                detail,
+                callAgainDate: callAgainOn.trim() ? callAgainOn : null,
+            });
+            setDetail('');
+            setCallAgainOn('');
+            setCalledOn(toInputDate(new Date().toISOString()));
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    return (
+        <div
+            className="fu-hist-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fu-hist-title"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
+            <div className="fu-hist-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="fu-hist-modal__head">
+                    <div>
+                        <h2 id="fu-hist-title" className="fu-hist-modal__title">
+                            Call history
+                        </h2>
+                        <p className="fu-hist-modal__sub">
+                            {followup.customerName}
+                            <span className="fu-hist-modal__phone">{followup.customerPhone}</span>
+                        </p>
+                    </div>
+                    <button type="button" className="fu-hist-modal__close" onClick={onClose} aria-label="Close">
+                        ×
+                    </button>
+                </div>
+
+                {!hasReal ? (
+                    <div className="fu-hist-demo-banner">
+                        <strong>Sample entries</strong>
+                        <span>Preview only — your saved calls will replace this list.</span>
+                    </div>
+                ) : null}
+
+                <div className="fu-hist-list">
+                    <ol className="fu-hist-timeline" aria-label="Call history, newest first">
+                        {timeline.map((entry, index) => {
+                            const isLatest = index === 0;
+                            const called = new Date(entry.calledAt);
+                            const dateLine = called.toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                            });
+                            const timeLine = called.toLocaleTimeString('en-IN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                            });
+                            return (
+                                <li
+                                    key={entry.id}
+                                    className={`fu-hist-timeline__item${!hasReal ? ' fu-hist-timeline__item--demo' : ''}${isLatest ? ' fu-hist-timeline__item--latest' : ''}`}
+                                >
+                                    <div className="fu-hist-timeline__rail" aria-hidden="true">
+                                        <span className="fu-hist-timeline__dot" />
+                                    </div>
+                                    <article className="fu-hist-timeline__panel">
+                                        <div className="fu-hist-timeline__panel-head">
+                                            <div className="fu-hist-timeline__when">
+                                                <time dateTime={entry.calledAt} className="fu-hist-timeline__date">
+                                                    {dateLine}
+                                                </time>
+                                                <span className="fu-hist-timeline__time">{timeLine}</span>
+                                            </div>
+                                            <div className="fu-hist-timeline__chips">
+                                                {isLatest ? (
+                                                    <span className="fu-hist-timeline__pill fu-hist-timeline__pill--latest">Latest call</span>
+                                                ) : null}
+                                                <span className="fu-hist-timeline__pill fu-hist-timeline__pill--caller">
+                                                    {entry.callerName || '—'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <p className="fu-hist-timeline__notes">{entry.detail || '—'}</p>
+                                        <div className="fu-hist-timeline__followup">
+                                            <span className="fu-hist-timeline__followup-icon" aria-hidden>
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                                    <path d="M16 2v4M8 2v4M3 10h18" />
+                                                </svg>
+                                            </span>
+                                            <span className="fu-hist-timeline__followup-label">Follow up</span>
+                                            <span className="fu-hist-timeline__followup-val">
+                                                {entry.callAgainDate ? formatDate(entry.callAgainDate) : 'Not set'}
+                                            </span>
+                                        </div>
+                                    </article>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                </div>
+
+                <form className="fu-hist-form" onSubmit={handleSubmit}>
+                    <h3 className="fu-hist-form__title">Log a new call</h3>
+                    <div className="fu-hist-form__grid">
+                        <label className="fu-hist-field">
+                            <span className="fu-hist-field__lab">Called on</span>
+                            <input
+                                className="fu-hist-field__input"
+                                type="date"
+                                value={calledOn}
+                                onChange={(e) => setCalledOn(e.target.value)}
+                                required
+                            />
+                        </label>
+                        <label className="fu-hist-field">
+                            <span className="fu-hist-field__lab">Caller</span>
+                            <select
+                                className="fu-hist-field__input"
+                                value={callerName}
+                                onChange={(e) => setCallerName(e.target.value)}
+                                required
+                            >
+                                <option value="">Select caller</option>
+                                {CALLER_OPTIONS.map((opt) => (
+                                    <option key={opt} value={opt}>
+                                        {opt}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="fu-hist-field fu-hist-field--full">
+                            <span className="fu-hist-field__lab">Notes</span>
+                            <textarea
+                                className="fu-hist-field__textarea"
+                                value={detail}
+                                onChange={(e) => setDetail(e.target.value)}
+                                placeholder="What was discussed, outcome, next step…"
+                                rows={3}
+                                required
+                            />
+                        </label>
+                        <label className="fu-hist-field">
+                            <span className="fu-hist-field__lab">Call again (optional)</span>
+                            <input
+                                className="fu-hist-field__input"
+                                type="date"
+                                value={callAgainOn}
+                                onChange={(e) => setCallAgainOn(e.target.value)}
+                            />
+                        </label>
+                    </div>
+                    <div className="fu-hist-form__actions">
+                        <button type="button" className="fu-hist-btn fu-hist-btn--ghost" onClick={onClose}>
+                            Close
+                        </button>
+                        <button type="submit" className="fu-hist-btn fu-hist-btn--primary" disabled={saving}>
+                            {saving ? 'Saving…' : 'Save to history'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 export default function Followups() {
     const [callerFilter, setCallerFilter] = useState<string>('');
     const [feedbackFilter, setFeedbackFilter] = useState<string>('');
@@ -127,11 +455,12 @@ export default function Followups() {
     const [callingDateFilter, setCallingDateFilter] = useState<string>('');
     const [upcomingFilter, setUpcomingFilter] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState<string>('');
-    const [followups, setFollowups] = useState<Followup[]>([]);
+    const [followups, setFollowups] = useState<Followup[]>(() => cloneDemoFollowups());
     const [orders, setOrders] = useState<Order[]>([]);
     const [ordersByCustomer, setOrdersByCustomer] = useState<Map<string, Order[]>>(new Map());
     const [showCustomerProfile, setShowCustomerProfile] = useState(false);
     const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
+    const [historyModalFollowup, setHistoryModalFollowup] = useState<Followup | null>(null);
     const [loading, setLoading] = useState(true);
     
     // Toast notifications
@@ -153,15 +482,18 @@ export default function Followups() {
                     loadFollowupsData()
                 ]);
 
+                const ordersSafe = Array.isArray(orders) ? orders : [];
+                const followupsList = Array.isArray(followupsData) ? followupsData : [];
+
                 // Create a map of followup data by customer phone
                 const followupsMap = new Map<string, FollowupData>();
-                followupsData.forEach(f => {
+                followupsList.forEach(f => {
                     followupsMap.set(f.customerPhone, f);
                 });
 
                 // Group orders by customer phone
                 const ordersByCustomer = new Map<string, Order[]>();
-                orders.forEach(order => {
+                ordersSafe.forEach(order => {
                     const phone = order.customerPhone;
                     if (!ordersByCustomer.has(phone)) {
                         ordersByCustomer.set(phone, []);
@@ -193,6 +525,11 @@ export default function Followups() {
                         callAgainDate: null,
                     };
 
+                    const historyRaw = followupData.callingHistory;
+                    const callingHistory: CallingHistoryEntry[] = Array.isArray(historyRaw)
+                        ? historyRaw
+                        : [];
+
                     return {
                         id: `FU-${phone}`,
                         customerName: lastOrder.customer,
@@ -205,6 +542,7 @@ export default function Followups() {
                         callerName: followupData.callerName || '',
                         callingDetail: followupData.callingDetail || '',
                         callAgainDate: followupData.callAgainDate,
+                        callingHistory,
                     };
                 });
 
@@ -213,11 +551,19 @@ export default function Followups() {
                     new Date(b.lastOrder).getTime() - new Date(a.lastOrder).getTime()
                 );
 
-                setFollowups(mergedFollowups);
-                setOrders(orders);
+                const fromOrders =
+                    mergedFollowups.length > 0
+                        ? mergedFollowups
+                        : cloneDemoFollowups();
+
+                setFollowups(applyDummyCallHistoryForUiPreview(fromOrders));
+                setOrders(ordersSafe);
                 setOrdersByCustomer(ordersByCustomer);
             } catch (error) {
                 console.error('Error loading followups data:', error);
+                setFollowups(applyDummyCallHistoryForUiPreview(cloneDemoFollowups()));
+                setOrders([]);
+                setOrdersByCustomer(new Map());
             } finally {
                 setLoading(false);
             }
@@ -227,6 +573,11 @@ export default function Followups() {
     }, []);
 
     const baseFollowups = followups;
+
+    const showingDemoFollowupsOnly = useMemo(
+        () => followups.length > 0 && followups.every(isDemoFollowupRow),
+        [followups],
+    );
 
     // Generate month and year options from followups data
     const { monthOptions, yearOptions } = useMemo(() => {
@@ -344,6 +695,11 @@ export default function Followups() {
             return f;
         }));
 
+        if (isDemoFollowupRow(followup)) {
+            showToast('Sample row — changes stay on this page only.', 'success');
+            return;
+        }
+
         // Save to backend - only save followup-specific fields (not order-derived fields)
         try {
             const followupData: Partial<FollowupData> = {
@@ -353,6 +709,7 @@ export default function Followups() {
                 callerName: updatedFollowup.callerName,
                 callingDetail: updatedFollowup.callingDetail,
                 callAgainDate: updatedFollowup.callAgainDate,
+                callingHistory: updatedFollowup.callingHistory,
             };
 
             await updateFollowupData(followup.customerPhone, followupData);
@@ -370,10 +727,65 @@ export default function Followups() {
         }
     }
 
+    async function appendCallLog(
+        followupId: string,
+        payload: { calledOn: string; callerName: string; detail: string; callAgainDate: string | null },
+    ) {
+        const followup = followups.find((f) => f.id === followupId);
+        if (!followup) return;
+
+        const calledAt = new Date(`${payload.calledOn}T12:00:00`).toISOString();
+        const newEntry: CallingHistoryEntry = {
+            id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            calledAt,
+            callerName: payload.callerName.trim(),
+            detail: payload.detail.trim(),
+            callAgainDate: payload.callAgainDate
+                ? new Date(`${payload.callAgainDate}T12:00:00`).toISOString()
+                : null,
+        };
+
+        const nextHistory = [newEntry, ...followup.callingHistory];
+        const updatedFollowup: Followup = {
+            ...followup,
+            callingDate: newEntry.calledAt,
+            callingDetail: newEntry.detail,
+            callerName: newEntry.callerName,
+            callAgainDate: newEntry.callAgainDate,
+            callingHistory: nextHistory,
+        };
+
+        setFollowups((prev) => prev.map((f) => (f.id === followupId ? updatedFollowup : f)));
+        setHistoryModalFollowup((cur) => (cur?.id === followupId ? updatedFollowup : cur));
+
+        if (isDemoFollowupRow(followup)) {
+            showToast('Sample row — call saved in this session only.', 'success');
+            return;
+        }
+
+        try {
+            await updateFollowupData(followup.customerPhone, {
+                customerPhone: followup.customerPhone,
+                feedback: updatedFollowup.feedback,
+                callingDate: updatedFollowup.callingDate,
+                callerName: updatedFollowup.callerName,
+                callingDetail: updatedFollowup.callingDetail,
+                callAgainDate: updatedFollowup.callAgainDate,
+                callingHistory: nextHistory,
+            });
+            showToast('Call added to history', 'success');
+        } catch (error) {
+            console.error('Error saving call history:', error);
+            showToast('Failed to save call. Please try again.', 'error');
+            setFollowups((prev) => prev.map((f) => (f.id === followupId ? followup : f)));
+            setHistoryModalFollowup((cur) => (cur?.id === followupId ? followup : cur));
+        }
+    }
+
     if (loading) {
         return (
-            <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
-                <div className="card" style={{ position: 'relative', minHeight: 280 }}>
+            <section className="followups-page">
+                <div className="card fu-shell" style={{ position: 'relative', minHeight: 280 }}>
                     <Spinner overlay message="Loading followups…" />
                 </div>
             </section>
@@ -381,22 +793,58 @@ export default function Followups() {
     }
 
     return (
-        <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
-            <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
-                <div style={{ fontWeight: 800 }}>Followups</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                <label className="label" style={{ fontSize: 11, margin: 0, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Search</label>
-                                <input
-                                    className="input"
-                                    type="text"
-                                    placeholder="Search by name or mobile"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    style={{ width: 240, height: 32, fontSize: 13, padding: '4px 12px' }}
-                                />
+        <section className="followups-page">
+            <div className="card fu-shell">
+                <header className="fu-top">
+                    <div className="fu-top__lead">
+                        <h1 className="fu-title">Followups</h1>
+                        <p className="fu-sub">Customer call queue and follow-up dates</p>
+                        {showingDemoFollowupsOnly ? (
+                            <p className="fu-demo-hint">
+                                No order customers loaded — showing sample rows below. Your real followups appear once orders are available from the server.
+                            </p>
+                        ) : null}
+                    </div>
+                    <div className="fu-top__meta">
+                        <span className="fu-count-pill" title="Rows after filters">
+                            <span className="fu-count-pill__n">{filtered.length}</span>
+                            <span className="fu-count-pill__lbl">visible</span>
+                        </span>
+                    </div>
+                </header>
+                <div className="fu-body">
+                    <div className="fu-panel">
+                        <div className="fu-panel__head">
+                            <span className="fu-panel__title">Filters</span>
+                            {(searchQuery || callerFilter || feedbackFilter || monthFilter || yearFilter || callingDateFilter || upcomingFilter) ? (
+                                <button
+                                    type="button"
+                                    className="fu-btn-clear"
+                                    onClick={() => { setSearchQuery(''); setCallerFilter(''); setFeedbackFilter(''); setMonthFilter(''); setYearFilter(''); setCallingDateFilter(''); setUpcomingFilter(''); }}
+                                >
+                                    Clear all
+                                </button>
+                            ) : null}
+                        </div>
+                        <div className="fu-panel__grid">
+                            <div className="fu-search-wrap">
+                                <label className="fu-flt__lab" htmlFor="followups-search">Search</label>
+                                <div className="fu-search">
+                                    <svg className="fu-search__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                                        <circle cx="11" cy="11" r="7" />
+                                        <path d="M21 21l-4.3-4.3" />
+                                    </svg>
+                                    <input
+                                        id="followups-search"
+                                        className="fu-search__input"
+                                        type="search"
+                                        placeholder="Name or phone number"
+                                        aria-label="Search by name or mobile"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        autoComplete="off"
+                                    />
+                                </div>
                             </div>
                             <StatusFilter
                                 label="Caller"
@@ -424,114 +872,102 @@ export default function Followups() {
                                 options={yearOptions.map(y => y.label)}
                                 optionValues={yearOptions.map(y => y.value)}
                             />
-                            {(searchQuery || callerFilter || feedbackFilter || monthFilter || yearFilter || callingDateFilter || upcomingFilter) ? (
-                                <button 
-                                    className="filter-btn" 
-                                    onClick={() => { setSearchQuery(''); setCallerFilter(''); setFeedbackFilter(''); setMonthFilter(''); setYearFilter(''); setCallingDateFilter(''); setUpcomingFilter(''); }}
-                                    style={{ fontSize: 12, padding: '6px 16px', height: 32, marginBottom: 0 }}
-                                >
-                                    Clear All
-                                </button>
-                            ) : null}
-                        </div>
-                        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <label className="label" style={{ fontSize: 11, margin: 0, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Calling Date</label>
-                                <div className="filter-group" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                    <CallingDateFilterButton 
-                                        active={callingDateFilter === 'no-calling-date'} 
-                                        onClick={() => setCallingDateFilter(callingDateFilter === 'no-calling-date' ? '' : 'no-calling-date')}
-                                    >
-                                        No Calling Date
-                                    </CallingDateFilterButton>
-                                    <CallingDateFilterButton 
-                                        active={callingDateFilter === 'more-than-15-days'} 
-                                        onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-15-days' ? '' : 'more-than-15-days')}
-                                    >
-                                        &gt; 15 days
-                                    </CallingDateFilterButton>
-                                    <CallingDateFilterButton 
-                                        active={callingDateFilter === 'more-than-30-days'} 
-                                        onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-30-days' ? '' : 'more-than-30-days')}
-                                    >
-                                        &gt; 30 days
-                                    </CallingDateFilterButton>
-                                    <CallingDateFilterButton 
-                                        active={callingDateFilter === 'more-than-45-days'} 
-                                        onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-45-days' ? '' : 'more-than-45-days')}
-                                    >
-                                        &gt; 45 days
-                                    </CallingDateFilterButton>
-                                    <CallingDateFilterButton 
-                                        active={callingDateFilter === 'more-than-60-days'} 
-                                        onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-60-days' ? '' : 'more-than-60-days')}
-                                    >
-                                        &gt; 60 days
-                                    </CallingDateFilterButton>
-                                </div>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <label className="label" style={{ fontSize: 11, margin: 0, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Upcoming Followups</label>
-                                <div className="filter-group" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                    <CallingDateFilterButton 
-                                        active={upcomingFilter === 'today'} 
-                                        onClick={() => setUpcomingFilter(upcomingFilter === 'today' ? '' : 'today')}
-                                    >
-                                        Today
-                                    </CallingDateFilterButton>
-                                    <CallingDateFilterButton 
-                                        active={upcomingFilter === 'next-2-days'} 
-                                        onClick={() => setUpcomingFilter(upcomingFilter === 'next-2-days' ? '' : 'next-2-days')}
-                                    >
-                                        Next 2 days
-                                    </CallingDateFilterButton>
-                                    <CallingDateFilterButton 
-                                        active={upcomingFilter === 'next-7-days'} 
-                                        onClick={() => setUpcomingFilter(upcomingFilter === 'next-7-days' ? '' : 'next-7-days')}
-                                    >
-                                        Next 7 days
-                                    </CallingDateFilterButton>
-                                    <CallingDateFilterButton 
-                                        active={upcomingFilter === 'next-15-days'} 
-                                        onClick={() => setUpcomingFilter(upcomingFilter === 'next-15-days' ? '' : 'next-15-days')}
-                                    >
-                                        Next 15 days
-                                    </CallingDateFilterButton>
-                                </div>
-                            </div>
                         </div>
                     </div>
-                    <div style={{ width: '100%', color: 'var(--muted)', fontSize: 14 }}>
-                        Showing {filtered.length} followups
+                    <div className="fu-quick">
+                        <div className="fu-quick__block">
+                            <span className="fu-quick__label">Last calling date</span>
+                            <div className="fu-pill-group" role="group" aria-label="Calling date filters">
+                                <CallingDateFilterButton
+                                    active={callingDateFilter === 'no-calling-date'}
+                                    onClick={() => setCallingDateFilter(callingDateFilter === 'no-calling-date' ? '' : 'no-calling-date')}
+                                >
+                                    No date
+                                </CallingDateFilterButton>
+                                <CallingDateFilterButton
+                                    active={callingDateFilter === 'more-than-15-days'}
+                                    onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-15-days' ? '' : 'more-than-15-days')}
+                                >
+                                    &gt; 15 days
+                                </CallingDateFilterButton>
+                                <CallingDateFilterButton
+                                    active={callingDateFilter === 'more-than-30-days'}
+                                    onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-30-days' ? '' : 'more-than-30-days')}
+                                >
+                                    &gt; 30 days
+                                </CallingDateFilterButton>
+                                <CallingDateFilterButton
+                                    active={callingDateFilter === 'more-than-45-days'}
+                                    onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-45-days' ? '' : 'more-than-45-days')}
+                                >
+                                    &gt; 45 days
+                                </CallingDateFilterButton>
+                                <CallingDateFilterButton
+                                    active={callingDateFilter === 'more-than-60-days'}
+                                    onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-60-days' ? '' : 'more-than-60-days')}
+                                >
+                                    &gt; 60 days
+                                </CallingDateFilterButton>
+                            </div>
+                        </div>
+                        <div className="fu-quick__block">
+                            <span className="fu-quick__label">Call again</span>
+                            <div className="fu-pill-group" role="group" aria-label="Upcoming followup filters">
+                                <CallingDateFilterButton
+                                    active={upcomingFilter === 'today'}
+                                    onClick={() => setUpcomingFilter(upcomingFilter === 'today' ? '' : 'today')}
+                                >
+                                    Today
+                                </CallingDateFilterButton>
+                                <CallingDateFilterButton
+                                    active={upcomingFilter === 'next-2-days'}
+                                    onClick={() => setUpcomingFilter(upcomingFilter === 'next-2-days' ? '' : 'next-2-days')}
+                                >
+                                    Next 2 days
+                                </CallingDateFilterButton>
+                                <CallingDateFilterButton
+                                    active={upcomingFilter === 'next-7-days'}
+                                    onClick={() => setUpcomingFilter(upcomingFilter === 'next-7-days' ? '' : 'next-7-days')}
+                                >
+                                    Next 7 days
+                                </CallingDateFilterButton>
+                                <CallingDateFilterButton
+                                    active={upcomingFilter === 'next-15-days'}
+                                    onClick={() => setUpcomingFilter(upcomingFilter === 'next-15-days' ? '' : 'next-15-days')}
+                                >
+                                    Next 15 days
+                                </CallingDateFilterButton>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <div className="table-scroll-wrapper">
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1400, tableLayout: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1408, tableLayout: 'auto' }}>
                         <colgroup>
                             <col style={{ width: '200px', minWidth: '200px' }} />
-                            <col style={{ width: '140px', minWidth: '140px' }} />
+                            <col style={{ width: '148px', minWidth: '148px' }} />
                             <col style={{ width: '100px', minWidth: '100px' }} />
                             <col style={{ width: '180px', minWidth: '180px' }} />
                             <col style={{ width: 'auto', minWidth: '140px' }} />
                             <col style={{ width: '180px', minWidth: '180px' }} />
-                            <col style={{ width: '140px', minWidth: '140px' }} />
                             <col style={{ width: '200px', minWidth: '200px' }} />
                             <col style={{ width: '180px', minWidth: '180px' }} />
+                            <col style={{ width: '140px', minWidth: '140px' }} />
                         </colgroup>
                         <thead>
                             <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
                                 <Th>Customer</Th>
                                 <Th>Last Order</Th>
                                 <Th>Total Orders</Th>
-                                <Th>Last Order Detail</Th>
+                                <Th>Last Order</Th>
                                 <Th>Feedback</Th>
                                 <Th>Calling Date</Th>
-                                <Th>Caller Name</Th>
                                 <Th>Calling Detail</Th>
                                 <Th>Call Again Date</Th>
+                                <Th>Caller Name</Th>
                             </tr>
                         </thead>
                         <tbody>
@@ -557,6 +993,10 @@ export default function Followups() {
                                                 onClick={(e) => {
                                                     e.preventDefault();
                                                     e.stopPropagation();
+                                                    if (isDemoFollowupRow(f)) {
+                                                        showToast('Sample customer — open a real order to use the profile.', 'delete');
+                                                        return;
+                                                    }
                                                     setSelectedCustomerPhone(f.customerPhone);
                                                     setShowCustomerProfile(true);
                                                 }}
@@ -611,7 +1051,22 @@ export default function Followups() {
                                             </span>
                                         </div>
                                     </Td>
-                                    <Td>{formatDate(f.lastOrder)}</Td>
+                                    <Td style={{ verticalAlign: 'middle' }}>
+                                        <div className="fu-last-order-cell">
+                                            <span className="fu-last-order-cell__date">{formatDate(f.lastOrder)}</span>
+                                            <button
+                                                type="button"
+                                                className={`fu-hist-icon-btn${f.callingHistory.length ? ' fu-hist-icon-btn--has' : ''}`}
+                                                title={`Call history${f.callingHistory.length ? ` (${f.callingHistory.length})` : ''}`}
+                                                aria-label={`Call history${f.callingHistory.length ? `, ${f.callingHistory.length} entries` : ''}`}
+                                                onClick={() => setHistoryModalFollowup(f)}
+                                            >
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                                                    <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </Td>
                                     <Td>{f.totalOrders}</Td>
                                     <Td>{f.lastOrderDetail}</Td>
                                     <Td>
@@ -654,19 +1109,6 @@ export default function Followups() {
                                         />
                                     </Td>
                                     <Td>
-                                        <select
-                                            className="input"
-                                            value={f.callerName}
-                                            onChange={(e) => updateFollowup(f.id, 'callerName', e.target.value)}
-                                            style={{ width: '100%', height: 32, fontSize: 13, padding: '4px 8px' }}
-                                        >
-                                            <option value="">Select caller</option>
-                                            {CALLER_OPTIONS.map((opt) => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
-                                    </Td>
-                                    <Td>
                                         <textarea
                                             className="input"
                                             value={f.callingDetail}
@@ -681,12 +1123,27 @@ export default function Followups() {
                                             onChange={(value) => updateFollowup(f.id, 'callAgainDate', value)}
                                         />
                                     </Td>
+                                    <Td>
+                                        <select
+                                            className="input"
+                                            value={f.callerName}
+                                            onChange={(e) => updateFollowup(f.id, 'callerName', e.target.value)}
+                                            style={{ width: '100%', height: 32, fontSize: 13, padding: '4px 8px' }}
+                                        >
+                                            <option value="">Select caller</option>
+                                            {CALLER_OPTIONS.map((opt) => (
+                                                <option key={opt} value={opt}>{opt}</option>
+                                            ))}
+                                        </select>
+                                    </Td>
                                 </tr>
                             ))}
                             {filtered.length === 0 ? (
                                 <tr>
                                     <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
-                                        No followups found
+                                        {baseFollowups.length > 0
+                                            ? 'No rows match your filters. Use Clear all in the Filters panel.'
+                                            : 'No followups found'}
                                     </td>
                                 </tr>
                             ) : null}
@@ -705,6 +1162,14 @@ export default function Followups() {
                     }} 
                 />
             )}
+            {historyModalFollowup ? (
+                <FollowupCallHistoryModal
+                    key={historyModalFollowup.id}
+                    followup={historyModalFollowup}
+                    onClose={() => setHistoryModalFollowup(null)}
+                    onAppend={(payload) => appendCallLog(historyModalFollowup.id, payload)}
+                />
+            ) : null}
             <ToastContainer toasts={toasts} />
         </section>
     );
@@ -719,20 +1184,23 @@ function Td({ children, style }: { children: React.ReactNode; style?: React.CSSP
 }
 
 function StatusFilter<T extends string>({ label, value, onChange, options, optionValues }: { label: string; value: T | ''; onChange: (val: T | '') => void; options: T[]; optionValues?: string[] }) {
+    const id = `followups-filter-${label.toLowerCase().replace(/\s+/g, '-')}`;
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label className="label" style={{ fontSize: 11, margin: 0, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</label>
-            <select
-                className="input"
-                value={value}
-                onChange={(e) => onChange(e.target.value as T | '')}
-                style={{ height: 32, minWidth: 120, cursor: 'pointer', fontSize: 13 }}
-            >
-                <option value="">All</option>
-                {options.map((opt, index) => (
-                    <option key={opt} value={optionValues ? optionValues[index] : opt}>{opt}</option>
-                ))}
-            </select>
+        <div className="fu-flt">
+            <label className="fu-flt__lab" htmlFor={id}>{label}</label>
+            <div className="fu-flt__box">
+                <select
+                    id={id}
+                    className="fu-flt__sel"
+                    value={value}
+                    onChange={(e) => onChange(e.target.value as T | '')}
+                >
+                    <option value="">All</option>
+                    {options.map((opt, index) => (
+                        <option key={opt} value={optionValues ? optionValues[index] : opt}>{opt}</option>
+                    ))}
+                </select>
+            </div>
         </div>
     );
 }
@@ -740,9 +1208,9 @@ function StatusFilter<T extends string>({ label, value, onChange, options, optio
 function CallingDateFilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
     return (
         <button
+            type="button"
             onClick={onClick}
-            className={`filter-btn ${active ? 'active' : ''}`}
-            style={{ fontSize: 12, padding: '6px 12px', height: 32 }}
+            className={`fu-pill${active ? ' fu-pill--active' : ''}`}
         >
             {children}
         </button>

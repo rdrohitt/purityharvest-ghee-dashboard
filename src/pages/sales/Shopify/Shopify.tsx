@@ -457,6 +457,18 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         const roasCurrent = totalMarketingSpend > 0 ? deliveredAmount / totalMarketingSpend : 0;
         const roasExpected = totalMarketingSpend > 0 ? (deliveredAmount + inTransitAmount) / totalMarketingSpend : 0;
 
+        const orderCountForPaymentMix = filtered.length;
+        let paidOrderCount = 0;
+        for (const o of filtered) {
+            if (o.paymentMode === 'PAID') paidOrderCount += 1;
+        }
+        const paidOrdersPct =
+            orderCountForPaymentMix > 0
+                ? Math.round((paidOrderCount / orderCountForPaymentMix) * 100)
+                : 0;
+        const codOrdersPct =
+            orderCountForPaymentMix > 0 ? Math.max(0, 100 - paidOrdersPct) : 0;
+
         // Manufacturing cost based on delivered lines and product actual cost from /api/products.
         const productMap = new Map<string, ProductApiItem>();
         products.forEach((p) => {
@@ -597,6 +609,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             shippingCharges,
             roasCurrent,
             roasExpected,
+            paidOrdersPct,
+            codOrdersPct,
             delivered,
             deliveredAmount,
             rto,
@@ -934,7 +948,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         inTransit={metrics.inTransit}
                         inTransitAmount={metrics.inTransitAmount}
                     />
-                    <ModernRoasMetric currentRoas={metrics.roasCurrent} expectedRoas={metrics.roasExpected} />
+                    <ModernRoasMetric
+                        currentRoas={metrics.roasCurrent}
+                        expectedRoas={metrics.roasExpected}
+                        paidOrdersPct={metrics.paidOrdersPct}
+                        codOrdersPct={metrics.codOrdersPct}
+                    />
                 </div>
 
                 {showCustom ? (
@@ -1209,7 +1228,17 @@ function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { i
     );
 }
 
-function ModernRoasMetric({ currentRoas, expectedRoas }: { currentRoas: number; expectedRoas: number }) {
+function ModernRoasMetric({
+    currentRoas,
+    expectedRoas,
+    paidOrdersPct,
+    codOrdersPct,
+}: {
+    currentRoas: number;
+    expectedRoas: number;
+    paidOrdersPct: number;
+    codOrdersPct: number;
+}) {
     const formatRoas = (v: number): string => {
         if (!Number.isFinite(v) || v <= 0) return '—';
         return v.toFixed(2);
@@ -1225,6 +1254,12 @@ function ModernRoasMetric({ currentRoas, expectedRoas }: { currentRoas: number; 
               ? Math.min(360, (currentRoas / 5) * 360)
               : 0;
 
+    const paymentSplitDeg =
+        paidOrdersPct > 0 || codOrdersPct > 0
+            ? Math.min(360, Math.max(0, (paidOrdersPct / 100) * 360))
+            : 0;
+    const hasOrderPaymentMix = paidOrdersPct > 0 || codOrdersPct > 0;
+
     return (
         <article className="shopify-dash-card shopify-dash-card--roas">
             <div className="shopify-dash-card__accent" aria-hidden />
@@ -1238,22 +1273,58 @@ function ModernRoasMetric({ currentRoas, expectedRoas }: { currentRoas: number; 
                     <h3 className="shopify-dash-card__heading">Return on ad spend</h3>
                 </div>
             </header>
-            <div className="shopify-dash-card__roas-body">
-                <div
-                    className="shopify-dash-card__gauge"
-                    style={{ '--shopify-gauge-deg': `${gaugeDeg}deg` } as CSSProperties}
-                    role="img"
-                    aria-label={`ROAS ${formatRoas(currentRoas)}, expected ${formatRoas(expectedRoas)}`}
-                >
-                    <div className="shopify-dash-card__gauge-cutout">
-                        <span className="shopify-dash-card__gauge-value">{formatRoas(currentRoas)}</span>
-                        <span className="shopify-dash-card__gauge-label">current</span>
+            <div className="shopify-dash-card__roas-stack">
+                <div className="shopify-dash-card__roas-body">
+                    <div
+                        className="shopify-dash-card__gauge"
+                        style={{ '--shopify-gauge-deg': `${gaugeDeg}deg` } as CSSProperties}
+                        role="img"
+                        aria-label={`ROAS ${formatRoas(currentRoas)}, expected ${formatRoas(expectedRoas)}`}
+                    >
+                        <div className="shopify-dash-card__gauge-cutout">
+                            <span className="shopify-dash-card__gauge-value">{formatRoas(currentRoas)}</span>
+                            <span className="shopify-dash-card__gauge-label">current</span>
+                        </div>
+                    </div>
+                    <div className="shopify-dash-card__roas-side">
+                        <p className="shopify-dash-card__compare-label">Target</p>
+                        <p className="shopify-dash-card__compare-value">{formatRoas(expectedRoas)}</p>
+                        <p className="shopify-dash-card__compare-hint">expected ROAS</p>
                     </div>
                 </div>
-                <div className="shopify-dash-card__roas-side">
-                    <p className="shopify-dash-card__compare-label">Target</p>
-                    <p className="shopify-dash-card__compare-value">{formatRoas(expectedRoas)}</p>
-                    <p className="shopify-dash-card__compare-hint">expected ROAS</p>
+                <div className="shopify-dash-card__roas-payment-row">
+                    <div
+                        className={`shopify-dash-card__gauge shopify-dash-card__gauge--payment shopify-dash-card__gauge--payment-lg${
+                            hasOrderPaymentMix ? '' : ' shopify-dash-card__gauge--payment-empty'
+                        }`}
+                        style={
+                            {
+                                '--shopify-pay-split': `${paymentSplitDeg}deg`,
+                            } as CSSProperties
+                        }
+                        role="img"
+                        aria-label={`Orders Paid ${paidOrdersPct} percent, COD ${codOrdersPct} percent`}
+                    >
+                        <div className="shopify-dash-card__gauge-cutout shopify-dash-card__gauge-cutout--payment shopify-dash-card__gauge-cutout--payment-lg">
+                            {hasOrderPaymentMix ? (
+                                <>
+                                    <div className="shopify-dash-card__pay-split-line">
+                                        <span className="shopify-dash-card__pay-split-pct">{paidOrdersPct}%</span>
+                                        <span className="shopify-dash-card__pay-split-name">Paid</span>
+                                    </div>
+                                    <div className="shopify-dash-card__pay-split-line">
+                                        <span className="shopify-dash-card__pay-split-pct">{codOrdersPct}%</span>
+                                        <span className="shopify-dash-card__pay-split-name">COD</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="shopify-dash-card__gauge-value shopify-dash-card__gauge-value--sm">—</span>
+                                    <span className="shopify-dash-card__gauge-label">orders</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
         </article>

@@ -1,5 +1,14 @@
 import { apiFetch } from '../api';
 
+/** One saved phone call / follow-up touchpoint (newest-first in UI). */
+export type CallingHistoryEntry = {
+    id: string;
+    calledAt: string; // ISO
+    callerName: string;
+    detail: string;
+    callAgainDate: string | null; // ISO or null
+};
+
 export type Followup = {
     id: string;
     customerName: string;
@@ -12,6 +21,7 @@ export type Followup = {
     callerName: string;
     callingDetail: string;
     callAgainDate: string | null; // ISO date or null
+    callingHistory: CallingHistoryEntry[];
 };
 
 /**
@@ -24,6 +34,8 @@ export type FollowupData = {
     callerName: string;
     callingDetail: string;
     callAgainDate: string | null;
+    /** Append-only style list; UI shows newest first. */
+    callingHistory?: CallingHistoryEntry[];
 };
 
 /**
@@ -132,6 +144,7 @@ export function generateMockFollowups(limit = 50): Followup[] {
             callerName: callers[Math.floor(rand(seed + 10) * callers.length)],
             callingDetail: rand(seed + 11) > 0.5 ? 'Customer requested callback' : 'Follow up on previous order',
             callAgainDate: callAgainDate?.toISOString() || null,
+            callingHistory: [],
         });
     }
     

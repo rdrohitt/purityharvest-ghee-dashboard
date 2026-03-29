@@ -2445,14 +2445,30 @@
   text-align: right;
 }
 
-.shopify-dash-card__roas-body {
+.shopify-dash-card__roas-stack {
   position: relative;
   z-index: 1;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding-top: 2px;
+}
+
+.shopify-dash-card__roas-body {
+  display: flex;
+  align-items: flex-start;
   gap: 16px;
   flex-wrap: wrap;
-  padding-top: 2px;
+}
+
+.shopify-dash-card__roas-payment-row {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 16px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 9%, var(--dash-surface));
 }
 
 .shopify-dash-card__gauge {
@@ -2472,6 +2488,56 @@
     0 0 0 1px color-mix(in srgb, #fff 15%, transparent) inset;
 }
 
+.shopify-dash-card__gauge--payment {
+  --shopify-pay-split: 0deg;
+  background: conic-gradient(
+    var(--dash-accent) 0 var(--shopify-pay-split),
+    var(--dash-accent2) var(--shopify-pay-split) 360deg
+  );
+  box-shadow:
+    0 4px 16px color-mix(in srgb, var(--dash-accent) 22%, transparent),
+    0 4px 14px color-mix(in srgb, var(--dash-accent2) 18%, transparent),
+    0 0 0 1px color-mix(in srgb, #fff 15%, transparent) inset;
+}
+
+.shopify-dash-card__gauge--payment-empty {
+  background: conic-gradient(
+    color-mix(in srgb, var(--text) 8%, var(--dash-surface)) 0 360deg
+  );
+  box-shadow:
+    0 2px 10px rgba(15, 23, 42, 0.06),
+    0 0 0 1px color-mix(in srgb, #fff 15%, transparent) inset;
+}
+
+.shopify-dash-card__gauge--payment-lg {
+  width: 132px;
+  height: 132px;
+}
+
+.shopify-dash-card__gauge--payment-lg.shopify-dash-card__gauge--payment-empty {
+  box-shadow:
+    0 4px 14px rgba(15, 23, 42, 0.07),
+    0 0 0 1px color-mix(in srgb, #fff 15%, transparent) inset;
+}
+
+.shopify-dash-card__gauge--payment-lg .shopify-dash-card__pay-split-pct {
+  font-size: 19px;
+}
+
+.shopify-dash-card__gauge--payment-lg .shopify-dash-card__pay-split-name {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+.shopify-dash-card__gauge--payment-lg .shopify-dash-card__gauge-value--sm {
+  font-size: 22px;
+}
+
+.shopify-dash-card__gauge--payment-lg .shopify-dash-card__gauge-label {
+  margin-top: 4px;
+  font-size: 9px;
+}
+
 .shopify-dash-card__gauge-cutout {
   width: 62px;
   height: 62px;
@@ -2483,6 +2549,43 @@
   justify-content: center;
   gap: 0;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) inset;
+}
+
+.shopify-dash-card__gauge-cutout--payment {
+  gap: 2px;
+  padding: 4px 2px;
+  text-align: center;
+}
+
+.shopify-dash-card__gauge-cutout--payment-lg {
+  width: 106px;
+  height: 106px;
+  gap: 4px;
+  padding: 6px 4px;
+}
+
+.shopify-dash-card__pay-split-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  line-height: 1.05;
+}
+
+.shopify-dash-card__pay-split-pct {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.shopify-dash-card__pay-split-name {
+  font-size: 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
 
 .shopify-dash-card__gauge-value {
@@ -2501,6 +2604,11 @@
   letter-spacing: 0.08em;
   color: var(--muted);
   margin-top: 3px;
+}
+
+.shopify-dash-card__gauge-value--sm {
+  font-size: 15px;
+  margin-top: 0;
 }
 
 .shopify-dash-card__roas-side {
