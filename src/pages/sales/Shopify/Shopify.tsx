@@ -1310,7 +1310,7 @@ function ModernRoasMetric({
                                 <>
                                     <div className="shopify-dash-card__pay-split-line">
                                         <span className="shopify-dash-card__pay-split-pct">{paidOrdersPct}%</span>
-                                        <span className="shopify-dash-card__pay-split-name">Paid</span>
+                                        <span className="shopify-dash-card__pay-split-name">Pre-Paid</span>
                                     </div>
                                     <div className="shopify-dash-card__pay-split-line">
                                         <span className="shopify-dash-card__pay-split-pct">{codOrdersPct}%</span>
