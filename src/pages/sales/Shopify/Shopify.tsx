@@ -1409,6 +1409,24 @@ function ModernDeliveryStatusMetric({
     inTransit: number;
     inTransitAmount: number;
 }) {
+    const totalOrders = delivered + rto + inTransit;
+    const totalAmount = deliveredAmount + rtoAmount + inTransitAmount;
+    const pct = (part: number, total: number): number => (total > 0 ? Math.round((part / total) * 100) : 0);
+    const orderPct = {
+        delivered: pct(delivered, totalOrders),
+        rto: pct(rto, totalOrders),
+        inTransit: totalOrders > 0 ? Math.max(0, 100 - pct(delivered, totalOrders) - pct(rto, totalOrders)) : 0,
+    };
+    const amountPct = {
+        delivered: pct(deliveredAmount, totalAmount),
+        rto: pct(rtoAmount, totalAmount),
+        inTransit:
+            totalAmount > 0 ? Math.max(0, 100 - pct(deliveredAmount, totalAmount) - pct(rtoAmount, totalAmount)) : 0,
+    };
+
+    const splitSegClass = (pctVal: number): string =>
+        pctVal > 0 && pctVal < 9 ? ' shopify-dash-card__ship-split-seg--narrow' : '';
+
     return (
         <article className="shopify-dash-card shopify-dash-card--ship">
             <div className="shopify-dash-card__accent" aria-hidden />
@@ -1448,6 +1466,100 @@ function ModernDeliveryStatusMetric({
                     <span className="shopify-dash-card__ship-amt">{formatCurrency(inTransitAmount)}</span>
                 </li>
             </ul>
+            <div className="shopify-dash-card__ship-charts">
+                <section className="shopify-dash-card__ship-chart" aria-label="Order share by status">
+                    <p className="shopify-dash-card__ship-chart-label">Orders</p>
+                    {totalOrders > 0 ? (
+                        <div
+                            className="shopify-dash-card__ship-split-bar"
+                            role="img"
+                            aria-label={`Delivered ${orderPct.delivered}%, RTO ${orderPct.rto}%, In transit ${orderPct.inTransit}%`}
+                        >
+                            {orderPct.delivered > 0 ? (
+                                <div
+                                    className={
+                                        'shopify-dash-card__ship-split-seg shopify-dash-card__ship-split-seg--delivered' +
+                                        splitSegClass(orderPct.delivered)
+                                    }
+                                    style={{ flex: `0 0 ${orderPct.delivered}%` }}
+                                >
+                                    <span className="shopify-dash-card__ship-split-pct">{orderPct.delivered}%</span>
+                                </div>
+                            ) : null}
+                            {orderPct.rto > 0 ? (
+                                <div
+                                    className={
+                                        'shopify-dash-card__ship-split-seg shopify-dash-card__ship-split-seg--rto' +
+                                        splitSegClass(orderPct.rto)
+                                    }
+                                    style={{ flex: `0 0 ${orderPct.rto}%` }}
+                                >
+                                    <span className="shopify-dash-card__ship-split-pct">{orderPct.rto}%</span>
+                                </div>
+                            ) : null}
+                            {orderPct.inTransit > 0 ? (
+                                <div
+                                    className={
+                                        'shopify-dash-card__ship-split-seg shopify-dash-card__ship-split-seg--transit' +
+                                        splitSegClass(orderPct.inTransit)
+                                    }
+                                    style={{ flex: `0 0 ${orderPct.inTransit}%` }}
+                                >
+                                    <span className="shopify-dash-card__ship-split-pct">{orderPct.inTransit}%</span>
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : (
+                        <div className="shopify-dash-card__ship-split-bar shopify-dash-card__ship-split-bar--empty" aria-hidden />
+                    )}
+                </section>
+                <section className="shopify-dash-card__ship-chart" aria-label="Amount share by status">
+                    <p className="shopify-dash-card__ship-chart-label">Amount</p>
+                    {totalAmount > 0 ? (
+                        <div
+                            className="shopify-dash-card__ship-split-bar"
+                            role="img"
+                            aria-label={`Delivered ${amountPct.delivered}%, RTO ${amountPct.rto}%, In transit ${amountPct.inTransit}%`}
+                        >
+                            {amountPct.delivered > 0 ? (
+                                <div
+                                    className={
+                                        'shopify-dash-card__ship-split-seg shopify-dash-card__ship-split-seg--delivered' +
+                                        splitSegClass(amountPct.delivered)
+                                    }
+                                    style={{ flex: `0 0 ${amountPct.delivered}%` }}
+                                >
+                                    <span className="shopify-dash-card__ship-split-pct">{amountPct.delivered}%</span>
+                                </div>
+                            ) : null}
+                            {amountPct.rto > 0 ? (
+                                <div
+                                    className={
+                                        'shopify-dash-card__ship-split-seg shopify-dash-card__ship-split-seg--rto' +
+                                        splitSegClass(amountPct.rto)
+                                    }
+                                    style={{ flex: `0 0 ${amountPct.rto}%` }}
+                                >
+                                    <span className="shopify-dash-card__ship-split-pct">{amountPct.rto}%</span>
+                                </div>
+                            ) : null}
+                            {amountPct.inTransit > 0 ? (
+                                <div
+                                    className={
+                                        'shopify-dash-card__ship-split-seg shopify-dash-card__ship-split-seg--transit' +
+                                        splitSegClass(amountPct.inTransit)
+                                    }
+                                    style={{ flex: `0 0 ${amountPct.inTransit}%` }}
+                                >
+                                    <span className="shopify-dash-card__ship-split-pct">{amountPct.inTransit}%</span>
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : (
+                        <div className="shopify-dash-card__ship-split-bar shopify-dash-card__ship-split-bar--empty" aria-hidden />
+                    )}
+                </section>
+            </div>
         </article>
     );
 }
