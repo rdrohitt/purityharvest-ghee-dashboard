@@ -56,6 +56,7 @@ function normalizeOrder(raw: unknown): ShopifyOrderApi | null {
         paymentMode: String(o.paymentMode ?? ''),
         fulfillmentStatus: String(o.fulfillmentStatus ?? ''),
         returnStatus: Boolean((o as any).returnStatus),
+        is_shipped: Boolean((o as any).is_shipped),
         codCharges: Number(o.codCharges) || 0,
         shippingCharges: Number(o.shippingCharges) || 0,
         discount: Number(o.discount) || 0,
@@ -122,6 +123,7 @@ export function orderDetailToOrder(o: ShopifyOrderApi): Order {
         if (lower === 'whatsapp') return 'Whatsapp';
         if (lower === 'amazon') return 'Amazon';
         if (lower === 'flipkart') return 'Flipkart';
+        if (lower === 'calling') return 'Calling';
         return (o.platform || '') as any;
     })();
     return {
@@ -157,6 +159,7 @@ export function orderDetailToOrder(o: ShopifyOrderApi): Order {
         type: mapOrderType(o.type),
         shippingTrackingUrl: o.shippingDetails?.trackingUrl,
         shippingTrackingCompany: o.shippingDetails?.trackingCompany,
+        is_shipped: Boolean(o.is_shipped),
     };
 }
 
@@ -302,6 +305,10 @@ export function buildShopifyOrderPayloadFromForm(
             ? String((base.customer as ShopifyOrderCustomer)._id ?? '')
             : '';
 
+    const platformBackend = (form.platform && String(form.platform).trim())
+        ? String(form.platform).toLowerCase()
+        : String(base.platform || 'shopify').toLowerCase();
+
     return {
         ...base,
         customer: customerId || base.customer,
@@ -313,9 +320,10 @@ export function buildShopifyOrderPayloadFromForm(
         pincode: form.pincode ?? '',
         type: toBackendOrderType(form.type) ?? base.type,
         products: updatedProducts,
-        platform: base.platform || 'shopify',
+        platform: platformBackend,
         paymentMode,
         fulfillmentStatus,
+        is_shipped: form.is_shipped,
         codCharges: form.codCharges ?? base.codCharges,
         shippingCharges: form.shippingCharges ?? base.shippingCharges,
         discount: form.discountAmount ?? base.discount,
@@ -366,6 +374,7 @@ export function shopifyOrderToOrder(o: ShopifyOrderApi): Order {
         if (lower === 'whatsapp') return 'Whatsapp';
         if (lower === 'amazon') return 'Amazon';
         if (lower === 'flipkart') return 'Flipkart';
+        if (lower === 'calling') return 'Calling';
         return (o.platform || '') as any;
     })();
     return {
@@ -394,5 +403,6 @@ export function shopifyOrderToOrder(o: ShopifyOrderApi): Order {
         type: mapOrderType(o.type),
         shippingTrackingUrl: o.shippingDetails?.trackingUrl,
         shippingTrackingCompany: o.shippingDetails?.trackingCompany,
+        is_shipped: Boolean(o.is_shipped),
     };
 }

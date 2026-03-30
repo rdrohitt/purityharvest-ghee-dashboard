@@ -829,7 +829,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             label="Platform"
                             value={platformFilter}
                             onChange={setPlatformFilter}
-                            options={['Shopify', 'Abandoned', 'Whatsapp', 'Amazon', 'Flipkart'] as Platform[]}
+                            options={['Shopify', 'Abandoned', 'Whatsapp', 'Amazon', 'Flipkart', 'Calling'] as Platform[]}
                         />
                         <StatusFilter
                             layout="ribbon"
@@ -1115,6 +1115,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     codCharges: o.codCharges ?? 0,
                                     discount: o.discountAmount ?? 0,
                                     notes: o.notes ?? '',
+                                    is_shipped: o.is_shipped,
                                 };
 
                                 await apiFetch('/api/orders', {

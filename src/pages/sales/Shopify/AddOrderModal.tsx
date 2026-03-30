@@ -11,7 +11,15 @@ import {
 } from '../../../utils/orders';
 import type { CustomerSearchResult } from '../../../types/shopify';
 import { searchCustomersByPhone } from '../../../utils/customers';
-import { toInputDate } from './ShopifyShared';
+import {
+    toInputDate,
+    ModernSelect,
+    ORDER_MODAL_TYPE_OPTIONS,
+    ORDER_MODAL_PLATFORM_OPTIONS,
+    ORDER_MODAL_PAYMENT_OPTIONS,
+    ORDER_MODAL_FULFILLMENT_OPTIONS,
+    ORDER_MODAL_DELIVERY_OPTIONS,
+} from './ShopifyShared';
 import { DatePicker } from './DatePicker';
 import { Spinner } from '../../../components/Spinner';
 import './Shopify.scss';
@@ -393,6 +401,7 @@ function AddOrderModal({
         if (lower === 'whatsapp') return 'Whatsapp';
         if (lower === 'amazon') return 'Amazon';
         if (lower === 'flipkart') return 'Flipkart';
+        if (lower === 'calling') return 'Calling';
         return p;
     };
     const [date, setDate] = useState<string>(
@@ -449,6 +458,11 @@ function AddOrderModal({
     );
     const [amount, setAmount] = useState<string>('');
     const [awb, setAwb] = useState<string>(initialOrder?.awbNumber || '');
+    const [isShipped, setIsShipped] = useState(initialOrder?.is_shipped ?? false);
+
+    useEffect(() => {
+        setIsShipped(initialOrder?.is_shipped ?? false);
+    }, [initialOrder?.id]);
     const [tracking, setTracking] = useState<{
         awb: string;
         statusText?: string;
@@ -621,6 +635,10 @@ function AddOrderModal({
     async function submit(e: React.FormEvent) {
         e.preventDefault();
         if (saving) return;
+        if (!type) {
+            alert('Please select Type');
+            return;
+        }
         if (!payment || !platform) {
             alert('Please select both Platform and Payment Mode');
             return;
@@ -654,6 +672,7 @@ function AddOrderModal({
             state,
             platform: platform as Platform,
             type: type ? (type as OrderType) : undefined,
+            is_shipped: isShipped,
         };
         try {
             setSaving(true);
@@ -775,19 +794,14 @@ function AddOrderModal({
                                     </div>
                                     <div>
                                         <label className="label">Type</label>
-                                        <select
-                                            className="input shopify-add-modal-input"
+                                        <ModernSelect<OrderType | ''>
+                                            variant="default"
                                             value={type}
-                                            onChange={(e) =>
-                                                setType(e.target.value as OrderType | '')
-                                            }
-                                            required
-                                        >
-                                            <option value="">Select Type</option>
-                                            <option value="New">New</option>
-                                            <option value="Repeat">Repeat</option>
-                                            <option value="Reference">Reference</option>
-                                        </select>
+                                            onChange={(v) => setType(v)}
+                                            options={ORDER_MODAL_TYPE_OPTIONS}
+                                            placeholder="Select Type"
+                                            aria-label="Order type"
+                                        />
                                     </div>
                                 </div>
 
@@ -866,79 +880,45 @@ function AddOrderModal({
                                 <div className="shopify-add-modal-section-grid">
                                     <div>
                                         <label className="label">Platform</label>
-                                        <select
-                                            className="input shopify-add-modal-input"
+                                        <ModernSelect<Platform | ''>
+                                            variant="default"
                                             value={platform}
-                                            onChange={(e) =>
-                                                setPlatform(e.target.value as Platform | '')
-                                            }
-                                            required
-                                        >
-                                            <option value="">Select Platform</option>
-                                            {(['Shopify', 'Abandoned', 'Whatsapp', 'Amazon', 'Flipkart'] as Platform[]).map(
-                                                (p) => (
-                                                    <option key={p} value={p}>
-                                                        {p}
-                                                    </option>
-                                                )
-                                            )}
-                                        </select>
+                                            onChange={(v) => setPlatform(v)}
+                                            options={ORDER_MODAL_PLATFORM_OPTIONS}
+                                            placeholder="Select Platform"
+                                            aria-label="Platform"
+                                        />
                                     </div>
                                     <div>
                                         <label className="label">Payment Mode</label>
-                                        <select
-                                            className="input shopify-add-modal-input"
+                                        <ModernSelect<PaymentStatus | ''>
+                                            variant="default"
                                             value={payment}
-                                            onChange={(e) =>
-                                                setPayment(e.target.value as PaymentStatus | '')
-                                            }
-                                            required
-                                        >
-                                            <option value="">Select Payment Mode</option>
-                                            {(['COD', 'PAID'] as PaymentStatus[]).map((p) => (
-                                                <option key={p} value={p}>
-                                                    {p}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            onChange={(v) => setPayment(v)}
+                                            options={ORDER_MODAL_PAYMENT_OPTIONS}
+                                            placeholder="Select Payment Mode"
+                                            aria-label="Payment mode"
+                                        />
                                     </div>
                                     <div>
                                         <label className="label">Fullfillment Status</label>
-                                        <select
-                                            className="input shopify-add-modal-input"
+                                        <ModernSelect<FulfillmentStatus>
+                                            variant="default"
                                             value={fulfillment}
-                                            onChange={(e) =>
-                                                setFulfillment(e.target.value as FulfillmentStatus)
-                                            }
-                                            required
-                                        >
-                                            {(['Unfulfilled', 'Fulfilled', 'Partial'] as FulfillmentStatus[]).map(
-                                                (p) => (
-                                                    <option key={p} value={p}>
-                                                        {p}
-                                                    </option>
-                                                )
-                                            )}
-                                        </select>
+                                            onChange={(v) => setFulfillment(v as FulfillmentStatus)}
+                                            options={ORDER_MODAL_FULFILLMENT_OPTIONS}
+                                            aria-label="Fulfillment status"
+                                        />
                                     </div>
                                     <div>
                                         <label className="label">Shipping Status</label>
-                                        <select
-                                            className="input shopify-add-modal-input"
+                                        <ModernSelect<DeliveryStatus>
+                                            variant="default"
                                             value={delivery}
-                                            onChange={(e) =>
-                                                setDelivery(e.target.value as DeliveryStatus)
-                                            }
-                                            required
-                                        >
-                                            {(['In Transit', 'Delivered', 'RTO', 'Pending Pickup'] as DeliveryStatus[]).map(
-                                                (p) => (
-                                                    <option key={p} value={p}>
-                                                        {p}
-                                                    </option>
-                                                )
-                                            )}
-                                        </select>
+                                            onChange={(v) => setDelivery(v as DeliveryStatus)}
+                                            options={ORDER_MODAL_DELIVERY_OPTIONS}
+                                            aria-label="Shipping status"
+                                        />
                                     </div>
                                 </div>
 
@@ -1003,6 +983,24 @@ function AddOrderModal({
                             </div>
 
                             <div className="shopify-add-modal-sidebar">
+                                <div className="shopify-add-modal-shipped-row">
+                                    <span className="shopify-add-modal-shipped-label" id="shipped-toggle-label">
+                                        Marked as shipped
+                                    </span>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={isShipped}
+                                        aria-labelledby="shipped-toggle-label"
+                                        className={
+                                            'shopify-add-modal-shipped-toggle' +
+                                            (isShipped ? ' shopify-add-modal-shipped-toggle--on' : '')
+                                        }
+                                        onClick={() => setIsShipped((v) => !v)}
+                                    >
+                                        <span className="shopify-add-modal-shipped-toggle-knob" aria-hidden />
+                                    </button>
+                                </div>
                                 <div className="shopify-add-modal-tracking-card">
                                     <label className="label shopify-add-modal-tracking-label">
                                         AWB No

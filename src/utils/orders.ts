@@ -3,7 +3,7 @@ import { apiFetch } from '../api';
 export type PaymentStatus = 'COD' | 'PAID';
 export type FulfillmentStatus = 'Unfulfilled' | 'Fulfilled' | 'Partial';
 export type DeliveryStatus = 'In Transit' | 'Delivered' | 'RTO' | 'Pending Pickup';
-export type Platform = 'Shopify' | 'Abandoned' | 'Whatsapp' | 'Amazon' | 'Flipkart';
+export type Platform = 'Shopify' | 'Abandoned' | 'Whatsapp' | 'Amazon' | 'Flipkart' | 'Calling';
 export type OrderType = 'New' | 'Repeat' | 'Reference';
 
 export type OrderItem = { variant: string; quantity: number; lineAmount: number };
@@ -15,6 +15,7 @@ export type Order = {
     customerPhone: string;
     customerAddress: string;
     items: OrderItem[];
+    is_shipped: boolean;
     amount: number;
     paymentStatus: PaymentStatus;
     fulfillmentStatus: FulfillmentStatus;
@@ -55,6 +56,7 @@ export async function loadOrders(): Promise<Order[]> {
         ...o,
         // Normalise possible backend shapes
         addedBy: (o.addedBy ?? o.added_by) ?? undefined,
+        is_shipped: Boolean((o as { is_shipped?: boolean }).is_shipped),
     })) as Order[];
 }
 

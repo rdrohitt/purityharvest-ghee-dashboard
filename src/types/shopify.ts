@@ -94,6 +94,8 @@ export interface ShopifyOrderApi {
     paymentMode: string;
     fulfillmentStatus: string;
     returnStatus: boolean;
+    /** Whether the order has been shipped (from API / backend). */
+    is_shipped?: boolean;
     codCharges: number;
     shippingCharges: number;
     discount: number;

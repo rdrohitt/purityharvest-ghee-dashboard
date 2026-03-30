@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, LineElement, BarElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend } from 'chart.js';
 import { DateRange, RangeKey, generateMockData, getPresetRange, sum, getMonthRange, monthLabel } from '../../utils/metrics';
+import './Dashboard.scss';
 
 ChartJS.register(LineElement, BarElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
@@ -81,6 +82,7 @@ export default function Dashboard() {
 
 	return (
 		<div className="page">
+			<div className="dashboard-coming-soon-shell">
 			<div className="card" style={{ marginBottom: 16, position: 'sticky', top: 64, zIndex: 5 }}>
 				<div className="filter-group" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
 					<RangeButton current={rangeKey} onClick={() => { setRangeKey('today'); setShowCustom(false); }} id="today">Today</RangeButton>
@@ -173,6 +175,22 @@ export default function Dashboard() {
 						</tbody>
 					</table>
 				</div>
+			</div>
+			<div
+				className="dashboard-coming-soon-overlay"
+				role="status"
+				aria-live="polite"
+				aria-label="Dashboard coming soon"
+			>
+				<div className="dashboard-coming-soon-panel">
+					<span className="dashboard-coming-soon-kicker">Analytics</span>
+					<h1 className="dashboard-coming-soon-title">Coming Soon</h1>
+					<div className="dashboard-coming-soon-divider" aria-hidden />
+					<p className="dashboard-coming-soon-sub">
+						We&apos;re building richer insights here. Check back shortly.
+					</p>
+				</div>
+			</div>
 			</div>
 		</div>
 	);
