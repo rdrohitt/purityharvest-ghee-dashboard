@@ -53,9 +53,12 @@ export default function Users() {
         }));
     }, []);
 
+    // Load once when the list is empty. Do not depend on `users` (array identity) or the effect
+    // re-runs after every failed load (setUsers([])) and spams /api/users.
     useEffect(() => {
         let cancelled = false;
-        if (users && users.length > 0) {
+        if (users.length > 0) {
+            dispatch(setUsersLoading(false));
             return;
         }
         dispatch(setUsersLoading(true));
@@ -63,11 +66,17 @@ export default function Users() {
         apiFetch('/api/users')
             .then((res) => {
                 if (cancelled) return;
+                if (res.status === 403) {
+                    setLoadError('You do not have permission to view this section.');
+                    dispatch(setUsersInStore([]));
+                    return;
+                }
                 if (!res.ok) throw new Error(res.statusText || 'Failed to load users');
                 return res.json();
             })
             .then((data: unknown) => {
                 if (cancelled) return;
+                if (data === undefined) return;
                 dispatch(setUsersInStore(normalizeUsers(data)));
             })
             .catch((err: Error) => {
@@ -79,7 +88,8 @@ export default function Users() {
         return () => {
             cancelled = true;
         };
-    }, [dispatch, normalizeUsers, users]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only when empty vs non-empty
+    }, [dispatch, normalizeUsers, users.length]);
 
     function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
         const id = `toast-${Date.now()}-${Math.random()}`;

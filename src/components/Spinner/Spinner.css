@@ -68,3 +68,11 @@
 	color: var(--muted, #64748b);
 	font-weight: 500;
 }
+
+/* When access is forbidden, suppress loaders and show permission overlay instead. */
+body.permission-blocked-active .spinner-overlay,
+body.permission-blocked-active main.content .spinner-overlay {
+	display: none !important;
+	visibility: hidden !important;
+	pointer-events: none !important;
+}

@@ -21,3 +21,87 @@
   width: 220px;
 }
 
+.page.permission-blocked {
+  position: relative;
+  overflow: hidden;
+}
+
+.page.permission-blocked > :not(.permission-overlay) {
+  filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Freeze/hide any in-page loaders while permission overlay is active. */
+.page.permission-blocked > :not(.permission-overlay) * {
+  animation: none !important;
+}
+
+.page.permission-blocked > :not(.permission-overlay) [role='status'],
+.page.permission-blocked > :not(.permission-overlay) [class*='spinner'],
+.page.permission-blocked > :not(.permission-overlay) [class*='loader'] {
+  display: none !important;
+}
+
+.permission-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.2);
+  z-index: 5;
+}
+
+.permission-overlay-card {
+  max-width: 520px;
+  margin: 16px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.9);
+  color: #0f172a;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.15);
+}
+
+.session-expired-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.58);
+  backdrop-filter: blur(2px);
+  z-index: 70000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.session-expired-modal-card {
+  width: min(460px, 100%);
+  background: var(--bg-elev, #ffffff);
+  color: var(--text, #0f172a);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.32);
+  padding: 24px;
+}
+
+.session-expired-modal-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.session-expired-modal-text {
+  margin: 10px 0 0;
+  color: var(--muted, #64748b);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.session-expired-modal-btn {
+  margin-top: 18px;
+}
+

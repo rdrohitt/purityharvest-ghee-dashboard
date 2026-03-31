@@ -3,6 +3,7 @@ import { logout } from '../auth';
 import { useEffect, useMemo, useState } from 'react';
 import { useAppSelector } from '../store';
 import { applyTheme, getInitialTheme, type Theme } from '../theme';
+import { API_FORBIDDEN_EVENT, API_UNAUTHORIZED_EVENT } from '../api';
 import './AdminLayout.scss';
 
 export default function AdminLayout() {
@@ -13,10 +14,13 @@ export default function AdminLayout() {
     const [theme, setTheme] = useState<Theme>(getInitialTheme());
     const [salesOpen, setSalesOpen] = useState(true);
     const [martsOpen, setMartsOpen] = useState(false);
+    const [forbiddenSection, setForbiddenSection] = useState(false);
+    const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
 
     useEffect(() => {
         // close drawer on route change (mobile)
         setDrawerOpen(false);
+        setForbiddenSection(false);
 
         // ensure sales group is expanded when a sales route is active
         if (
@@ -36,6 +40,33 @@ export default function AdminLayout() {
         }
     }, [location.pathname]);
 
+    useEffect(() => {
+        const onForbidden = () => setForbiddenSection(true);
+        window.addEventListener(API_FORBIDDEN_EVENT, onForbidden as EventListener);
+        return () => {
+            window.removeEventListener(API_FORBIDDEN_EVENT, onForbidden as EventListener);
+        };
+    }, []);
+
+    useEffect(() => {
+        const onUnauthorized = () => setShowSessionExpiredModal(true);
+        window.addEventListener(API_UNAUTHORIZED_EVENT, onUnauthorized as EventListener);
+        return () => {
+            window.removeEventListener(API_UNAUTHORIZED_EVENT, onUnauthorized as EventListener);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (forbiddenSection) {
+            document.body.classList.add('permission-blocked-active');
+        } else {
+            document.body.classList.remove('permission-blocked-active');
+        }
+        return () => {
+            document.body.classList.remove('permission-blocked-active');
+        };
+    }, [forbiddenSection]);
+
     const enabledLabels = useMemo(() => {
         const set = new Set<string>();
         menu.forEach((m) => {
@@ -47,6 +78,12 @@ export default function AdminLayout() {
     const hasMenuLabel = (label: string) => enabledLabels.has(label);
 
     function handleLogout() {
+        logout();
+        window.location.replace('/login');
+    }
+
+    function handleSignInAgain() {
+        setShowSessionExpiredModal(false);
         logout();
         window.location.replace('/login');
     }
@@ -64,6 +101,19 @@ export default function AdminLayout() {
         <div className={layoutClass}>
             {/* Mobile backdrop */}
             {drawerOpen ? <div className="drawer-backdrop" onClick={() => setDrawerOpen(false)} /> : null}
+            {showSessionExpiredModal ? (
+                <div className="session-expired-modal-backdrop" role="dialog" aria-modal="true" aria-live="assertive">
+                    <div className="session-expired-modal-card">
+                        <h3 className="session-expired-modal-title">Session Expired</h3>
+                        <p className="session-expired-modal-text">
+                            Your session is logged out. Please login again.
+                        </p>
+                        <button type="button" className="button session-expired-modal-btn" onClick={handleSignInAgain}>
+                            Sign In
+                        </button>
+                    </div>
+                </div>
+            ) : null}
 
             <aside className={sidebarClass}>
                 <div className="brand">🔷 <span>Purity Harvest</span></div>
@@ -196,8 +246,15 @@ export default function AdminLayout() {
                         <div title="Account">🙂</div>
                     </div>
                 </div>
-                <div className="page">
+                <div className={forbiddenSection ? 'page permission-blocked' : 'page'}>
                     <Outlet />
+                    {forbiddenSection ? (
+                        <div className="permission-overlay" role="alert" aria-live="polite">
+                            <div className="permission-overlay-card">
+                                You do not have permission for this section.
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             </main>
         </div>
