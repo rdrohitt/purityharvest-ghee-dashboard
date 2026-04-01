@@ -932,6 +932,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         metaSpend={metrics.metaSpend}
                         miscCost={metrics.miscSpend}
                         delhiveryCost={metrics.delhiverySpend}
+                        isMilkSelected={categoryTab === 'milk'}
                     />
                     <ModernQuantityMetric
                         quantityBySize={metrics.quantityBySize}
@@ -939,6 +940,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         rtoQuantityBySize={metrics.rtoQuantityBySize}
                         inTransitQuantityBySize={metrics.inTransitQuantityBySize}
                         gheeLitersByKind={metrics.gheeLitersByKind}
+                        isMilkSelected={categoryTab === 'milk'}
                     />
                     <ModernDeliveryStatusMetric
                         delivered={metrics.delivered}
@@ -947,6 +949,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         rtoAmount={metrics.rtoAmount}
                         inTransit={metrics.inTransit}
                         inTransitAmount={metrics.inTransitAmount}
+                        isMilkSelected={categoryTab === 'milk'}
                     />
                     <ModernRoasMetric
                         currentRoas={metrics.roasCurrent}
@@ -1341,6 +1344,7 @@ function ModernSalesWithEBITAMetric({
     metaSpend,
     miscCost,
     delhiveryCost,
+    isMilkSelected,
 }: {
     totalSales: number;
     ebita: number;
@@ -1350,6 +1354,7 @@ function ModernSalesWithEBITAMetric({
     metaSpend: number;
     miscCost: number;
     delhiveryCost: number;
+    isMilkSelected: boolean;
 }) {
     return (
         <article className="shopify-dash-card shopify-dash-card--sales">
@@ -1368,29 +1373,36 @@ function ModernSalesWithEBITAMetric({
                 <p className="shopify-dash-card__figure">{formatCurrency(totalSales)}</p>
                 <p className="shopify-dash-card__caption">Total sales in range</p>
             </div>
-            <div className="shopify-dash-card__stat-row">
-                <div className={`shopify-dash-card__stat ${ebita >= 0 ? 'shopify-dash-card__stat--pos' : 'shopify-dash-card__stat--neg'}`}>
-                    <span className="shopify-dash-card__stat-k">EBITA</span>
-                    <span className="shopify-dash-card__stat-v">{formatCurrency(ebita)}</span>
+            <div className={isMilkSelected ? 'shopify-milk-blocked-area shopify-milk-blocked-area--active' : 'shopify-milk-blocked-area'}>
+                {isMilkSelected ? (
+                    <div className="shopify-dash-card__disabled-overlay" aria-live="polite">
+                        Not For Milk
+                    </div>
+                ) : null}
+                <div className="shopify-dash-card__stat-row">
+                    <div className={`shopify-dash-card__stat ${ebita >= 0 ? 'shopify-dash-card__stat--pos' : 'shopify-dash-card__stat--neg'}`}>
+                        <span className="shopify-dash-card__stat-k">EBITA</span>
+                        <span className="shopify-dash-card__stat-v">{formatCurrency(ebita)}</span>
+                    </div>
+                    <div className={`shopify-dash-card__stat ${expectedEbita >= 0 ? 'shopify-dash-card__stat--pos' : 'shopify-dash-card__stat--neg'}`}>
+                        <span className="shopify-dash-card__stat-k">Expected</span>
+                        <span className="shopify-dash-card__stat-v">{formatCurrency(expectedEbita)}</span>
+                        <span className="shopify-dash-card__stat-h">Incl. in-transit orders</span>
+                    </div>
                 </div>
-                <div className={`shopify-dash-card__stat ${expectedEbita >= 0 ? 'shopify-dash-card__stat--pos' : 'shopify-dash-card__stat--neg'}`}>
-                    <span className="shopify-dash-card__stat-k">Expected</span>
-                    <span className="shopify-dash-card__stat-v">{formatCurrency(expectedEbita)}</span>
-                    <span className="shopify-dash-card__stat-h">Incl. in-transit orders</span>
-                </div>
+                <section className="shopify-dash-card__panel" aria-label="Cost breakdown">
+                    <div className="shopify-dash-card__panel-head">
+                        <span className="shopify-dash-card__panel-title">Costs</span>
+                    </div>
+                    <ul className="shopify-dash-card__cost-list">
+                        <li><span>Mfg · delivered</span><span>{formatCurrency(manufacturingCost)}</span></li>
+                        <li><span>Mfg · expected</span><span>{formatCurrency(expectedManufacturingCost)}</span></li>
+                        <li><span>Meta ads</span><span>{formatCurrency(metaSpend)}</span></li>
+                        <li><span>Misc</span><span>{formatCurrency(miscCost)}</span></li>
+                        <li><span>Delhivery</span><span>{formatCurrency(delhiveryCost)}</span></li>
+                    </ul>
+                </section>
             </div>
-            <section className="shopify-dash-card__panel" aria-label="Cost breakdown">
-                <div className="shopify-dash-card__panel-head">
-                    <span className="shopify-dash-card__panel-title">Costs</span>
-                </div>
-                <ul className="shopify-dash-card__cost-list">
-                    <li><span>Mfg · delivered</span><span>{formatCurrency(manufacturingCost)}</span></li>
-                    <li><span>Mfg · expected</span><span>{formatCurrency(expectedManufacturingCost)}</span></li>
-                    <li><span>Meta ads</span><span>{formatCurrency(metaSpend)}</span></li>
-                    <li><span>Misc</span><span>{formatCurrency(miscCost)}</span></li>
-                    <li><span>Delhivery</span><span>{formatCurrency(delhiveryCost)}</span></li>
-                </ul>
-            </section>
         </article>
     );
 }
@@ -1402,6 +1414,7 @@ function ModernDeliveryStatusMetric({
     rtoAmount,
     inTransit,
     inTransitAmount,
+    isMilkSelected,
 }: {
     delivered: number;
     deliveredAmount: number;
@@ -1409,6 +1422,7 @@ function ModernDeliveryStatusMetric({
     rtoAmount: number;
     inTransit: number;
     inTransitAmount: number;
+    isMilkSelected: boolean;
 }) {
     const totalOrders = delivered + rto + inTransit;
     const totalAmount = deliveredAmount + rtoAmount + inTransitAmount;
@@ -1429,9 +1443,14 @@ function ModernDeliveryStatusMetric({
         pctVal > 0 && pctVal < 9 ? ' shopify-dash-card__ship-split-seg--narrow' : '';
 
     return (
-        <article className="shopify-dash-card shopify-dash-card--ship">
+        <article className={`shopify-dash-card shopify-dash-card--ship${isMilkSelected ? ' shopify-dash-card--disabled' : ''}`}>
             <div className="shopify-dash-card__accent" aria-hidden />
             <div className="shopify-dash-card__noise" aria-hidden />
+            {isMilkSelected ? (
+                <div className="shopify-dash-card__disabled-overlay" aria-live="polite">
+                    Not For Milk
+                </div>
+            ) : null}
             <header className="shopify-dash-card__head">
                 <div className="shopify-dash-card__icon" aria-hidden>
                     <IconPackage />
@@ -1571,12 +1590,14 @@ function ModernQuantityMetric({
     rtoQuantityBySize,
     inTransitQuantityBySize,
     gheeLitersByKind,
+    isMilkSelected,
 }: {
     quantityBySize: { [key: string]: number };
     deliveredQuantityBySize: { [key: string]: number };
     rtoQuantityBySize: { [key: string]: number };
     inTransitQuantityBySize: { [key: string]: number };
     gheeLitersByKind: GheeLitersByKind;
+    isMilkSelected: boolean;
 }) {
     const totalQuantityInLiters = (quantityBySize['500ml'] || 0) * 0.5 + (quantityBySize['1ltr'] || 0) * 1 + (quantityBySize['5ltr'] || 0) * 5;
     const totalDeliveredInLiters = (deliveredQuantityBySize['500ml'] || 0) * 0.5 + (deliveredQuantityBySize['1ltr'] || 0) * 1 + (deliveredQuantityBySize['5ltr'] || 0) * 5;
@@ -1611,49 +1632,56 @@ function ModernQuantityMetric({
                     <span className="shopify-dash-card__pill-v">{formatLiters(totalDeliveredInLiters)}</span>
                 </div>
             </div>
-            <section className="shopify-dash-card__ghee-strip" aria-label="Ghee volume by type">
-                <p className="shopify-dash-card__ghee-strip-title">Ghee · total liters by type</p>
-                <div className="shopify-dash-card__ghee-cols">
-                    <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--gir">
-                        <span className="shopify-dash-card__ghee-label">Gir cow</span>
-                        <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.gir)}</span>
+            <div className={isMilkSelected ? 'shopify-milk-blocked-area shopify-milk-blocked-area--active' : 'shopify-milk-blocked-area'}>
+                {isMilkSelected ? (
+                    <div className="shopify-dash-card__disabled-overlay" aria-live="polite">
+                        Not For Milk
                     </div>
-                    <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--desi">
-                        <span className="shopify-dash-card__ghee-label">Desi cow</span>
-                        <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.desi)}</span>
-                    </div>
-                    <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--buffalo">
-                        <span className="shopify-dash-card__ghee-label">Buffalo </span>
-                        <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.buffalo)}</span>
-                    </div>
-                </div>
-            </section>
-            {totalQuantityInLiters > 0 ? (
-                <div className="shopify-dash-card__table-wrap">
-                    <div className="shopify-dash-card__table" role="table" aria-label="Units by pack size and status">
-                        <div className="shopify-dash-card__tr shopify-dash-card__tr--head" role="row">
-                            <span role="columnheader">Size</span>
-                            <span role="columnheader" title="Total">Tot</span>
-                            <span role="columnheader" title="Delivered">Del</span>
-                            <span role="columnheader">RTO</span>
-                            <span role="columnheader" title="In transit">Trn</span>
+                ) : null}
+                <section className="shopify-dash-card__ghee-strip" aria-label="Ghee volume by type">
+                    <p className="shopify-dash-card__ghee-strip-title">Ghee · total liters by type</p>
+                    <div className="shopify-dash-card__ghee-cols">
+                        <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--gir">
+                            <span className="shopify-dash-card__ghee-label">Gir cow</span>
+                            <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.gir)}</span>
                         </div>
-                        {sizeRows.map(({ key, label }) =>
-                            quantityBySize[key] > 0 ? (
-                                <div key={key} className="shopify-dash-card__tr" role="row">
-                                    <span className="shopify-dash-card__td--lead" role="cell">{label}</span>
-                                    <span className="shopify-dash-card__td--t" role="cell">{quantityBySize[key].toLocaleString()}</span>
-                                    <span className="shopify-dash-card__td--d" role="cell">{(deliveredQuantityBySize[key] || 0).toLocaleString()}</span>
-                                    <span className="shopify-dash-card__td--r" role="cell">{(rtoQuantityBySize[key] || 0).toLocaleString()}</span>
-                                    <span className="shopify-dash-card__td--i" role="cell">{(inTransitQuantityBySize[key] || 0).toLocaleString()}</span>
-                                </div>
-                            ) : null,
-                        )}
+                        <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--desi">
+                            <span className="shopify-dash-card__ghee-label">Desi cow</span>
+                            <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.desi)}</span>
+                        </div>
+                        <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--buffalo">
+                            <span className="shopify-dash-card__ghee-label">Buffalo </span>
+                            <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.buffalo)}</span>
+                        </div>
                     </div>
-                </div>
-            ) : (
-                <p className="shopify-dash-card__empty">No volume in this range</p>
-            )}
+                </section>
+                {totalQuantityInLiters > 0 ? (
+                    <div className="shopify-dash-card__table-wrap">
+                        <div className="shopify-dash-card__table" role="table" aria-label="Units by pack size and status">
+                            <div className="shopify-dash-card__tr shopify-dash-card__tr--head" role="row">
+                                <span role="columnheader">Size</span>
+                                <span role="columnheader" title="Total">Tot</span>
+                                <span role="columnheader" title="Delivered">Del</span>
+                                <span role="columnheader">RTO</span>
+                                <span role="columnheader" title="In transit">Trn</span>
+                            </div>
+                            {sizeRows.map(({ key, label }) =>
+                                quantityBySize[key] > 0 ? (
+                                    <div key={key} className="shopify-dash-card__tr" role="row">
+                                        <span className="shopify-dash-card__td--lead" role="cell">{label}</span>
+                                        <span className="shopify-dash-card__td--t" role="cell">{quantityBySize[key].toLocaleString()}</span>
+                                        <span className="shopify-dash-card__td--d" role="cell">{(deliveredQuantityBySize[key] || 0).toLocaleString()}</span>
+                                        <span className="shopify-dash-card__td--r" role="cell">{(rtoQuantityBySize[key] || 0).toLocaleString()}</span>
+                                        <span className="shopify-dash-card__td--i" role="cell">{(inTransitQuantityBySize[key] || 0).toLocaleString()}</span>
+                                    </div>
+                                ) : null,
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <p className="shopify-dash-card__empty">No volume in this range</p>
+                )}
+            </div>
         </article>
     );
 }

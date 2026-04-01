@@ -18,6 +18,7 @@ import GurugramMarts from './pages/Marts/GurugramMarts/index';
 import DelhiMarts from './pages/Marts/DelhiMarts/index';
 import Modules from './pages/Modules/index';
 import { isAuthenticated, hydrateUserFromToken } from './auth';
+import { API_ACTIVITY_EVENT } from './api';
 import { Spinner } from './components/Spinner';
 
 function PrivateRoute({ children }: { children: ReactElement }) {
@@ -42,6 +43,7 @@ function RootRedirect() {
 
 export default function App() {
 	const [hydratingUser, setHydratingUser] = useState<boolean>(isAuthenticated());
+	const [activeApiRequests, setActiveApiRequests] = useState(0);
 
 	useEffect(() => {
 		if (!isAuthenticated()) {
@@ -63,9 +65,24 @@ export default function App() {
 		};
 	}, []);
 
+	useEffect(() => {
+		const onApiActivity = (event: Event) => {
+			const custom = event as CustomEvent<{ activeRequests?: number }>;
+			setActiveApiRequests(custom.detail?.activeRequests ?? 0);
+		};
+
+		window.addEventListener(API_ACTIVITY_EVENT, onApiActivity as EventListener);
+		return () => {
+			window.removeEventListener(API_ACTIVITY_EVENT, onApiActivity as EventListener);
+		};
+	}, []);
+
+	const showGlobalSpinner = hydratingUser || activeApiRequests > 0;
+	const spinnerMessage = hydratingUser ? 'Loading dashboard…' : 'Loading…';
+
 	return (
 		<>
-			{hydratingUser && <Spinner overlay fixed message="Loading dashboard…" />}
+			{showGlobalSpinner && <Spinner overlay fixed message={spinnerMessage} />}
 			<Routes>
 				<Route path="/" element={<RootRedirect />} />
 				<Route 

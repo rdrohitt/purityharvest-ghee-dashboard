@@ -8,6 +8,8 @@ const inflightByKey = new Map<string, Promise<Response>>();
 
 export const API_FORBIDDEN_EVENT = 'ph:api-forbidden';
 export const API_UNAUTHORIZED_EVENT = 'ph:api-unauthorized';
+export const API_ACTIVITY_EVENT = 'ph:api-activity';
+let activeApiRequests = 0;
 
 function getRequestKey(path: string, init?: RequestInit): string {
 	const method = (init?.method ?? 'GET').toUpperCase();
@@ -42,6 +44,25 @@ function dispatchUnauthorizedEvent(path: string): void {
 	window.dispatchEvent(new CustomEvent(API_UNAUTHORIZED_EVENT, { detail: { path } }));
 }
 
+function dispatchApiActivityEvent(): void {
+	if (typeof window === 'undefined') return;
+	window.dispatchEvent(
+		new CustomEvent(API_ACTIVITY_EVENT, {
+			detail: { activeRequests: activeApiRequests },
+		})
+	);
+}
+
+function beginApiActivity(): void {
+	activeApiRequests += 1;
+	dispatchApiActivityEvent();
+}
+
+function endApiActivity(): void {
+	activeApiRequests = Math.max(0, activeApiRequests - 1);
+	dispatchApiActivityEvent();
+}
+
 /**
  * Authenticated fetch: same as fetch(apiUrl(path), init) but adds
  * Authorization: Bearer <token> when the user is logged in.
@@ -69,18 +90,23 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
 	}
 
 	const runFetch = async (): Promise<Response> => {
-		const response = await fetch(url, { ...init, headers });
-		if (response.status === 401) {
-			dispatchUnauthorizedEvent(path);
+		beginApiActivity();
+		try {
+			const response = await fetch(url, { ...init, headers });
+			if (response.status === 401) {
+				dispatchUnauthorizedEvent(path);
+				return response;
+			}
+			if (response.status === 403) {
+				forbiddenUntilByRequestKey.set(requestKey, Date.now() + FORBIDDEN_COOLDOWN_MS);
+				dispatchForbiddenEvent(path);
+				return response;
+			}
+			forbiddenUntilByRequestKey.delete(requestKey);
 			return response;
+		} finally {
+			endApiActivity();
 		}
-		if (response.status === 403) {
-			forbiddenUntilByRequestKey.set(requestKey, Date.now() + FORBIDDEN_COOLDOWN_MS);
-			dispatchForbiddenEvent(path);
-			return response;
-		}
-		forbiddenUntilByRequestKey.delete(requestKey);
-		return response;
 	};
 
 	if (canDedupe && inflightByKey.has(requestKey)) {

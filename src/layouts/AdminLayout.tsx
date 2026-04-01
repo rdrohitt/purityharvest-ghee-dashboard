@@ -8,6 +8,7 @@ import './AdminLayout.scss';
 
 export default function AdminLayout() {
     const location = useLocation();
+    const meUser = useAppSelector((state) => state.user.user);
     const menu = useAppSelector((state) => state.user.menu);
     const [collapsed, setCollapsed] = useState(false);
     const [drawerOpen, setDrawerOpen] = useState(false);
@@ -76,6 +77,29 @@ export default function AdminLayout() {
     }, [menu]);
 
     const hasMenuLabel = (label: string) => enabledLabels.has(label);
+
+    const topbarGreeting = useMemo(() => {
+        const name = meUser?.name?.trim();
+        const username = meUser?.username?.trim();
+        const displayName = name || username || 'Admin';
+
+        const hourInIST = Number(
+            new Intl.DateTimeFormat('en-IN', {
+                hour: '2-digit',
+                hour12: false,
+                timeZone: 'Asia/Kolkata',
+            }).format(new Date())
+        );
+
+        let greeting = 'Good Evening';
+        if (hourInIST >= 5 && hourInIST < 12) {
+            greeting = 'Good Morning';
+        } else if (hourInIST >= 12 && hourInIST < 17) {
+            greeting = 'Good Afternoon';
+        }
+
+        return `${greeting} ${displayName}`;
+    }, [meUser]);
 
     function handleLogout() {
         logout();
@@ -239,7 +263,9 @@ export default function AdminLayout() {
                 <div className="topbar">
                     <button className="icon-btn" onClick={() => setDrawerOpen((v) => !v)} aria-label="Toggle menu">☰</button>
                     <button className="icon-btn" onClick={() => setCollapsed((v) => !v)} aria-label="Collapse sidebar">⇔</button>
-                    <div className="admin-topbar-title">Admin</div>
+                    <div className="admin-topbar-title" title={topbarGreeting}>
+                        {topbarGreeting}
+                    </div>
                     <div className="admin-topbar-right">
                         <input className="input admin-topbar-search" placeholder="Search" />
                         <button className="icon-btn" onClick={toggleTheme} title="Toggle theme">{theme === 'dark' ? '🌙' : '🌞'}</button>
