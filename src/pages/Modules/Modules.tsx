@@ -135,6 +135,7 @@ export default function Modules() {
 
   return (
     <section className="modules-page">
+      {loading ? <Spinner overlay fixed message="Loading modules…" /> : null}
       <ModulesToastContainer toasts={toasts} />
 
       <div className="card modules-header-card">
@@ -169,9 +170,7 @@ export default function Modules() {
               : `${filtered.length.toLocaleString()} module${filtered.length === 1 ? '' : 's'}`}
         </div>
         {loading ? (
-          <div className="modules-table-loading">
-            <Spinner overlay message="Loading modules…" />
-          </div>
+          null
         ) : !loadError ? (
         <div className="table-scroll-wrapper">
           <table className="modules-table">

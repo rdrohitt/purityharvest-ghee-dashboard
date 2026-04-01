@@ -42,6 +42,7 @@ function RootRedirect() {
 }
 
 export default function App() {
+	const location = useLocation();
 	const [hydratingUser, setHydratingUser] = useState<boolean>(isAuthenticated());
 	const [activeApiRequests, setActiveApiRequests] = useState(0);
 
@@ -77,7 +78,17 @@ export default function App() {
 		};
 	}, []);
 
-	const showGlobalSpinner = hydratingUser || activeApiRequests > 0;
+	const isMarketingSpendRoute = location.pathname.startsWith('/admin/marketing-spend');
+	const isShopifyRoute = location.pathname.startsWith('/admin/shopify');
+	const isUsersRoute =
+		location.pathname.startsWith('/admin/users-and-roles') ||
+		location.pathname.startsWith('/admin/users');
+	const isModulesRoute = location.pathname.startsWith('/admin/modules');
+	const isProductsRoute = location.pathname.startsWith('/admin/products');
+	const showGlobalSpinner =
+		hydratingUser ||
+		(!(isMarketingSpendRoute || isShopifyRoute || isUsersRoute || isModulesRoute || isProductsRoute) &&
+			activeApiRequests > 0);
 	const spinnerMessage = hydratingUser ? 'Loading dashboard…' : 'Loading…';
 
 	return (

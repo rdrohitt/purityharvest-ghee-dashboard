@@ -110,7 +110,7 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
 	};
 
 	if (canDedupe && inflightByKey.has(requestKey)) {
-		return inflightByKey.get(requestKey)!;
+		return inflightByKey.get(requestKey)!.then((response) => response.clone());
 	}
 
 	const promise = runFetch();
@@ -121,5 +121,5 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
 		});
 	}
 
-	return promise;
+	return canDedupe ? promise.then((response) => response.clone()) : promise;
 }

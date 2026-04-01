@@ -238,6 +238,7 @@ export default function Products() {
 
     return (
         <section className="products-page">
+            {loading ? <Spinner overlay fixed message="Loading products…" /> : null}
             <ToastContainer toasts={toasts} />
             <div className="card products-tabs-card">
                 <div className="products-tabs-row">
@@ -311,9 +312,7 @@ export default function Products() {
                     {loading ? 'Loading…' : `Showing ${groupedByProduct.length} products (${filteredRows.length} variants)`}
                 </div>
                 {loading ? (
-                    <div className="products-table-loading">
-                        <Spinner overlay message="Loading products…" />
-                    </div>
+                    null
                 ) : (
                 <div className="table-scroll-wrapper">
                     <table className="products-table">

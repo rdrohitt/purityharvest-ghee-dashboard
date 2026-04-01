@@ -172,6 +172,7 @@ export default function Users() {
 
     return (
         <section className="users-page">
+            {loading ? <Spinner overlay fixed message="Loading users…" /> : null}
             <ToastContainer toasts={toasts} />
 
             <div className="card users-header-card">
@@ -219,9 +220,7 @@ export default function Users() {
                             : `${filtered.length.toLocaleString()} user${filtered.length === 1 ? '' : 's'}`}
                 </div>
                 {loading ? (
-                    <div className="users-table-loading">
-                        <Spinner overlay message="Loading users…" />
-                    </div>
+                    null
                 ) : !loadError ? (
                 <div className="table-scroll-wrapper">
                     <table className="users-table">

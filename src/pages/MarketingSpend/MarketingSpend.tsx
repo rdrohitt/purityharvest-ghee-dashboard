@@ -66,16 +66,18 @@ export default function MarketingSpend() {
             createdByName: item.createdBy?.name,
             updatedByName: item.updatedBy?.name,
         });
+        const platformOf = (item: MarketingSpendApiItem): string =>
+            String(item.platform ?? '').trim().toLowerCase();
 
-        const metaItems = all.filter((i) => i.platform === 'meta1').map(toSpendRecord);
-        const amazonItems = all.filter((i) => i.platform === 'amazon').map(toSpendRecord);
-        const flipkartItems = all.filter((i) => i.platform === 'flipkart').map(toSpendRecord);
-        const checkoutItems = all.filter((i) => i.platform === 'checkout').map(toSpendRecord);
-        const engageItems = all.filter((i) => i.platform === 'engage').map(toSpendRecord);
-        const dolchiItems = all.filter((i) => i.platform === 'dolchi').map(toSpendRecord);
-        const delhiveryItems = all.filter((i) => i.platform === 'delhivery').map(toSpendRecord);
+        const metaItems = all.filter((i) => platformOf(i) === 'meta1').map(toSpendRecord);
+        const amazonItems = all.filter((i) => platformOf(i) === 'amazon').map(toSpendRecord);
+        const flipkartItems = all.filter((i) => platformOf(i) === 'flipkart').map(toSpendRecord);
+        const checkoutItems = all.filter((i) => platformOf(i) === 'checkout').map(toSpendRecord);
+        const engageItems = all.filter((i) => platformOf(i) === 'engage').map(toSpendRecord);
+        const dolchiItems = all.filter((i) => platformOf(i) === 'dolchi').map(toSpendRecord);
+        const delhiveryItems = all.filter((i) => platformOf(i) === 'delhivery').map(toSpendRecord);
         const miscItems = all
-            .filter((i) => i.platform === 'misc')
+            .filter((i) => platformOf(i) === 'misc')
             .map(
                 (item): MiscRecord => ({
                     id: item._id,
@@ -168,6 +170,7 @@ export default function MarketingSpend() {
 
     return (
         <section className="marketing-spend-page">
+            {loading ? <Spinner overlay fixed message="Loading Spend Record" /> : null}
             <div className="card marketing-spend-summary">
                 <div className="marketing-spend-summary__title">Marketing Spend</div>
                 <div className="marketing-spend-summary__subtitle">Capture wallet recharges across channels</div>
@@ -614,11 +617,7 @@ function UnifiedTable({ rows, onEdit, onDelete, loading }: {
     loading: boolean;
 }) {
     if (loading) {
-        return (
-            <div className="marketing-spend-table__loading">
-                <Spinner overlay message="Loading spend records…" />
-            </div>
-        );
+        return null;
     }
     if (rows.length === 0) {
         return (

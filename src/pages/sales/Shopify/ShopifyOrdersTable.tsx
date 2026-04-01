@@ -352,9 +352,7 @@ export function ShopifyOrdersTable({
                 {loading ? '—' : `${orderCount.toLocaleString()} order${orderCount === 1 ? '' : 's'}`}
             </div>
             {loading ? (
-                <div className="shopify-orders-loading">
-                    <Spinner overlay message="Loading orders…" />
-                </div>
+                null
             ) : (
                 <div className="table-scroll-wrapper">
                     <table className="orders-table shopify-orders-table">

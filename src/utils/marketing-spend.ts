@@ -18,6 +18,32 @@ export interface CreateMarketingSpendPayload {
     note?: string;
 }
 
+function extractMarketingSpendArray(json: unknown): MarketingSpendApiItem[] {
+    if (Array.isArray(json)) return json as MarketingSpendApiItem[];
+    if (!json || typeof json !== 'object') return [];
+
+    const obj = json as Record<string, unknown>;
+    if (Array.isArray(obj.data)) return obj.data as MarketingSpendApiItem[];
+    if (Array.isArray(obj.records)) return obj.records as MarketingSpendApiItem[];
+    if (Array.isArray(obj.result)) return obj.result as MarketingSpendApiItem[];
+    if (Array.isArray(obj.list)) return obj.list as MarketingSpendApiItem[];
+    if (Array.isArray(obj.items)) return obj.items as MarketingSpendApiItem[];
+    if (Array.isArray(obj.marketingSpend)) return obj.marketingSpend as MarketingSpendApiItem[];
+
+    const data = obj.data;
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const nested = data as Record<string, unknown>;
+        if (Array.isArray(nested.data)) return nested.data as MarketingSpendApiItem[];
+        if (Array.isArray(nested.records)) return nested.records as MarketingSpendApiItem[];
+        if (Array.isArray(nested.result)) return nested.result as MarketingSpendApiItem[];
+        if (Array.isArray(nested.list)) return nested.list as MarketingSpendApiItem[];
+        if (Array.isArray(nested.items)) return nested.items as MarketingSpendApiItem[];
+        if (Array.isArray(nested.marketingSpend)) return nested.marketingSpend as MarketingSpendApiItem[];
+    }
+
+    return [];
+}
+
 /**
  * Load all marketing spend records from the backend API.
  * Single GET `/api/marketing` that returns an array of MarketingSpendApiItem.
@@ -28,7 +54,8 @@ export async function loadAllMarketingSpend(): Promise<MarketingSpendApiItem[]> 
         throw new Error('Failed to load marketing spend data from API');
     }
 
-    return (await response.json()) as MarketingSpendApiItem[];
+    const raw = (await response.json()) as unknown;
+    return extractMarketingSpendArray(raw);
 }
 
 /**

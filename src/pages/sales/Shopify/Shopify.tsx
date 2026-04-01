@@ -250,6 +250,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return { from: '2024-01-01', to: todayStr };
     }, [range, customStart, customEnd]);
 
+    /** GET /api/orders: from/to match selected date filters (`to` is exclusive next day so last day is included). */
+    const ordersListQuery = useMemo(
+        () => ({ from: dateRangeForApi.from, to: addOneDay(dateRangeForApi.to) }),
+        [dateRangeForApi.from, dateRangeForApi.to],
+    );
+
     const syncShopifyOrders = async () => {
         try {
             setLoading(true);
@@ -260,8 +266,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 showToast('Failed to Sync', 'error');
                 return;
             }
-            const toInclusive = addOneDay(dateRangeForApi.to);
-            const ordersData = await loadOrdersFromApi({ from: dateRangeForApi.from, to: toInclusive });
+            const ordersData = await loadOrdersFromApi(ordersListQuery);
             setOrders(ordersData);
         } catch (err) {
             console.error('Failed to sync Shopify orders', err);
@@ -275,8 +280,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
-        const toInclusive = addOneDay(dateRangeForApi.to);
-        loadOrdersFromApi({ from: dateRangeForApi.from, to: toInclusive })
+        loadOrdersFromApi(ordersListQuery)
             .then((ordersData) => {
                 if (!cancelled) setOrders(ordersData);
             })
@@ -287,7 +291,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 if (!cancelled) setLoading(false);
             });
         return () => { cancelled = true; };
-    }, [dateRangeForApi.from, dateRangeForApi.to]);
+    }, [ordersListQuery]);
 
     // When Edit is clicked, fetch full order from GET /api/orders/:id then open modal
     useEffect(() => {
@@ -372,17 +376,24 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             const matchesState = !stateFilter || o.state === stateFilter;
             const matchesCategory = (() => {
                 if (categoryTab === 'all') return true;
+                // Avoid hiding all rows when product catalog hasn't loaded yet (common in local dev).
+                if (productCategoryMap.size === 0) return true;
                 const lines = o.products || [];
                 for (const line of lines) {
                     const rawProductId = (line as any).productId;
                     let productId: string | null = null;
+                    let inlineProductName = '';
                     if (rawProductId && typeof rawProductId === 'object' && '_id' in rawProductId) {
                         productId = String((rawProductId as { _id: string })._id);
+                        if ('name' in rawProductId) {
+                            inlineProductName = String((rawProductId as { name?: string }).name ?? '').toLowerCase();
+                        }
                     } else if (typeof rawProductId === 'string') {
                         productId = rawProductId;
                     }
-                    if (!productId) continue;
-                    const catLower = productCategoryMap.get(productId) || '';
+                    const catFromMap = productId ? (productCategoryMap.get(productId) || '') : '';
+                    const variantText = String((line as { variantName?: string }).variantName ?? '').toLowerCase();
+                    const catLower = `${catFromMap} ${inlineProductName} ${variantText}`.trim();
                     if (!catLower) continue;
                     if (categoryTab === 'milk' && catLower.includes('milk')) return true;
                     if (categoryTab === 'ghee' && catLower.includes('ghee')) return true;
@@ -712,6 +723,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
     return (
         <section className="shopify-page">
+            {(loading || marketingSpendLoading) ? <Spinner overlay fixed message="Loading Orders" /> : null}
             <div className="card shopify-header-card">
                 <div className="shopify-header-title">{title}</div>
                 <div className="shopify-header-main">
@@ -1018,8 +1030,15 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     mode={editingOrder ? 'edit' : 'add'}
                     initialOrder={editingOrder || undefined}
                     onClose={() => {
+                        const wasEditing = editingOrder !== null;
                         setShowAddOrder(false);
                         setEditingOrder(null);
+                        // Ensure list refresh uses the same from/to as the date filter (bare GET /orders otherwise).
+                        if (wasEditing) {
+                            void loadOrdersFromApi(ordersListQuery)
+                                .then((fresh) => setOrders(fresh))
+                                .catch(() => {});
+                        }
                     }} 
                     onCreate={async (o) => {
                         try {
@@ -1053,7 +1072,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                 } else {
                                     await updateOrder(o);
                                 }
-                                const fresh = await loadOrdersFromApi();
+                                const fresh = await loadOrdersFromApi(ordersListQuery);
                                 setOrders(fresh);
                                 setEditingOrder(null);
                                 showToast('Order updated successfully!', 'success');
@@ -1128,7 +1147,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     },
                                     body: JSON.stringify(payload),
                                 });
-                                const fresh = await loadOrdersFromApi();
+                                const fresh = await loadOrdersFromApi(ordersListQuery);
                                 setOrders(fresh);
                                 setShowAddOrder(false);
                                 showToast('Order added successfully!', 'success');
@@ -1162,7 +1181,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     onConfirm={async () => {
                         try {
                             await deleteOrder(orderToDelete.id);
-                            const fresh = await loadOrdersFromApi();
+                            const fresh = await loadOrdersFromApi(ordersListQuery);
                             setOrders(fresh);
                             showToast('Order deleted successfully!', 'delete');
                             setOrderToDelete(null);
