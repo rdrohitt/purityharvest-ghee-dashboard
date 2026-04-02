@@ -2,7 +2,16 @@ import type { ShopifyOrderApi, ShopifyOrderCustomer } from '../../../types/shopi
 import type { Order } from '../../../utils/orders';
 import type { Platform } from '../../../utils/orders';
 import type { SpendRecord } from '../../../utils/marketing-spend';
-import { shopifyOrderToOrder, getOrderAddress, getOrderCustomerName, getOrderCustomerPhone, mapDeliveryStatusFromTracking, mapOrderType } from '../../../utils/shopify-orders';
+import {
+    shopifyOrderToOrder,
+    getOrderAddress,
+    getOrderCustomerName,
+    getOrderCustomerPhone,
+    mapDeliveryStatusFromTracking,
+    mapOrderType,
+    getShopifyProductUnitPrice,
+    getShopifyProductLineAmount,
+} from '../../../utils/shopify-orders';
 import { Spinner } from '../../../components/Spinner';
 import { formatCurrency, generateWhatsAppSummary, Th, Td, StatusTag, PlatformTag, TypeTag } from './ShopifyShared';
 import jsPDF from 'jspdf';
@@ -229,8 +238,8 @@ function generateOrderInvoicePDF(order: ShopifyOrderApi): void {
                 : '';
         const itemName = productName || p.variantName || 'Item';
         const qty = Number(p.quantity || 0);
-        const unitPrice = Number(p.price || 0);
-        const lineTotal = qty * unitPrice;
+        const unitPrice = getShopifyProductUnitPrice(p);
+        const lineTotal = getShopifyProductLineAmount(p);
         return [
             String(idx + 1),
             `${itemName}${p.variantName ? ` (${p.variantName})` : ''}`,

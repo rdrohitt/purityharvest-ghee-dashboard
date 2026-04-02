@@ -1,7 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { apiFetch } from '../../../api';
 import { updateOrder, deleteOrder, type Order, type OrderItem, type PaymentStatus, type FulfillmentStatus, type DeliveryStatus, type Platform, type OrderType } from '../../../utils/orders';
-import { loadOrdersFromApi, shopifyOrderToOrder, fetchOrderById, orderDetailToOrder, mapDeliveryStatusFromTracking, mapFulfillmentStatus, mapOrderType, getOrderCustomerName, getOrderCustomerPhone, updateShopifyOrderFromForm } from '../../../utils/shopify-orders';
+import {
+    loadOrdersFromApi,
+    shopifyOrderToOrder,
+    fetchOrderById,
+    orderDetailToOrder,
+    mapDeliveryStatusFromTracking,
+    mapFulfillmentStatus,
+    mapOrderType,
+    getOrderCustomerName,
+    getOrderCustomerPhone,
+    updateShopifyOrderFromForm,
+    getShopifyProductUnitPrice,
+} from '../../../utils/shopify-orders';
 import type { ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../../../types/shopify';
 import { loadProducts, type ProductApiItem } from '../../../utils/products';
 import type { MarketingSpendApiItem } from '../../../types/marketing-spend';
@@ -19,6 +31,7 @@ import './Shopify.scss';
 
 type UiRange = 'all' | 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
 type CategoryTab = 'all' | 'milk' | 'ghee' | 'oils';
+type ShippedTab = 'shipped' | 'notShipped';
 
 /** Liters sold for each ghee product line (matched by product name from API / catalog). */
 export type GheeLitersByKind = { gir: number; desi: number; buffalo: number };
@@ -113,6 +126,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const [marketingSpendLoading, setMarketingSpendLoading] = useState(true);
     const [loading, setLoading] = useState(true);
     const [categoryTab, setCategoryTab] = useState<CategoryTab>('ghee');
+    const [shippedTab, setShippedTab] = useState<ShippedTab>('shipped');
     const [syncingShopify, setSyncingShopify] = useState(false);
     
     // Toast notifications
@@ -374,6 +388,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             const matchesPlatform = !platformFilter || (o.platform && o.platform.toLowerCase() === platformFilter.toLowerCase());
             const matchesType = !typeFilter || mapOrderType(o.type) === typeFilter;
             const matchesState = !stateFilter || o.state === stateFilter;
+            const matchesShipped =
+                shippedTab === 'shipped' ? o.is_shipped === true : o.is_shipped === false;
             const matchesCategory = (() => {
                 if (categoryTab === 'all') return true;
                 // Avoid hiding all rows when product catalog hasn't loaded yet (common in local dev).
@@ -408,6 +424,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 matchesDelivery &&
                 matchesPlatform &&
                 matchesType &&
+                matchesShipped &&
                 matchesState &&
                 matchesCategory
             );
@@ -420,6 +437,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         deliveryStatusFilter,
         platformFilter,
         typeFilter,
+        shippedTab,
         stateFilter,
         categoryTab,
         productCategoryMap,
@@ -497,7 +515,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
             const product = productMap.get(productId);
             if (!product) {
-                return Number(line.price || line.variantPrice || 0);
+                return getShopifyProductUnitPrice(line);
             }
 
             const variantName = String(line.variantName || '').trim().toLowerCase();
@@ -511,9 +529,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 product.actualPrice ??
                 matchedVariant?.price ??
                 product.price ??
-                line.price ??
-                line.variantPrice ??
-                0;
+                getShopifyProductUnitPrice(line);
 
             return Number(unitActual || 0);
         };
@@ -1004,6 +1020,21 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 ) : null}
             </div>
 
+            <div className="shopify-category-tabs">
+                <FilterButton
+                    active={shippedTab === 'shipped'}
+                    onClick={() => setShippedTab('shipped')}
+                >
+                    Shipped
+                </FilterButton>
+                <FilterButton
+                    active={shippedTab === 'notShipped'}
+                    onClick={() => setShippedTab('notShipped')}
+                >
+                    Not Shipped
+                </FilterButton>
+            </div>
+
             <ShopifyOrdersTable
                 groupedByDate={groupedByDate}
                 marketingSpend={marketingSpendForSummary}
@@ -1105,7 +1136,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     return {
                                         productId: option?.id,
                                         quantity: it.quantity,
-                                        price: unitPrice,
+                                        variantPrice: unitPrice,
+                                        price: it.lineAmount,
                                         // Send only the variant name (e.g. "1 Ltr") to match product API
                                         variantName: option?.size,
                                     };

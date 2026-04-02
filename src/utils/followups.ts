@@ -1,4 +1,28 @@
 import { apiFetch } from '../api';
+import type { FollowupsDashboardResponse, FollowupsDashboardRow } from '../types/followups';
+
+function parseFollowupsDashboardResponse(json: unknown): FollowupsDashboardResponse {
+    if (!json || typeof json !== 'object') {
+        throw new Error('Invalid followups dashboard response');
+    }
+    const o = json as Record<string, unknown>;
+    if (
+        typeof o.total !== 'number' ||
+        typeof o.page !== 'number' ||
+        typeof o.limit !== 'number' ||
+        !Array.isArray(o.rows)
+    ) {
+        throw new Error('Invalid followups dashboard response');
+    }
+    const rows = o.rows as FollowupsDashboardRow[];
+    const { total, page, limit } = o;
+    const count = typeof o.count === 'number' ? o.count : rows.length;
+    const totalPages =
+        typeof o.totalPages === 'number' && o.totalPages >= 1
+            ? o.totalPages
+            : Math.max(1, Math.ceil(total / limit));
+    return { count, total, page, limit, totalPages, rows };
+}
 
 /** One saved phone call / follow-up touchpoint (newest-first in UI). */
 export type CallingHistoryEntry = {
@@ -38,15 +62,79 @@ export type FollowupData = {
     callingHistory?: CallingHistoryEntry[];
 };
 
+export type LoadFollowupsDashboardOptions = {
+    /** 1-based page index (default 1) */
+    page?: number;
+    /** Page size (default 50) */
+    limit?: number;
+};
+
+/** Normalize dashboard customer phone to 10-digit key used across the app. */
+export function normalizeFollowupDashboardPhone(phoneNumber: string): string {
+    return String(phoneNumber).replace(/\D/g, '').slice(-10);
+}
+
+export function dashboardRowToFollowupData(row: FollowupsDashboardRow): FollowupData {
+    const customerPhone = normalizeFollowupDashboardPhone(row.customer.phoneNumber);
+    return {
+        customerPhone,
+        feedback: row.feedback ?? '',
+        callingDate: row.callingDate,
+        callerName: row.caller?.name ?? '',
+        callingDetail: row.callingDetail ?? '',
+        callAgainDate: row.callAgain,
+    };
+}
+
+export function dashboardRowToFollowup(row: FollowupsDashboardRow): Followup {
+    const customerPhone = normalizeFollowupDashboardPhone(row.customer.phoneNumber);
+    const id =
+        row.followupId != null && String(row.followupId).trim() !== ''
+            ? String(row.followupId)
+            : `FU-${customerPhone}`;
+    return {
+        id,
+        customerName: row.customer.name,
+        customerPhone,
+        lastOrder: row.lastOrderDate,
+        totalOrders: row.totalOrders,
+        lastOrderDetail: row.lastOrderSummary,
+        feedback: row.feedback ?? '',
+        callingDate: row.callingDate,
+        callerName: row.caller?.name ?? '',
+        callingDetail: row.callingDetail ?? '',
+        callAgainDate: row.callAgain,
+        callingHistory: [],
+    };
+}
+
 /**
- * Load followups data from the backend API, which reads from followups.json on disk.
+ * Paginated dashboard: `/api/followups/dashboard?page=&limit=` (default limit 50).
+ * Response shape: {@link FollowupsDashboardResponse}.
  */
-export async function loadFollowupsData(): Promise<FollowupData[]> {
-    const response = await apiFetch('/api/followups');
+export async function fetchFollowupsDashboard(
+    options: LoadFollowupsDashboardOptions = {}
+): Promise<FollowupsDashboardResponse> {
+    const page = Math.max(1, options.page ?? 1);
+    const limit = Math.max(1, Math.min(500, options.limit ?? 50));
+    const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+    });
+    const response = await apiFetch(`/api/followups/dashboard?${params.toString()}`);
     if (!response.ok) {
         throw new Error('Failed to load followups from API');
     }
-    return (await response.json()) as FollowupData[];
+    const json: unknown = await response.json();
+    return parseFollowupsDashboardResponse(json);
+}
+
+/** Maps dashboard `rows` to legacy {@link FollowupData} (e.g. for tooling). */
+export async function loadFollowupsData(
+    options: LoadFollowupsDashboardOptions = {}
+): Promise<FollowupData[]> {
+    const dash = await fetchFollowupsDashboard(options);
+    return dash.rows.map(dashboardRowToFollowupData);
 }
 
 /**
@@ -86,7 +174,6 @@ export async function updateFollowupData(customerPhone: string, followupData: Pa
 
     return (await response.json()) as FollowupData;
 }
-
 function rand(seed: number) {
     const x = Math.sin(seed) * 10000;
     return x - Math.floor(x);
@@ -150,4 +237,5 @@ export function generateMockFollowups(limit = 50): Followup[] {
     
     return followups.sort((a, b) => new Date(b.lastOrder).getTime() - new Date(a.lastOrder).getTime());
 }
+
 

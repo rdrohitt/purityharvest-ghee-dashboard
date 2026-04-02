@@ -1,6 +1,13 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Spinner } from '../../components/Spinner';
-import { type Followup, type FollowupData, type CallingHistoryEntry, loadFollowupsData, updateFollowupData } from '../../utils/followups';
+import {
+    type Followup,
+    type FollowupData,
+    type CallingHistoryEntry,
+    fetchFollowupsDashboard,
+    dashboardRowToFollowup,
+    updateFollowupData,
+} from '../../utils/followups';
 import { loadOrders, type Order, type OrderItem } from '../../utils/orders';
 import './Followups.scss';
 
@@ -50,6 +57,9 @@ const FEEDBACK_OPTIONS = [
     'Other feedback',
 ];
 const CALLER_OPTIONS = ['Monia', 'Sarita'];
+
+/** Page sizes for followups dashboard (API caps at 500). */
+const FOLLOWUPS_PAGE_SIZE_OPTIONS = [25, 50, 100, 200, 500] as const;
 
 function getFeedbackStyle(feedback: string): { background: string; border: string; color: string } {
     const value = (feedback || '').toLowerCase();
@@ -455,13 +465,22 @@ export default function Followups() {
     const [callingDateFilter, setCallingDateFilter] = useState<string>('');
     const [upcomingFilter, setUpcomingFilter] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState<string>('');
-    const [followups, setFollowups] = useState<Followup[]>(() => cloneDemoFollowups());
+    const [followups, setFollowups] = useState<Followup[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
     const [ordersByCustomer, setOrdersByCustomer] = useState<Map<string, Order[]>>(new Map());
     const [showCustomerProfile, setShowCustomerProfile] = useState(false);
     const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
     const [historyModalFollowup, setHistoryModalFollowup] = useState<Followup | null>(null);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(50);
+    const [dashboardMeta, setDashboardMeta] = useState<{
+        total: number;
+        totalPages: number;
+        count: number;
+        page: number;
+        limit: number;
+    } | null>(null);
     
     // Toast notifications
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -474,103 +493,83 @@ export default function Followups() {
     }
 
     useEffect(() => {
-        async function loadData() {
+        let cancelled = false;
+        (async () => {
+            try {
+                const raw = await loadOrders();
+                if (cancelled) return;
+                const ordersSafe = Array.isArray(raw) ? raw : [];
+                const map = new Map<string, Order[]>();
+                ordersSafe.forEach((order) => {
+                    const phone = order.customerPhone;
+                    if (!map.has(phone)) map.set(phone, []);
+                    map.get(phone)!.push(order);
+                });
+                setOrders(ordersSafe);
+                setOrdersByCustomer(map);
+            } catch (error) {
+                console.error('Error loading orders for followups:', error);
+                if (!cancelled) {
+                    setOrders([]);
+                    setOrdersByCustomer(new Map());
+                }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
             try {
                 setLoading(true);
-                const [orders, followupsData] = await Promise.all([
-                    loadOrders(),
-                    loadFollowupsData()
-                ]);
-
-                const ordersSafe = Array.isArray(orders) ? orders : [];
-                const followupsList = Array.isArray(followupsData) ? followupsData : [];
-
-                // Create a map of followup data by customer phone
-                const followupsMap = new Map<string, FollowupData>();
-                followupsList.forEach(f => {
-                    followupsMap.set(f.customerPhone, f);
+                const dashboard = await fetchFollowupsDashboard({ page, limit: pageSize });
+                if (cancelled) return;
+                setDashboardMeta({
+                    total: dashboard.total,
+                    totalPages: dashboard.totalPages,
+                    count: dashboard.count,
+                    page: dashboard.page,
+                    limit: dashboard.limit,
                 });
-
-                // Group orders by customer phone
-                const ordersByCustomer = new Map<string, Order[]>();
-                ordersSafe.forEach(order => {
-                    const phone = order.customerPhone;
-                    if (!ordersByCustomer.has(phone)) {
-                        ordersByCustomer.set(phone, []);
-                    }
-                    ordersByCustomer.get(phone)!.push(order);
-                });
-
-                // Create followups from orders and merge with followups data
-                const mergedFollowups: Followup[] = Array.from(ordersByCustomer.entries()).map(([phone, customerOrders]) => {
-                    // Sort orders by date (most recent first)
-                    const sortedOrders = [...customerOrders].sort((a, b) => 
-                        new Date(b.date).getTime() - new Date(a.date).getTime()
-                    );
-                    const lastOrder = sortedOrders[0];
-                    const totalOrders = customerOrders.length;
-
-                    // Get last order detail
-                    const lastOrderItems = lastOrder.items.map(item => 
-                        `${item.variant} × ${item.quantity}`
-                    ).join(', ');
-
-                    // Get followup data or use defaults
-                    const followupData = followupsMap.get(phone) || {
-                        customerPhone: phone,
-                        feedback: '',
-                        callingDate: null,
-                        callerName: '',
-                        callingDetail: '',
-                        callAgainDate: null,
-                    };
-
-                    const historyRaw = followupData.callingHistory;
-                    const callingHistory: CallingHistoryEntry[] = Array.isArray(historyRaw)
-                        ? historyRaw
-                        : [];
-
-                    return {
-                        id: `FU-${phone}`,
-                        customerName: lastOrder.customer,
-                        customerPhone: phone,
-                        lastOrder: lastOrder.date,
-                        totalOrders,
-                        lastOrderDetail: lastOrderItems,
-                        feedback: followupData.feedback || '',
-                        callingDate: followupData.callingDate,
-                        callerName: followupData.callerName || '',
-                        callingDetail: followupData.callingDetail || '',
-                        callAgainDate: followupData.callAgainDate,
-                        callingHistory,
-                    };
-                });
-
-                // Sort by last order date (most recent first)
-                mergedFollowups.sort((a, b) => 
-                    new Date(b.lastOrder).getTime() - new Date(a.lastOrder).getTime()
-                );
-
-                const fromOrders =
-                    mergedFollowups.length > 0
-                        ? mergedFollowups
+                if (dashboard.page !== page) {
+                    setPage(dashboard.page);
+                }
+                const fromDashboard =
+                    dashboard.rows.length > 0
+                        ? dashboard.rows.map(dashboardRowToFollowup)
                         : cloneDemoFollowups();
-
-                setFollowups(applyDummyCallHistoryForUiPreview(fromOrders));
-                setOrders(ordersSafe);
-                setOrdersByCustomer(ordersByCustomer);
+                setFollowups(applyDummyCallHistoryForUiPreview(fromDashboard));
             } catch (error) {
-                console.error('Error loading followups data:', error);
-                setFollowups(applyDummyCallHistoryForUiPreview(cloneDemoFollowups()));
-                setOrders([]);
-                setOrdersByCustomer(new Map());
+                console.error('Error loading followups dashboard:', error);
+                if (!cancelled) {
+                    setDashboardMeta(null);
+                    setFollowups(applyDummyCallHistoryForUiPreview(cloneDemoFollowups()));
+                }
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
-        }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [page, pageSize]);
 
-        loadData();
-    }, []);
+    const totalRecords = dashboardMeta?.total ?? 0;
+    const totalPages = Math.max(1, dashboardMeta?.totalPages ?? 1);
+    const rangeStart =
+        !dashboardMeta || totalRecords === 0 || dashboardMeta.count === 0
+            ? 0
+            : (dashboardMeta.page - 1) * dashboardMeta.limit + 1;
+    const rangeEnd =
+        !dashboardMeta || totalRecords === 0 || dashboardMeta.count === 0
+            ? 0
+            : Math.min(
+                  (dashboardMeta.page - 1) * dashboardMeta.limit + dashboardMeta.count,
+                  totalRecords,
+              );
 
     const baseFollowups = followups;
 
@@ -782,18 +781,9 @@ export default function Followups() {
         }
     }
 
-    if (loading) {
-        return (
-            <section className="followups-page">
-                <div className="card fu-shell" style={{ position: 'relative', minHeight: 280 }}>
-                    <Spinner overlay message="Loading followups…" />
-                </div>
-            </section>
-        );
-    }
-
     return (
         <section className="followups-page">
+            {loading ? <Spinner overlay fixed message="Loading followups…" /> : null}
             <div className="card fu-shell">
                 <header className="fu-top">
                     <div className="fu-top__lead">
@@ -806,9 +796,18 @@ export default function Followups() {
                         ) : null}
                     </div>
                     <div className="fu-top__meta">
-                        <span className="fu-count-pill" title="Rows after filters">
-                            <span className="fu-count-pill__n">{filtered.length}</span>
-                            <span className="fu-count-pill__lbl">visible</span>
+                        <span className="fu-count-pill" title={loading ? undefined : 'Rows on this page after filters'}>
+                            <span className="fu-count-pill__n">{loading ? '—' : filtered.length}</span>
+                            <span className="fu-count-pill__lbl">{loading ? 'Loading…' : 'visible'}</span>
+                        </span>
+                        <span
+                            className="fu-count-pill fu-count-pill--total"
+                            title={loading || dashboardMeta == null ? undefined : 'Total followup records from server'}
+                        >
+                            <span className="fu-count-pill__n">
+                                {loading || dashboardMeta == null ? '—' : totalRecords.toLocaleString()}
+                            </span>
+                            <span className="fu-count-pill__lbl">{loading ? '…' : 'total'}</span>
                         </span>
                     </div>
                 </header>
@@ -971,7 +970,8 @@ export default function Followups() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((f) => (
+                            {!loading
+                                ? filtered.map((f) => (
                                 <tr key={f.id} style={{ borderBottom: '1px solid var(--border)' }}>
                                     <Td>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1137,8 +1137,9 @@ export default function Followups() {
                                         </select>
                                     </Td>
                                 </tr>
-                            ))}
-                            {filtered.length === 0 ? (
+                            ))
+                                : null}
+                            {!loading && filtered.length === 0 ? (
                                 <tr>
                                     <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
                                         {baseFollowups.length > 0
@@ -1150,6 +1151,86 @@ export default function Followups() {
                         </tbody>
                     </table>
                 </div>
+                <footer className="fu-pagination" aria-label="Followups pagination">
+                    <div className="fu-pagination__range">
+                        {loading ? (
+                            <span className="fu-pagination__muted">Loading…</span>
+                        ) : dashboardMeta ? (
+                            dashboardMeta.count === 0 && totalRecords > 0 ? (
+                                <>
+                                    No rows on this page ·{' '}
+                                    <strong>{totalRecords.toLocaleString()}</strong> total
+                                </>
+                            ) : (
+                                <>
+                                    Showing{' '}
+                                    <strong>
+                                        {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()}
+                                    </strong>{' '}
+                                    of <strong>{totalRecords.toLocaleString()}</strong>
+                                </>
+                            )
+                        ) : (
+                            <span className="fu-pagination__muted">Total unavailable</span>
+                        )}
+                    </div>
+                    <label className="fu-pagination__size">
+                        <span className="fu-pagination__size-lab">Rows per page</span>
+                        <select
+                            className="fu-pagination__select"
+                            value={pageSize}
+                            disabled={loading}
+                            aria-label="Rows per page"
+                            onChange={(e) => {
+                                setPageSize(Number(e.target.value));
+                                setPage(1);
+                            }}
+                        >
+                            {FOLLOWUPS_PAGE_SIZE_OPTIONS.map((n) => (
+                                <option key={n} value={n}>
+                                    {n}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                    <div className="fu-pagination__nav">
+                        <button
+                            type="button"
+                            className="fu-page-btn"
+                            disabled={loading || page <= 1}
+                            onClick={() => setPage(1)}
+                        >
+                            First
+                        </button>
+                        <button
+                            type="button"
+                            className="fu-page-btn"
+                            disabled={loading || page <= 1}
+                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        >
+                            Prev
+                        </button>
+                        <span className="fu-pagination__page-of">
+                            Page <strong>{page}</strong> of <strong>{totalPages}</strong>
+                        </span>
+                        <button
+                            type="button"
+                            className="fu-page-btn"
+                            disabled={loading || page >= totalPages}
+                            onClick={() => setPage((p) => p + 1)}
+                        >
+                            Next
+                        </button>
+                        <button
+                            type="button"
+                            className="fu-page-btn"
+                            disabled={loading || page >= totalPages}
+                            onClick={() => setPage(totalPages)}
+                        >
+                            Last
+                        </button>
+                    </div>
+                </footer>
             </div>
             {showCustomerProfile && selectedCustomerPhone && (
                 <CustomerProfileModal 

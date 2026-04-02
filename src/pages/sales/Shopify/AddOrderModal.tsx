@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+    cloneElement,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ReactElement,
+    type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import {
     type Order,
@@ -19,12 +29,198 @@ import {
     ORDER_MODAL_PAYMENT_OPTIONS,
     ORDER_MODAL_FULFILLMENT_OPTIONS,
     ORDER_MODAL_DELIVERY_OPTIONS,
+    ORDER_MODAL_TRACKING_COMPANY_OPTIONS,
+    type TrackingCompany,
 } from './ShopifyShared';
 import { DatePicker } from './DatePicker';
 import { Spinner } from '../../../components/Spinner';
 import './Shopify.scss';
 
 const DEBOUNCE_MS = 350;
+
+function ModalFieldSvg({ children }: { children: ReactNode }) {
+    return (
+        <svg
+            className="shopify-add-modal-field-svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+        >
+            {children}
+        </svg>
+    );
+}
+
+/** Prefix icons for Add / Edit order modal fields (stroke SVGs, no extra dependency). */
+const ADD_MODAL_FIELD_ICONS = {
+    phone: (
+        <ModalFieldSvg>
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+        </ModalFieldSvg>
+    ),
+    user: (
+        <ModalFieldSvg>
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+        </ModalFieldSvg>
+    ),
+    mapPin: (
+        <ModalFieldSvg>
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+            <circle cx="12" cy="10" r="3" />
+        </ModalFieldSvg>
+    ),
+    hash: (
+        <ModalFieldSvg>
+            <line x1="4" y1="9" x2="20" y2="9" />
+            <line x1="4" y1="15" x2="20" y2="15" />
+            <line x1="10" y1="3" x2="8" y2="21" />
+            <line x1="16" y1="3" x2="14" y2="21" />
+        </ModalFieldSvg>
+    ),
+    building: (
+        <ModalFieldSvg>
+            <path d="M3 21h18" />
+            <path d="M5 21V7l8-4v18" />
+            <path d="M19 21V11l-6-4" />
+            <line x1="9" y1="9" x2="9" y2="9.01" />
+            <line x1="9" y1="12" x2="9" y2="12.01" />
+            <line x1="9" y1="15" x2="9" y2="15.01" />
+            <line x1="9" y1="18" x2="9" y2="18.01" />
+        </ModalFieldSvg>
+    ),
+    package: (
+        <ModalFieldSvg>
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+            <line x1="12" y1="22.08" x2="12" y2="12" />
+        </ModalFieldSvg>
+    ),
+    layers: (
+        <ModalFieldSvg>
+            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+            <polyline points="2 17 12 22 22 17" />
+            <polyline points="2 12 12 17 22 12" />
+        </ModalFieldSvg>
+    ),
+    rupee: (
+        <ModalFieldSvg>
+            <path d="M6 3h12M6 8h12" />
+            <path d="M6 13c0 3.314 2.686 6 6 6h2M6 8c0 2.21 1.79 4 4 4h4" />
+        </ModalFieldSvg>
+    ),
+    wallet: (
+        <ModalFieldSvg>
+            <path d="M21 12V7H5a2 2 0 0 1 0-4h18v4" />
+            <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+            <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+        </ModalFieldSvg>
+    ),
+    truck: (
+        <ModalFieldSvg>
+            <path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
+            <path d="M15 18H9" />
+            <path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14" />
+            <circle cx="17" cy="18" r="2" />
+            <circle cx="7" cy="18" r="2" />
+        </ModalFieldSvg>
+    ),
+    percent: (
+        <ModalFieldSvg>
+            <line x1="19" y1="5" x2="5" y2="19" />
+            <circle cx="6.5" cy="6.5" r="2.5" />
+            <circle cx="17.5" cy="17.5" r="2.5" />
+        </ModalFieldSvg>
+    ),
+    sigma: (
+        <ModalFieldSvg>
+            <path d="M18 7V5H6l6 7-6 7h12v-2" />
+        </ModalFieldSvg>
+    ),
+    notes: (
+        <ModalFieldSvg>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+        </ModalFieldSvg>
+    ),
+    barcode: (
+        <ModalFieldSvg>
+            <path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14" />
+        </ModalFieldSvg>
+    ),
+    link: (
+        <ModalFieldSvg>
+            <path d="M10 13a5 5 0 0 1 0-7l1-1a5 5 0 0 1 7 7l-1 1" />
+            <path d="M14 11a5 5 0 0 1 0 7l-1 1a5 5 0 0 1-7-7l1-1" />
+        </ModalFieldSvg>
+    ),
+};
+
+function AddModalInputWrap({
+    icon,
+    children,
+    variant = 'default',
+}: {
+    icon: ReactNode;
+    children: ReactElement<{ className?: string }>;
+    variant?: 'default' | 'textarea';
+}) {
+    const mergedClass = `${children.props.className || ''} shopify-add-modal-input--with-prefix`.trim();
+    return (
+        <div
+            className={
+                'shopify-add-modal-input-wrap' +
+                (variant === 'textarea' ? ' shopify-add-modal-input-wrap--textarea' : '')
+            }
+        >
+            <span className="shopify-add-modal-input-wrap__icon">{icon}</span>
+            {cloneElement(children, { className: mergedClass })}
+        </div>
+    );
+}
+
+function AddModalSection({
+    id,
+    title,
+    description,
+    children,
+}: {
+    id: string;
+    title: string;
+    description?: string;
+    children: ReactNode;
+}) {
+    return (
+        <section className="shopify-add-modal-section" aria-labelledby={id}>
+            <header className="shopify-add-modal-section__head">
+                <h4 id={id} className="shopify-add-modal-section__title">
+                    {title}
+                </h4>
+                {description ? (
+                    <p className="shopify-add-modal-section__desc">{description}</p>
+                ) : null}
+            </header>
+            <div className="shopify-add-modal-section__body">{children}</div>
+        </section>
+    );
+}
+
+function normalizeTrackingCompany(v: string | undefined): TrackingCompany | '' {
+    if (!v?.trim()) return '';
+    const lower = v.trim().toLowerCase();
+    if (lower === 'delhivery') return 'Delhivery';
+    if (lower === 'amazon') return 'Amazon';
+    if (lower === 'shiprocket') return 'Shiprocket';
+    return '';
+}
 
 export type ProductVariantOption = { id: string; name: string; size: string; price: number };
 
@@ -125,10 +321,11 @@ function PhoneDropdown({
 
     return (
         <div ref={containerRef} className="shopify-phonedrop-root">
-            <div className="shopify-phonedrop-inner">
+            <div className="shopify-phonedrop-inner shopify-add-modal-input-wrap shopify-add-modal-input-wrap--phonedrop">
+                <span className="shopify-add-modal-input-wrap__icon">{ADD_MODAL_FIELD_ICONS.phone}</span>
                 <input
                     type="tel"
-                    className="input shopify-phonedrop-input"
+                    className="input shopify-phonedrop-input shopify-add-modal-input--with-prefix"
                     value={phone}
                     onChange={(e) => {
                         const value = e.target.value.replace(/\D/g, '');
@@ -301,7 +498,10 @@ function VariantDropdown({
                 aria-expanded={isOpen}
                 aria-label={displayLabel}
             >
-                <span className={!value ? 'variant-dropdown-placeholder' : ''}>
+                <span className="variant-dropdown-trigger__prefix" aria-hidden>
+                    {ADD_MODAL_FIELD_ICONS.package}
+                </span>
+                <span className={`variant-dropdown-trigger__label${!value ? ' variant-dropdown-placeholder' : ''}`}>
                     {displayLabel}
                 </span>
                 <span className="variant-dropdown-chevron" aria-hidden>
@@ -442,19 +642,16 @@ function AddOrderModal({
     );
     const [notes, setNotes] = useState<string>(initialOrder?.notes || '');
     const [items, setItems] = useState<
-        Array<{ variant: string; quantity: number; price: number }>
+        Array<{ variant: string; quantity: number; variantPrice: number }>
     >(
         initialOrder?.items && initialOrder.items.length > 0
             ? initialOrder.items.map((it) => {
-                  const price =
-                      mode === 'edit'
-                          ? it.lineAmount
-                          : it.quantity > 0
-                          ? it.lineAmount / it.quantity
-                          : 0;
-                  return { variant: it.variant, quantity: it.quantity, price };
+                  // `lineAmount` is always line total; unit price matches API `variantPrice`.
+                  const variantPrice =
+                      it.quantity > 0 ? it.lineAmount / it.quantity : 0;
+                  return { variant: it.variant, quantity: it.quantity, variantPrice };
               })
-            : [{ variant: '', quantity: 1, price: 0 }]
+            : [{ variant: '', quantity: 1, variantPrice: 0 }]
     );
     const [amount, setAmount] = useState<string>('');
     const [awb, setAwb] = useState<string>(initialOrder?.awbNumber || '');
@@ -482,13 +679,26 @@ function AddOrderModal({
     const [trackingLoading, setTrackingLoading] = useState(false);
     const [trackingError, setTrackingError] = useState<string | null>(null);
 
-    const trackingUrlFromApi = initialOrder?.shippingTrackingUrl || '';
-    const trackingCompanyFromApi = initialOrder?.shippingTrackingCompany || '';
-    const trackingUrl = trackingUrlFromApi
-        ? trackingUrlFromApi
-        : awb.trim()
+    const [shippingTrackingUrlInput, setShippingTrackingUrlInput] = useState(
+        () => initialOrder?.shippingTrackingUrl || ''
+    );
+    const [shippingTrackingCompanyInput, setShippingTrackingCompanyInput] = useState<
+        TrackingCompany | ''
+    >(() => normalizeTrackingCompany(initialOrder?.shippingTrackingCompany));
+
+    useEffect(() => {
+        setShippingTrackingUrlInput(initialOrder?.shippingTrackingUrl || '');
+        setShippingTrackingCompanyInput(
+            normalizeTrackingCompany(initialOrder?.shippingTrackingCompany)
+        );
+    }, [initialOrder?.id]);
+
+    const delhiveryUrlFromAwb = awb.trim()
         ? `https://www.delhivery.com/track/package/${encodeURIComponent(awb.trim())}`
         : '';
+    const resolvedTrackingUrl =
+        shippingTrackingUrlInput.trim() || delhiveryUrlFromAwb;
+
     const [saving, setSaving] = useState(false);
 
     const getAvailableProducts = (currentIdx: number) => {
@@ -502,7 +712,7 @@ function AddOrderModal({
     };
 
     useEffect(() => {
-        const itemsTotal = items.reduce((sum, it) => sum + it.price * it.quantity, 0);
+        const itemsTotal = items.reduce((sum, it) => sum + it.variantPrice * it.quantity, 0);
         const codChargesAmount = Number(codCharges) || 0;
         const shippingChargesAmount = Number(shippingCharges) || 0;
         const discountAmount = Number(discount) || 0;
@@ -601,14 +811,14 @@ function AddOrderModal({
     }, [awb]);
 
     function addItem() {
-        setItems((prev) => [...prev, { variant: '', quantity: 1, price: 0 }]);
+        setItems((prev) => [...prev, { variant: '', quantity: 1, variantPrice: 0 }]);
     }
     function removeItem(idx: number) {
         setItems((prev) => prev.filter((_, i) => i !== idx));
     }
     function updateItem(
         idx: number,
-        key: 'variant' | 'quantity' | 'price',
+        key: 'variant' | 'quantity' | 'variantPrice',
         value: string | number
     ) {
         setItems((prev) => {
@@ -619,11 +829,15 @@ function AddOrderModal({
                         const product = products.find(
                             (p) => `${p.name} - ${p.size}` === variantStr
                         );
-                        return { ...it, variant: variantStr, price: product ? product.price : 0 };
+                        return {
+                            ...it,
+                            variant: variantStr,
+                            variantPrice: product ? product.price : 0,
+                        };
                     } else if (key === 'quantity') {
                         return { ...it, quantity: Number(value) || 0 };
                     } else {
-                        return { ...it, price: Number(value) || 0 };
+                        return { ...it, variantPrice: Number(value) || 0 };
                     }
                 }
                 return it;
@@ -654,7 +868,7 @@ function AddOrderModal({
                     ({
                         variant: it.variant,
                         quantity: it.quantity,
-                        lineAmount: it.price * it.quantity,
+                        lineAmount: it.variantPrice * it.quantity,
                     } as OrderItem)
             ),
             amount: Number(amount || 0),
@@ -666,8 +880,8 @@ function AddOrderModal({
             shippingCharges: shippingCharges ? Number(shippingCharges) : undefined,
             discountAmount: discount ? Number(discount) : undefined,
             awbNumber: awb || undefined,
-            shippingTrackingUrl: trackingUrl || undefined,
-            shippingTrackingCompany: trackingCompanyFromApi || undefined,
+            shippingTrackingUrl: resolvedTrackingUrl || undefined,
+            shippingTrackingCompany: shippingTrackingCompanyInput || undefined,
             notes: notes || undefined,
             state,
             platform: platform as Platform,
@@ -709,104 +923,120 @@ function AddOrderModal({
                     <div className="shopify-add-modal-body">
                         <div className="shopify-add-modal-grid">
                             <div className="shopify-add-modal-left">
-                                <div className="shopify-add-modal-section-grid">
-                                    <div className="shopify-add-modal-field-half">
-                                        <label className="label">Phone</label>
-                                        <PhoneDropdown
-                                            selectedPhone={phone}
-                                            phone={phone}
-                                            onSelectSearchResult={(customer) => {
-                                                setName(customer.name);
-                                                setPhone(customer.phoneNumber.replace(/\D/g, '').slice(-10));
-                                                setAddress(customer.address || '');
-                                                setState(customer.state || '');
-                                                setPincode(customer.pincode || '');
-                                                setType('Repeat');
-                                            }}
-                                            onNewPhone={(newPhone) => {
-                                                setPhone(newPhone);
-                                                setName('');
-                                                setAddress('');
-                                                setState('');
-                                                setPincode('');
-                                                setType('New');
-                                            }}
-                                            required
-                                            skipSearch={mode === 'edit'}
-                                        />
+                                <AddModalSection id="add-modal-section-customer" title="Customer">
+                                    <div className="shopify-add-modal-section-grid shopify-add-modal-section-grid--customer-top">
+                                        <div>
+                                            <label className="label">Phone</label>
+                                            <PhoneDropdown
+                                                selectedPhone={phone}
+                                                phone={phone}
+                                                onSelectSearchResult={(customer) => {
+                                                    setName(customer.name);
+                                                    setPhone(
+                                                        customer.phoneNumber.replace(/\D/g, '').slice(-10)
+                                                    );
+                                                    setAddress(customer.address || '');
+                                                    setState(customer.state || '');
+                                                    setPincode(customer.pincode || '');
+                                                    setType('Repeat');
+                                                }}
+                                                onNewPhone={(newPhone) => {
+                                                    setPhone(newPhone);
+                                                    setName('');
+                                                    setAddress('');
+                                                    setState('');
+                                                    setPincode('');
+                                                    setType('New');
+                                                }}
+                                                required
+                                                skipSearch={mode === 'edit'}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="label">Customer name</label>
+                                            <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.user}>
+                                                <input
+                                                    className="input shopify-add-modal-input"
+                                                    type="text"
+                                                    value={name}
+                                                    onChange={(e) => setName(e.target.value)}
+                                                    required
+                                                />
+                                            </AddModalInputWrap>
+                                        </div>
+                                        <div>
+                                            <label className="label">Type</label>
+                                            <ModernSelect<OrderType | ''>
+                                                variant="default"
+                                                value={type}
+                                                onChange={(v) => setType(v)}
+                                                options={ORDER_MODAL_TYPE_OPTIONS}
+                                                placeholder="Select type"
+                                                aria-label="Order type"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="shopify-add-modal-field-half">
-                                        <label className="label">Customer Name</label>
-                                        <input
-                                            className="input shopify-add-modal-input"
-                                            type="text"
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                            required
-                                        />
+                                    <div className="shopify-add-modal-single-column shopify-add-modal-single-column--tight">
+                                        <div>
+                                            <label className="label">Address</label>
+                                            <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.mapPin}>
+                                                <input
+                                                    className="input shopify-add-modal-input"
+                                                    value={address}
+                                                    onChange={(e) => setAddress(e.target.value)}
+                                                    required
+                                                />
+                                            </AddModalInputWrap>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="shopify-add-modal-single-column">
-                                    <div>
-                                        <label className="label">Address</label>
-                                        <input
-                                            className="input shopify-add-modal-input"
-                                            value={address}
-                                            onChange={(e) => setAddress(e.target.value)}
-                                            required
-                                        />
+                                    <div className="shopify-add-modal-section-grid shopify-add-modal-section-grid--customer-loc">
+                                        <div>
+                                            <label className="label">Pincode</label>
+                                            <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.hash}>
+                                                <input
+                                                    className="input shopify-add-modal-input"
+                                                    type="tel"
+                                                    value={pincode}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value.replace(/\D/g, '');
+                                                        if (value.length <= 6) {
+                                                            setPincode(value);
+                                                        }
+                                                    }}
+                                                    maxLength={6}
+                                                    pattern="[0-9]{6}"
+                                                    required
+                                                />
+                                            </AddModalInputWrap>
+                                        </div>
+                                        <div>
+                                            <label className="label">State</label>
+                                            <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.building}>
+                                                <input
+                                                    className="input shopify-add-modal-input"
+                                                    value={state}
+                                                    onChange={(e) => setState(e.target.value)}
+                                                    required
+                                                />
+                                            </AddModalInputWrap>
+                                        </div>
+                                        <div>
+                                            <label className="label">Date</label>
+                                            <DatePicker
+                                                value={date}
+                                                onChange={setDate}
+                                                placeholder="Select date"
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="shopify-add-modal-section-grid">
-                                    <div>
-                                        <label className="label">Date</label>
-                                        <DatePicker
-                                            value={date}
-                                            onChange={setDate}
-                                            placeholder="Select date"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="label">State</label>
-                                        <input
-                                            className="input shopify-add-modal-input"
-                                            value={state}
-                                            onChange={(e) => setState(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="label">Pincode</label>
-                                        <input
-                                            className="input shopify-add-modal-input"
-                                            type="tel"
-                                            value={pincode}
-                                            onChange={(e) => {
-                                                const value = e.target.value.replace(/\D/g, '');
-                                                if (value.length <= 6) {
-                                                    setPincode(value);
-                                                }
-                                            }}
-                                            maxLength={6}
-                                            pattern="[0-9]{6}"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="label">Type</label>
-                                        <ModernSelect<OrderType | ''>
-                                            variant="default"
-                                            value={type}
-                                            onChange={(v) => setType(v)}
-                                            options={ORDER_MODAL_TYPE_OPTIONS}
-                                            placeholder="Select Type"
-                                            aria-label="Order type"
-                                        />
-                                    </div>
-                                </div>
+                                </AddModalSection>
 
-                                <div>
-                                    <div className="shopify-add-modal-items">
+                                <AddModalSection id="add-modal-section-order" title="Order details">
+                                    <div className="shopify-add-modal-subblock">
+                                        <div className="shopify-add-modal-subblock__title">
+                                            Line items
+                                        </div>
+                                        <div className="shopify-add-modal-items">
                                         {items.map((it, idx) => {
                                             const availableProducts = getAvailableProducts(idx);
                                             return (
@@ -827,29 +1057,33 @@ function AddOrderModal({
                                                     </div>
                                                     <div>
                                                         <label className="label">Quantity</label>
-                                                        <input
-                                                            className="input shopify-add-modal-input"
-                                                            type="number"
-                                                            min={1}
-                                                            value={it.quantity}
-                                                            onChange={(e) =>
-                                                                updateItem(idx, 'quantity', e.target.value)
-                                                            }
-                                                            required
-                                                        />
+                                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.layers}>
+                                                            <input
+                                                                className="input shopify-add-modal-input"
+                                                                type="number"
+                                                                min={1}
+                                                                value={it.quantity}
+                                                                onChange={(e) =>
+                                                                    updateItem(idx, 'quantity', e.target.value)
+                                                                }
+                                                                required
+                                                            />
+                                                        </AddModalInputWrap>
                                                     </div>
                                                     <div>
                                                         <label className="label">Price (₹)</label>
-                                                        <input
-                                                            className="input shopify-add-modal-input"
-                                                            type="number"
-                                                            min={0}
-                                                            value={it.price || ''}
-                                                            onChange={(e) =>
-                                                                updateItem(idx, 'price', e.target.value)
-                                                            }
-                                                            required
-                                                        />
+                                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.rupee}>
+                                                            <input
+                                                                className="input shopify-add-modal-input"
+                                                                type="number"
+                                                                min={0}
+                                                                value={it.variantPrice || ''}
+                                                                onChange={(e) =>
+                                                                    updateItem(idx, 'variantPrice', e.target.value)
+                                                                }
+                                                                required
+                                                            />
+                                                        </AddModalInputWrap>
                                                     </div>
                                                     <div>
                                                         <label className="label shopify-add-modal-label-hidden">
@@ -874,8 +1108,8 @@ function AddOrderModal({
                                         >
                                             + Add item
                                         </button>
+                                        </div>
                                     </div>
-                                </div>
 
                                 <div className="shopify-add-modal-section-grid">
                                     <div>
@@ -901,7 +1135,7 @@ function AddOrderModal({
                                         />
                                     </div>
                                     <div>
-                                        <label className="label">Fullfillment Status</label>
+                                        <label className="label">Fulfillment status</label>
                                         <ModernSelect<FulfillmentStatus>
                                             variant="default"
                                             value={fulfillment}
@@ -911,7 +1145,7 @@ function AddOrderModal({
                                         />
                                     </div>
                                     <div>
-                                        <label className="label">Shipping Status</label>
+                                        <label className="label">Shipping status</label>
                                         <ModernSelect<DeliveryStatus>
                                             variant="default"
                                             value={delivery}
@@ -925,119 +1159,171 @@ function AddOrderModal({
                                 <div className="shopify-add-modal-section-grid">
                                     <div>
                                         <label className="label">COD Charges (₹)</label>
-                                        <input
-                                            className="input shopify-add-modal-input"
-                                            type="number"
-                                            min={0}
-                                            step="0.01"
-                                            value={codCharges}
-                                            onChange={(e) => setCodCharges(e.target.value)}
-                                        />
+                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.wallet}>
+                                            <input
+                                                className="input shopify-add-modal-input"
+                                                type="number"
+                                                min={0}
+                                                step="0.01"
+                                                value={codCharges}
+                                                onChange={(e) => setCodCharges(e.target.value)}
+                                            />
+                                        </AddModalInputWrap>
                                     </div>
                                     <div>
                                         <label className="label">Shipping Charges (₹)</label>
-                                        <input
-                                            className="input shopify-add-modal-input"
-                                            type="number"
-                                            min={0}
-                                            step="0.01"
-                                            value={shippingCharges}
-                                            onChange={(e) =>
-                                                setShippingCharges(e.target.value)
-                                            }
-                                        />
+                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.truck}>
+                                            <input
+                                                className="input shopify-add-modal-input"
+                                                type="number"
+                                                min={0}
+                                                step="0.01"
+                                                value={shippingCharges}
+                                                onChange={(e) =>
+                                                    setShippingCharges(e.target.value)
+                                                }
+                                            />
+                                        </AddModalInputWrap>
                                     </div>
                                     <div>
                                         <label className="label">Discount (₹)</label>
-                                        <input
-                                            className="input shopify-add-modal-input"
-                                            type="number"
-                                            min={0}
-                                            step="0.01"
-                                            value={discount}
-                                            onChange={(e) => setDiscount(e.target.value)}
-                                        />
+                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.percent}>
+                                            <input
+                                                className="input shopify-add-modal-input"
+                                                type="number"
+                                                min={0}
+                                                step="0.01"
+                                                value={discount}
+                                                onChange={(e) => setDiscount(e.target.value)}
+                                            />
+                                        </AddModalInputWrap>
                                     </div>
                                     <div>
                                         <label className="label">Total Amount (₹)</label>
-                                        <input
-                                            className="input shopify-add-modal-input shopify-add-modal-input--readonly"
-                                            type="number"
-                                            min={0}
-                                            value={amount}
-                                            readOnly
-                                            required
-                                        />
+                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.sigma}>
+                                            <input
+                                                className="input shopify-add-modal-input shopify-add-modal-input--readonly"
+                                                type="number"
+                                                min={0}
+                                                value={amount}
+                                                readOnly
+                                                required
+                                            />
+                                        </AddModalInputWrap>
                                     </div>
                                 </div>
 
-                                <div className="shopify-add-modal-notes">
+                                <div className="shopify-add-modal-notes shopify-add-modal-notes--in-section">
                                     <label className="label">Notes</label>
-                                    <textarea
-                                        className="input shopify-add-modal-notes-textarea"
-                                        placeholder="Internal notes about this order (optional)"
-                                        value={notes}
-                                        onChange={(e) => setNotes(e.target.value)}
-                                    />
+                                    <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.notes} variant="textarea">
+                                        <textarea
+                                            className="input shopify-add-modal-notes-textarea"
+                                            placeholder="Internal notes about this order (optional)"
+                                            value={notes}
+                                            onChange={(e) => setNotes(e.target.value)}
+                                        />
+                                    </AddModalInputWrap>
                                 </div>
+                                </AddModalSection>
                             </div>
 
                             <div className="shopify-add-modal-sidebar">
-                                <div className="shopify-add-modal-shipped-row">
-                                    <span className="shopify-add-modal-shipped-label" id="shipped-toggle-label">
-                                        Marked as shipped
-                                    </span>
-                                    <button
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={isShipped}
-                                        aria-labelledby="shipped-toggle-label"
-                                        className={
-                                            'shopify-add-modal-shipped-toggle' +
-                                            (isShipped ? ' shopify-add-modal-shipped-toggle--on' : '')
-                                        }
-                                        onClick={() => setIsShipped((v) => !v)}
-                                    >
-                                        <span className="shopify-add-modal-shipped-toggle-knob" aria-hidden />
-                                    </button>
-                                </div>
-                                <div className="shopify-add-modal-tracking-card">
-                                    <label className="label shopify-add-modal-tracking-label">
-                                        AWB No
-                                    </label>
-                                    <input
-                                        className="input shopify-add-modal-tracking-input"
-                                        type="text"
-                                        value={awb}
-                                        onChange={(e) => setAwb(e.target.value)}
-                                        placeholder="Enter AWB"
-                                    />
-                                </div>
-                                <div>
-                                    <div className="label shopify-add-modal-shipping-timeline-label">
-                                        Shipping timeline
+                                <AddModalSection id="add-modal-section-tracking" title="Tracking details">
+                                    <div className="shopify-add-modal-shipped-row shopify-add-modal-shipped-row--section">
+                                        <span
+                                            className="shopify-add-modal-shipped-label"
+                                            id="shipped-toggle-label"
+                                        >
+                                            Marked as shipped
+                                        </span>
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            aria-checked={isShipped}
+                                            aria-labelledby="shipped-toggle-label"
+                                            className={
+                                                'shopify-add-modal-shipped-toggle' +
+                                                (isShipped ? ' shopify-add-modal-shipped-toggle--on' : '')
+                                            }
+                                            onClick={() => setIsShipped((v) => !v)}
+                                        >
+                                            <span
+                                                className="shopify-add-modal-shipped-toggle-knob"
+                                                aria-hidden
+                                            />
+                                        </button>
                                     </div>
-                                    <ShippingTimeline
-                                        status={delivery}
-                                        awb={awb}
-                                        tracking={tracking}
-                                        loading={trackingLoading}
-                                        error={trackingError}
-                                        trackingCompany={trackingCompanyFromApi}
-                                    />
-                                    {trackingUrl && (
-                                        <div className="shopify-tracking-link-wrap">
-                                            <a
-                                                href={trackingUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="shopify-tracking-link"
-                                            >
-                                                Open tracking in new tab
-                                            </a>
+
+                                    <div className="shopify-add-modal-tracking-fields">
+                                        <label className="label shopify-add-modal-tracking-label">
+                                            AWB number
+                                        </label>
+                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.barcode}>
+                                            <input
+                                                className="input shopify-add-modal-tracking-input"
+                                                type="text"
+                                                value={awb}
+                                                onChange={(e) => setAwb(e.target.value)}
+                                                placeholder="Waybill or tracking ID"
+                                            />
+                                        </AddModalInputWrap>
+                                        <label className="label shopify-add-modal-tracking-label">
+                                            Tracking URL
+                                        </label>
+                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.link}>
+                                            <input
+                                                className="input shopify-add-modal-tracking-input"
+                                                type="text"
+                                                inputMode="url"
+                                                value={shippingTrackingUrlInput}
+                                                onChange={(e) =>
+                                                    setShippingTrackingUrlInput(e.target.value)
+                                                }
+                                                placeholder="Optional; Delhivery link is used from AWB if empty"
+                                            />
+                                        </AddModalInputWrap>
+                                        <label className="label shopify-add-modal-tracking-label">
+                                            Tracking company
+                                        </label>
+                                        <ModernSelect<TrackingCompany>
+                                            variant="default"
+                                            value={shippingTrackingCompanyInput}
+                                            onChange={(v) => setShippingTrackingCompanyInput(v)}
+                                            options={ORDER_MODAL_TRACKING_COMPANY_OPTIONS}
+                                            placeholder="Select carrier"
+                                            aria-label="Tracking company"
+                                            className="shopify-add-modal-tracking-input"
+                                        />
+                                    </div>
+
+                                    <div className="shopify-add-modal-timeline-block">
+                                        <div className="shopify-add-modal-timeline-block__label">
+                                            Shipping timeline
                                         </div>
-                                    )}
-                                </div>
+                                        <ShippingTimeline
+                                            status={delivery}
+                                            awb={awb}
+                                            tracking={tracking}
+                                            loading={trackingLoading}
+                                            error={trackingError}
+                                            trackingCompany={
+                                                shippingTrackingCompanyInput || undefined
+                                            }
+                                        />
+                                        {resolvedTrackingUrl ? (
+                                            <div className="shopify-tracking-link-wrap">
+                                                <a
+                                                    href={resolvedTrackingUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="shopify-tracking-link"
+                                                >
+                                                    Open tracking in new tab
+                                                </a>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </AddModalSection>
                             </div>
                         </div>
                     </div>

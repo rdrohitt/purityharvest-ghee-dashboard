@@ -946,3 +946,118 @@
 [data-theme="dark"] .fu-hist-icon-btn--has::after {
   border-color: var(--bg-elev);
 }
+
+/* Dashboard pagination */
+.fu-count-pill--total {
+  background: color-mix(in srgb, var(--bg) 70%, var(--bg-elev));
+  border-color: var(--border);
+}
+
+.fu-count-pill--total .fu-count-pill__n {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.fu-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 55%, var(--bg-elev));
+  font-size: 0.8125rem;
+  color: var(--text);
+}
+
+.fu-pagination__range {
+  min-width: 0;
+  flex: 1 1 200px;
+  line-height: 1.45;
+}
+
+.fu-pagination__range strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.fu-pagination__muted {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.fu-pagination__size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.fu-pagination__size-lab {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fu-pagination__select {
+  height: 32px;
+  min-width: 72px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fu-pagination__select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fu-pagination__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.fu-pagination__page-of {
+  padding: 0 8px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.fu-pagination__page-of strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.fu-page-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.fu-page-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  background: color-mix(in srgb, var(--primary-weak) 40%, var(--bg-elev));
+}
+
+.fu-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

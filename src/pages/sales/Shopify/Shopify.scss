@@ -655,6 +655,97 @@
   background: #ffffff;
 }
 
+/* Prefixed inputs: icon + field share one bordered control */
+.shopify-add-modal-field-svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.shopify-add-modal-input-wrap {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-top: 6px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: #ffffff;
+  box-sizing: border-box;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.shopify-add-modal-input-wrap:focus-within {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary) 70%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.shopify-add-modal-input-wrap__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  padding-left: 10px;
+  color: color-mix(in srgb, var(--primary) 42%, #64748b);
+  opacity: 0.92;
+  pointer-events: none;
+}
+
+.shopify-add-modal-input-wrap--textarea {
+  align-items: flex-start;
+}
+
+.shopify-add-modal-input-wrap--textarea .shopify-add-modal-input-wrap__icon {
+  padding-top: 14px;
+}
+
+.shopify-add-modal-input-wrap .shopify-add-modal-input.shopify-add-modal-input--with-prefix,
+.shopify-add-modal-input-wrap .shopify-add-modal-tracking-input.shopify-add-modal-input--with-prefix,
+.shopify-add-modal-input-wrap .shopify-add-modal-notes-textarea.shopify-add-modal-input--with-prefix {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0 !important;
+  border: none !important;
+  border-radius: 0 8px 8px 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.shopify-add-modal-input-wrap .shopify-add-modal-input.shopify-add-modal-input--with-prefix:focus-visible,
+.shopify-add-modal-input-wrap .shopify-add-modal-tracking-input.shopify-add-modal-input--with-prefix:focus-visible,
+.shopify-add-modal-input-wrap .shopify-add-modal-notes-textarea.shopify-add-modal-input--with-prefix:focus-visible {
+  outline: none;
+  box-shadow: none !important;
+}
+
+.shopify-add-modal-notes--in-section .shopify-add-modal-input-wrap {
+  margin-top: 8px;
+}
+
+.shopify-add-modal-notes--in-section
+  .shopify-add-modal-input-wrap
+  .shopify-add-modal-notes-textarea.shopify-add-modal-input--with-prefix {
+  border-radius: 0 8px 8px 0 !important;
+}
+
+.shopify-add-modal-input-wrap--phonedrop {
+  position: relative;
+  padding: 0;
+}
+
+.shopify-add-modal-input-wrap--phonedrop .shopify-phonedrop-input.shopify-add-modal-input--with-prefix {
+  padding-right: 32px;
+  border-radius: 0 8px 8px 0 !important;
+}
+
+.shopify-add-modal-input-wrap--phonedrop .shopify-phonedrop-chevron {
+  margin-top: 0;
+}
+
 /* Custom dropdown (modal + toolbar filters) */
 .shopify-modern-select {
   position: relative;
@@ -926,7 +1017,123 @@
 
 .shopify-add-modal-left {
   display: grid;
-  gap: 16px;
+  gap: 20px;
+}
+
+/* Add / Edit order — grouped sections */
+.shopify-add-modal-section {
+  background: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
+}
+
+.shopify-add-modal-section__head {
+  padding: 16px 18px 14px;
+  background: linear-gradient(180deg, #e8f2fe 0%, #eff6ff 45%, #f5f9ff 100%);
+  border-bottom: 1px solid color-mix(in srgb, #93c5fd 40%, var(--border));
+}
+
+.shopify-add-modal-section__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.shopify-add-modal-section__desc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  font-weight: 450;
+  max-width: 52ch;
+}
+
+.shopify-add-modal-section__body {
+  padding: 18px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.shopify-add-modal-section-grid.shopify-add-modal-section-grid--customer-top {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 0.95fr);
+  align-items: start;
+}
+
+.shopify-add-modal-section-grid.shopify-add-modal-section-grid--customer-top > div {
+  min-width: 0;
+}
+
+.shopify-add-modal-section-grid.shopify-add-modal-section-grid--customer-loc {
+  grid-template-columns: minmax(100px, 140px) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.shopify-add-modal-section-grid.shopify-add-modal-section-grid--customer-loc > div {
+  min-width: 0;
+}
+
+.shopify-add-modal-single-column--tight {
+  gap: 0;
+}
+
+.shopify-add-modal-subblock__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+}
+
+.shopify-add-modal-notes--in-section {
+  padding-top: 0;
+}
+
+.shopify-add-modal-notes--in-section .shopify-add-modal-notes-textarea {
+  margin-top: 6px;
+}
+
+.shopify-add-modal-sidebar .shopify-add-modal-section {
+  position: sticky;
+  top: 4px;
+}
+
+.shopify-add-modal-shipped-row--section {
+  padding-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+.shopify-add-modal-tracking-fields {
+  padding: 14px 14px 16px;
+  background: #f8fafc;
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  border-radius: 10px;
+}
+
+.shopify-add-modal-tracking-fields > .shopify-add-modal-tracking-label:not(:first-child) {
+  margin-top: 12px;
+}
+
+.shopify-add-modal-tracking-fields > .shopify-add-modal-tracking-label:first-child {
+  margin-top: 0;
+}
+
+.shopify-add-modal-timeline-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shopify-add-modal-timeline-block__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
 }
 
 .shopify-add-modal-single-column {
@@ -2251,6 +2458,26 @@
   justify-content: space-between;
   user-select: none;
 }
+.shopify-dp-trigger--with-prefix {
+  justify-content: flex-start;
+  gap: 6px;
+  padding-left: 4px;
+}
+.shopify-dp-trigger__prefix {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  color: color-mix(in srgb, var(--primary) 42%, #64748b);
+  opacity: 0.92;
+}
+.shopify-dp-trigger--with-prefix .shopify-dp-trigger-value--muted,
+.shopify-dp-trigger--with-prefix .shopify-dp-trigger-value--text {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
 .shopify-dp-trigger-value--muted { color: var(--muted); }
 .shopify-dp-trigger-value--text { color: var(--text); }
 .shopify-dp-trigger-icon { font-size: 18px; color: var(--muted); }
@@ -3275,7 +3502,15 @@
 // ----- PhoneDropdown (AddOrderModal) -----
 .shopify-phonedrop-root,
 .shopify-phonedrop-inner { position: relative; width: 100%; }
-.shopify-phonedrop-input { width: 100%; margin-top: 6px; padding-right: 32px; }
+.shopify-phonedrop-inner:not(.shopify-add-modal-input-wrap--phonedrop) .shopify-phonedrop-input {
+  width: 100%;
+  margin-top: 6px;
+  padding-right: 32px;
+}
+.shopify-phonedrop-inner.shopify-add-modal-input-wrap--phonedrop .shopify-phonedrop-input {
+  width: 100%;
+  padding-right: 32px;
+}
 .shopify-phonedrop-chevron {
   position: absolute;
   right: 8px;
@@ -3288,6 +3523,9 @@
   align-items: center;
   pointer-events: auto;
   span { font-size: 10px; color: var(--muted); }
+}
+.shopify-phonedrop-inner.shopify-add-modal-input-wrap--phonedrop .shopify-phonedrop-chevron {
+  margin-top: 0;
 }
 .shopify-phonedrop-popup {
   position: fixed;
@@ -3366,7 +3604,7 @@
   width: 100%;
   margin-top: 6px;
   min-height: 44px;
-  padding: 10px 40px 10px 12px;
+  padding: 10px 40px 10px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
@@ -3376,8 +3614,8 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 6px;
   transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
   outline: none;
 
@@ -3390,6 +3628,23 @@
     border-color: var(--primary);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
   }
+}
+
+.variant-dropdown-trigger__prefix {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--primary) 42%, #64748b);
+  opacity: 0.92;
+}
+
+.variant-dropdown-trigger__label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .variant-dropdown-placeholder {

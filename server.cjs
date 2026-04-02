@@ -1454,6 +1454,54 @@ app.get('/api/followups', async (_req, res) => {
   }
 });
 
+/** Paginated followups list for Followups dashboard (default limit 50). Mirrors production API shape. */
+app.get('/api/followups/dashboard', async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
+    const limitRaw = parseInt(String(req.query.limit), 10);
+    const limit = Number.isFinite(limitRaw)
+      ? Math.max(1, Math.min(500, limitRaw))
+      : 50;
+    const followups = await readFollowups();
+    const total = followups.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+    const slice = followups.slice(start, start + limit);
+    const rows = slice.map((f) => ({
+      customer: {
+        _id: '',
+        name: String(f.customerPhone || 'Customer'),
+        phoneNumber: String(f.customerPhone || ''),
+        countryCode: '+91',
+        phone: `+91 ${f.customerPhone || ''}`,
+        tag: 'LOCAL',
+      },
+      lastOrderDate: new Date().toISOString(),
+      totalOrders: 1,
+      lastOrderSummary: '',
+      lastOrderAmount: 0,
+      lastOrderQuantity: 1,
+      feedback: f.feedback ?? null,
+      callingDate: f.callingDate ?? null,
+      callingDetail: f.callingDetail ?? '',
+      callAgain: f.callAgainDate ?? null,
+      caller: f.callerName ? { name: f.callerName } : null,
+      followupId: null,
+    }));
+    res.json({
+      count: rows.length,
+      total,
+      page,
+      limit,
+      totalPages,
+      rows,
+    });
+  } catch (err) {
+    console.error('Error reading followups dashboard', err);
+    res.status(500).json({ message: 'Failed to read followups dashboard' });
+  }
+});
+
 app.post('/api/followups', async (req, res) => {
   try {
     const newFollowup = req.body;

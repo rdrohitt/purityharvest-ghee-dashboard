@@ -1,6 +1,35 @@
 import { apiFetch } from '../api';
-import type { ShopifyOrderApi, ShopifyOrderCustomer } from '../types/shopify';
+import type { ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../types/shopify';
 import type { Order, PaymentStatus, FulfillmentStatus, DeliveryStatus, OrderType } from './orders';
+
+/**
+ * Unit selling price from an order line (`variantPrice` when set; else legacy `price` as unit).
+ */
+export function getShopifyProductUnitPrice(p: ShopifyOrderProduct): number {
+    const qty = Number(p.quantity) || 0;
+    const vp = Number(p.variantPrice);
+    const pr = Number(p.price);
+    const hasVp = Number.isFinite(vp) && vp > 0;
+    const hasPr = Number.isFinite(pr) && pr > 0;
+    if (hasVp) return vp;
+    if (hasPr && qty > 0) return pr;
+    return hasPr ? pr : 0;
+}
+
+/**
+ * Line total (`price` when sent with `variantPrice` as line total; else unit × qty).
+ */
+export function getShopifyProductLineAmount(p: ShopifyOrderProduct): number {
+    const qty = Number(p.quantity) || 0;
+    const vp = Number(p.variantPrice);
+    const pr = Number(p.price);
+    const hasVp = Number.isFinite(vp) && vp > 0;
+    const hasPr = Number.isFinite(pr) && pr > 0;
+    if (hasVp && hasPr) return pr;
+    if (hasVp && qty > 0) return vp * qty;
+    if (hasPr && qty > 0) return pr * qty;
+    return hasPr ? pr : 0;
+}
 
 /** Get customer name from order (from customer object or top-level customerName). */
 export function getOrderCustomerName(o: ShopifyOrderApi): string {
@@ -141,7 +170,7 @@ export function orderDetailToOrder(o: ShopifyOrderApi): Order {
             return {
                 variant: variantLabel,
                 quantity: p.quantity,
-                lineAmount: p.price,
+                lineAmount: getShopifyProductLineAmount(p),
             };
         }),
         amount: o.totalAmount,
@@ -244,10 +273,17 @@ export function buildShopifyOrderPayloadFromForm(
     const fulfillmentStatus = toBackendFulfillmentStatus(form.fulfillmentStatus);
     const deliveryStatus = toBackendDeliveryStatus(form.deliveryStatus);
     const awb = form.awbNumber || base.shippingDetails?.trackingNumber || '';
+    const delhiveryFromAwb = awb.trim()
+        ? `https://www.delhivery.com/track/package/${encodeURIComponent(awb.trim())}`
+        : '';
     const trackingUrl =
-        awb || base.shippingDetails?.trackingNumber
-            ? `https://www.delhivery.com/track/package/${encodeURIComponent(awb || base.shippingDetails!.trackingNumber)}`
-            : base.shippingDetails?.trackingUrl || '';
+        (form.shippingTrackingUrl && form.shippingTrackingUrl.trim()) ||
+        delhiveryFromAwb ||
+        (base.shippingDetails?.trackingUrl ?? '');
+    const trackingCompany =
+        (form.shippingTrackingCompany && form.shippingTrackingCompany.trim()) ||
+        base.shippingDetails?.trackingCompany ||
+        'Delhivery';
 
     const baseProducts = (base.products || []) as ShopifyOrderApi['products'];
 
@@ -282,7 +318,9 @@ export function buildShopifyOrderPayloadFromForm(
         const unitPrice =
             line.quantity && line.quantity > 0
                 ? line.lineAmount / line.quantity
-                : existing?.variantPrice ?? 0;
+                : existing
+                ? getShopifyProductUnitPrice(existing as ShopifyOrderProduct)
+                : 0;
 
         const baseRest = (existing as any) ?? {};
 
@@ -333,7 +371,7 @@ export function buildShopifyOrderPayloadFromForm(
             trackingNumber: awb,
             trackingStatus: deliveryStatus,
             trackingUrl,
-            trackingCompany: base.shippingDetails?.trackingCompany || 'Delhivery',
+            trackingCompany,
         },
     };
 }
@@ -386,7 +424,7 @@ export function shopifyOrderToOrder(o: ShopifyOrderApi): Order {
         items: (o.products || []).map((p) => ({
             variant: p.variantName,
             quantity: p.quantity,
-            lineAmount: p.price,
+            lineAmount: getShopifyProductLineAmount(p),
         })),
         amount: o.totalAmount,
         paymentStatus,
