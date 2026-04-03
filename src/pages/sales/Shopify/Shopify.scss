@@ -1011,7 +1011,6 @@
 .shopify-add-modal-grid {
   display: grid;
   grid-template-columns: minmax(0, 4fr) minmax(280px, 1.4fr);
-  gap: 16px;
   align-items: flex-start;
 }
 
@@ -1203,8 +1202,7 @@
  }
 
  .shopify-add-modal-sidebar {
-   border-left: 1px solid var(--border);
-  padding-left: 18px;
+  padding-left: 10px;
    display: flex;
    flex-direction: column;
   gap: 14px;

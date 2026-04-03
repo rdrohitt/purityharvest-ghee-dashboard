@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { toInputDate } from './followupsFormat';
 
-export function DateInput({ value, onChange }: { value: string | null; onChange: (value: string | null) => void }) {
+type DateInputProps = {
+    value: string | null;
+    onChange: (value: string | null) => void;
+    minDate?: string | null;
+};
+
+export function DateInput({ value, onChange, minDate = null }: DateInputProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(() => {
         const date = value ? new Date(value) : new Date();
@@ -55,9 +61,16 @@ export function DateInput({ value, onChange }: { value: string | null; onChange:
     const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
     const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const normalizedMinDate = (() => {
+        if (!minDate) return null;
+        const d = new Date(minDate);
+        d.setHours(0, 0, 0, 0);
+        return d;
+    })();
 
     function handleDateSelect(day: number) {
         const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+        if (normalizedMinDate && newDate < normalizedMinDate) return;
         onChange(newDate.toISOString());
         setIsOpen(false);
     }
@@ -155,12 +168,14 @@ export function DateInput({ value, onChange }: { value: string | null; onChange:
                                 date.getMonth() === selectedDate.getMonth() &&
                                 date.getFullYear() === selectedDate.getFullYear();
                             const isToday = date.toDateString() === new Date().toDateString();
+                            const isDisabled = normalizedMinDate ? date < normalizedMinDate : false;
                             return (
                                 <button
                                     key={day}
                                     type="button"
-                                    className={`fu-date-popup__day${isSelected ? ' fu-date-popup__day--selected' : ''}${isToday && !isSelected ? ' fu-date-popup__day--today' : ''}`}
+                                    className={`fu-date-popup__day${isSelected ? ' fu-date-popup__day--selected' : ''}${isToday && !isSelected ? ' fu-date-popup__day--today' : ''}${isDisabled ? ' fu-date-popup__day--disabled' : ''}`}
                                     onClick={() => handleDateSelect(day)}
+                                    disabled={isDisabled}
                                 >
                                     {day}
                                 </button>

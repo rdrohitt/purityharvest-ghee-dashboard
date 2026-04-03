@@ -4,6 +4,7 @@ import { type Followup, type CallingHistoryEntry, fetchFollowupsDashboard, dashb
 import { apiFetch } from '../../api';
 import { useAppSelector } from '../../store';
 import { loadOrders, type Order } from '../../utils/orders';
+import type { FollowupsCustomerHistoryResponse } from '../../types/followups';
 import { CustomerProfileModal } from './CustomerProfileModal';
 import { FollowupCallHistoryModal } from './FollowupCallHistoryModal';
 import {
@@ -34,6 +35,7 @@ export default function Followups() {
     const [showCustomerProfile, setShowCustomerProfile] = useState(false);
     const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
     const [historyModalFollowup, setHistoryModalFollowup] = useState<Followup | null>(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(50);
@@ -210,14 +212,24 @@ export default function Followups() {
             if (!followup) return;
 
             const calledAt = new Date(`${payload.calledOn}T12:00:00`).toISOString();
+            const actorName = (currentUser?.name || currentUser?.username || '').trim() || null;
             const newEntry: CallingHistoryEntry = {
                 id: `h-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
                 calledAt,
                 callerName: payload.callerName.trim(),
+                callerId: null,
                 detail: payload.detail.trim(),
                 callAgainDate: payload.callAgainDate
                     ? new Date(`${payload.callAgainDate}T12:00:00`).toISOString()
                     : null,
+                feedback: payload.feedback ?? null,
+                createdAt: calledAt,
+                updatedAt: calledAt,
+                createdByName: actorName,
+                updatedByName: actorName,
+                createdById: currentUser?._id ?? null,
+                updatedById: currentUser?._id ?? null,
+                version: null,
             };
 
             const nextHistory = [newEntry, ...followup.callingHistory];
@@ -264,6 +276,54 @@ export default function Followups() {
                         }),
                     });
                 }
+
+                // Re-fetch latest history from backend after save so modal/table stay in sync with server state.
+                if (customerId) {
+                    const historyRes = await apiFetch(`/api/followups/customer/${encodeURIComponent(customerId)}`);
+                    if (historyRes.ok) {
+                        const historyJson: unknown = await historyRes.json();
+                        const historyData = historyJson as FollowupsCustomerHistoryResponse;
+                        if (
+                            historyData &&
+                            typeof historyData === 'object' &&
+                            Array.isArray(historyData.history) &&
+                            historyData.customer
+                        ) {
+                            const mappedHistory: CallingHistoryEntry[] = historyData.history.map((h) => ({
+                                id: h._id,
+                                calledAt: h.calledOn,
+                                callerName: h.caller?.name ?? '',
+                                callerId: h.caller?._id ?? null,
+                                detail: h.notes ?? '',
+                                callAgainDate: h.callAgain ?? null,
+                                feedback: h.feedback ?? null,
+                                createdAt: h.createdAt,
+                                updatedAt: h.updatedAt,
+                                createdByName: h.createdBy?.name ?? null,
+                                updatedByName: h.updatedBy?.name ?? null,
+                                createdById: h.createdBy?._id ?? null,
+                                updatedById: h.updatedBy?._id ?? null,
+                                version: typeof h.__v === 'number' ? h.__v : null,
+                            }));
+                            const sortedHistory = [...mappedHistory].sort(
+                                (a, b) => new Date(b.calledAt).getTime() - new Date(a.calledAt).getTime(),
+                            );
+                            const latestFromApi = sortedHistory[0];
+                            const refreshedFollowup: Followup = {
+                                ...followup,
+                                customerName: historyData.customer?.name ?? followup.customerName,
+                                callingHistory: sortedHistory,
+                                callingDate: latestFromApi?.calledAt ?? followup.callingDate,
+                                callerName: latestFromApi?.callerName ?? followup.callerName,
+                                callingDetail: latestFromApi?.detail ?? followup.callingDetail,
+                                callAgainDate: latestFromApi?.callAgainDate ?? followup.callAgainDate,
+                                feedback: latestFromApi?.feedback ?? followup.feedback,
+                            };
+                            setFollowups((prev) => prev.map((f) => (f.id === followupId ? refreshedFollowup : f)));
+                            setHistoryModalFollowup((cur) => (cur?.id === followupId ? refreshedFollowup : cur));
+                        }
+                    }
+                }
                 showToast('Call added to history', 'success');
             } catch (error) {
                 console.error('Error saving call history:', error);
@@ -283,6 +343,80 @@ export default function Followups() {
             }
             setSelectedCustomerPhone(f.customerPhone);
             setShowCustomerProfile(true);
+        },
+        [showToast],
+    );
+
+    const onOpenHistory = useCallback(
+        async (f: Followup) => {
+            // Open immediately for better UX, then hydrate timeline with the API response.
+            setHistoryModalFollowup(f);
+            setHistoryLoading(true);
+
+            if (!f.customerId) {
+                setHistoryLoading(false);
+                return;
+            }
+            if (isDemoFollowupRow(f)) {
+                showToast('Sample row — call history shown from the current session data.', 'success');
+                setHistoryLoading(false);
+                return;
+            }
+
+            try {
+                const res = await apiFetch(`/api/followups/customer/${encodeURIComponent(f.customerId)}`);
+                if (!res.ok) {
+                    throw new Error(`Failed to load followup history (HTTP ${res.status})`);
+                }
+
+                const json: unknown = await res.json();
+                const data = json as FollowupsCustomerHistoryResponse;
+                if (!data || typeof data !== 'object' || !Array.isArray(data.history) || !data.customer) {
+                    throw new Error('Invalid followup history response shape');
+                }
+
+                const mappedHistory: CallingHistoryEntry[] = data.history.map((h) => ({
+                    id: h._id,
+                    calledAt: h.calledOn,
+                    callerName: h.caller?.name ?? '',
+                    callerId: h.caller?._id ?? null,
+                    detail: h.notes ?? '',
+                    callAgainDate: h.callAgain ?? null,
+                    feedback: h.feedback ?? null,
+                    createdAt: h.createdAt,
+                    updatedAt: h.updatedAt,
+                    createdByName: h.createdBy?.name ?? null,
+                    updatedByName: h.updatedBy?.name ?? null,
+                    createdById: h.createdBy?._id ?? null,
+                    updatedById: h.updatedBy?._id ?? null,
+                    version: typeof h.__v === 'number' ? h.__v : null,
+                }));
+
+                const sortedHistory = [...mappedHistory].sort(
+                    (a, b) => new Date(b.calledAt).getTime() - new Date(a.calledAt).getTime(),
+                );
+                const latest = sortedHistory[0];
+
+                setHistoryModalFollowup((cur) => {
+                    // Avoid race conditions if user opens another customer before this request finishes.
+                    if (!cur || cur.id !== f.id) return cur;
+                    return {
+                        ...f,
+                        customerName: data.customer?.name ?? f.customerName,
+                        callingHistory: sortedHistory,
+                        callingDate: latest?.calledAt ?? f.callingDate,
+                        callerName: latest?.callerName ?? f.callerName,
+                        callingDetail: latest?.detail ?? f.callingDetail,
+                        callAgainDate: latest?.callAgainDate ?? f.callAgainDate,
+                        // Keep `feedback` from the dashboard row; feedback is shown per-history-entry below.
+                    };
+                });
+            } catch (error) {
+                console.error('Error loading call history:', error);
+                showToast('Failed to load call history. Please try again.', 'error');
+            } finally {
+                setHistoryLoading(false);
+            }
         },
         [showToast],
     );
@@ -326,7 +460,7 @@ export default function Followups() {
                     baseFollowups={baseFollowups}
                     ordersByCustomer={ordersByCustomer}
                     onCustomerClick={onCustomerClick}
-                    onOpenHistory={setHistoryModalFollowup}
+                    onOpenHistory={onOpenHistory}
                     onUpdate={updateFollowup}
                 />
                 <FollowupsPagination
@@ -358,7 +492,11 @@ export default function Followups() {
                 <FollowupCallHistoryModal
                     key={historyModalFollowup.id}
                     followup={historyModalFollowup}
-                    onClose={() => setHistoryModalFollowup(null)}
+                    loadingHistory={historyLoading}
+                    onClose={() => {
+                        setHistoryLoading(false);
+                        setHistoryModalFollowup(null);
+                    }}
                     onAppend={(payload) => appendCallLog(historyModalFollowup.id, payload)}
                 />
             ) : null}

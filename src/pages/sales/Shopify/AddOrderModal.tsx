@@ -224,6 +224,10 @@ function normalizeTrackingCompany(v: string | undefined): TrackingCompany | '' {
 
 export type ProductVariantOption = { id: string; name: string; size: string; price: number };
 
+function formatVariantLabel(product: ProductVariantOption): string {
+    return product.size ? `${product.name} - ${product.size}` : product.name;
+}
+
 function PhoneDropdown({
     selectedPhone,
     onSelectSearchResult,
@@ -433,6 +437,7 @@ function VariantDropdown({
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
 
     // Filter on every render from current search so list updates on every key press
@@ -469,20 +474,46 @@ function VariantDropdown({
     }, [isOpen]);
 
     useLayoutEffect(() => {
-        if (!isOpen || !popupRef.current || !containerRef.current) return;
-        const rect = containerRef.current.getBoundingClientRect();
-        const popup = popupRef.current;
-        const popupHeight = 320;
-        let top = rect.bottom + 4;
-        let left = rect.left;
-        if (rect.bottom + popupHeight > window.innerHeight) {
-            top = rect.top - popupHeight - 4;
-        }
-        if (rect.left + 320 > window.innerWidth) {
-            left = window.innerWidth - 320 - 12;
-        }
-        popup.style.top = `${top}px`;
-        popup.style.left = `${left}px`;
+        if (!isOpen || !popupRef.current || !triggerRef.current) return;
+
+        const positionPopup = () => {
+            if (!popupRef.current || !triggerRef.current) return;
+            const rect = triggerRef.current.getBoundingClientRect();
+            const popup = popupRef.current;
+            const gutter = 12;
+
+            const popupWidth = Math.max(280, rect.width);
+            let left = rect.left;
+            if (left + popupWidth > window.innerWidth - gutter) {
+                left = window.innerWidth - popupWidth - gutter;
+            }
+            left = Math.max(gutter, left);
+
+            popup.style.left = `${left}px`;
+            popup.style.width = `${popupWidth}px`;
+            popup.style.maxWidth = `${Math.max(280, window.innerWidth - gutter * 2)}px`;
+
+            // Measure after width is applied so open-up/open-down is based on actual content height.
+            const popupHeight = Math.min(popup.offsetHeight || 320, window.innerHeight - gutter * 2);
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const shouldOpenUp = spaceBelow < popupHeight + 8 && rect.top > popupHeight + 8;
+
+            let top = shouldOpenUp ? rect.top - popupHeight - 4 : rect.bottom + 4;
+            top = Math.max(gutter, Math.min(top, window.innerHeight - popupHeight - gutter));
+            popup.style.top = `${top}px`;
+        };
+
+        positionPopup();
+        const rafId = window.requestAnimationFrame(positionPopup);
+        const onViewportChange = () => positionPopup();
+        window.addEventListener('resize', onViewportChange);
+        window.addEventListener('scroll', onViewportChange, true);
+
+        return () => {
+            window.cancelAnimationFrame(rafId);
+            window.removeEventListener('resize', onViewportChange);
+            window.removeEventListener('scroll', onViewportChange, true);
+        };
     }, [isOpen, searchQuery, filteredOptions.length]);
 
     const displayLabel = value || placeholder;
@@ -491,6 +522,7 @@ function VariantDropdown({
         <div ref={containerRef} className="variant-dropdown-root">
             <label className="label">Variant</label>
             <button
+                ref={triggerRef}
                 type="button"
                 className="variant-dropdown-trigger"
                 onClick={() => setIsOpen((o) => !o)}
@@ -544,7 +576,7 @@ function VariantDropdown({
                             </div>
                         ) : (
                             filteredOptions.map((product) => {
-                                const variantStr = `${product.name} - ${product.size}`;
+                                const variantStr = formatVariantLabel(product);
                                 const isSelected = value === variantStr;
                                 return (
                                     <button
@@ -563,7 +595,9 @@ function VariantDropdown({
                                             {product.name}
                                         </span>
                                         <span className="variant-dropdown-option-meta">
-                                            {product.size} · ₹{product.price.toLocaleString('en-IN')}
+                                            {product.size
+                                                ? `${product.size} · ₹${product.price.toLocaleString('en-IN')}`
+                                                : `₹${product.price.toLocaleString('en-IN')}`}
                                         </span>
                                     </button>
                                 );
@@ -706,7 +740,7 @@ function AddOrderModal({
             .map((it, idx) => (idx !== currentIdx ? it.variant : ''))
             .filter(Boolean);
         return products.filter((product) => {
-            const variantStr = `${product.name} - ${product.size}`;
+            const variantStr = formatVariantLabel(product);
             return !selectedVariants.includes(variantStr);
         });
     };
@@ -827,7 +861,7 @@ function AddOrderModal({
                     if (key === 'variant') {
                         const variantStr = value as string;
                         const product = products.find(
-                            (p) => `${p.name} - ${p.size}` === variantStr
+                            (p) => formatVariantLabel(p) === variantStr
                         );
                         return {
                             ...it,

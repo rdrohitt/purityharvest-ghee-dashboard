@@ -42,3 +42,45 @@ export interface FollowupsDashboardResponse {
     totalPages: number;
     rows: FollowupsDashboardRow[];
 }
+
+/**
+ * Customer call history:
+ * `GET /api/followups/customer/<customerId>`
+ */
+export interface FollowupsCustomerHistoryCustomer {
+    _id: string;
+    name: string;
+    phoneNumber: string;
+    countryCode: string;
+    address: string;
+    state: string;
+    pincode: string;
+    createdAt: string; // ISO
+    updatedAt: string; // ISO
+    __v: number;
+}
+
+export interface FollowupsCustomerHistoryUserRef {
+    _id: string;
+    name: string;
+}
+
+export interface FollowupsCustomerHistoryEntry {
+    _id: string;
+    calledOn: string; // ISO
+    caller: FollowupsCustomerHistoryUserRef;
+    feedback: string | null;
+    notes: string;
+    callAgain: string | null; // ISO or null
+    createdBy: FollowupsCustomerHistoryUserRef;
+    updatedBy: FollowupsCustomerHistoryUserRef;
+    createdAt: string; // ISO
+    updatedAt: string; // ISO
+    __v: number;
+}
+
+export interface FollowupsCustomerHistoryResponse {
+    customer: FollowupsCustomerHistoryCustomer;
+    count: number;
+    history: FollowupsCustomerHistoryEntry[];
+}

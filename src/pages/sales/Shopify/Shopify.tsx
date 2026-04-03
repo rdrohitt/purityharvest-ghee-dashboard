@@ -334,14 +334,26 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     }, [editingOrderId]);
 
     const productOptions = useMemo((): ProductVariantOption[] => {
-        return products.flatMap((p) =>
-            (p.variants || []).map((v) => ({
+        return products.flatMap((p) => {
+            const variants = Array.isArray(p.variants) ? p.variants : [];
+            if (variants.length === 0) {
+                return [
+                    {
+                        id: p._id,
+                        name: p.name,
+                        size: '',
+                        price: Number(p.price || 0),
+                    },
+                ];
+            }
+
+            return variants.map((v) => ({
                 id: p._id,
                 name: p.name,
                 size: v.name,
                 price: v.price,
-            }))
-        );
+            }));
+        });
     }, [products]);
 
     const productCategoryMap = useMemo(() => {

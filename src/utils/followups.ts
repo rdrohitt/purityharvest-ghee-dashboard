@@ -29,8 +29,17 @@ export type CallingHistoryEntry = {
     id: string;
     calledAt: string; // ISO
     callerName: string;
+    callerId: string | null;
     detail: string;
     callAgainDate: string | null; // ISO or null
+    feedback: string | null;
+    createdAt: string; // ISO
+    updatedAt: string; // ISO
+    createdByName: string | null;
+    updatedByName: string | null;
+    createdById: string | null;
+    updatedById: string | null;
+    version: number | null; // `__v` from backend (if present)
 };
 
 export type Followup = {

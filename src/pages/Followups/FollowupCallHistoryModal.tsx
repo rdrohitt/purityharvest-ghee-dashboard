@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
+import { Spinner } from '../../components/Spinner';
 import type { Followup } from '../../utils/followups';
 import { useAppSelector } from '../../store';
 import { CALLER_OPTIONS, FEEDBACK_OPTIONS } from './followupsConstants';
-import { formatDate, getFeedbackEmoji, getFeedbackSelectClass, toInputDate } from './followupsFormat';
+import { DateInput } from './DateInput';
+import { formatDate, getFeedbackEmoji, toInputDate } from './followupsFormat';
 
 export function FollowupCallHistoryModal({
     followup,
+    loadingHistory = false,
     onClose,
     onAppend,
 }: {
     followup: Followup;
+    loadingHistory?: boolean;
     onClose: () => void;
     onAppend: (payload: {
         calledOn: string;
@@ -22,35 +26,45 @@ export function FollowupCallHistoryModal({
     const currentUser = useAppSelector((state) => state.user.user);
     const loggedInCallerName = (currentUser?.name || currentUser?.username || '').trim();
 
-    const [calledOn, setCalledOn] = useState(() => toInputDate(new Date().toISOString()));
+    const [calledOn, setCalledOn] = useState<string | null>(() => new Date().toISOString());
     const [callerName, setCallerName] = useState(
         loggedInCallerName || followup.callerName || CALLER_OPTIONS[0] || '',
     );
     const [detail, setDetail] = useState('');
-    const [feedback, setFeedback] = useState(followup.feedback || '');
-    const [callAgainOn, setCallAgainOn] = useState('');
+    const [feedback, setFeedback] = useState('');
+    const [callAgainOn, setCallAgainOn] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+
+    const busy = loadingHistory || saving;
 
     const timeline = [...followup.callingHistory].sort(
         (a, b) => new Date(b.calledAt).getTime() - new Date(a.calledAt).getTime(),
     );
+    const countToneClass =
+        timeline.length === 0
+            ? 'fu-hist-modal__count--zero'
+            : timeline.length < 3
+              ? 'fu-hist-modal__count--low'
+              : timeline.length > 3
+                ? 'fu-hist-modal__count--high'
+                : 'fu-hist-modal__count--mid';
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!detail.trim() || !callerName.trim()) return;
+        if (!detail.trim() || !callerName.trim() || !calledOn) return;
         setSaving(true);
         try {
             await onAppend({
-                calledOn,
+                calledOn: toInputDate(calledOn),
                 callerName,
                 detail,
-                callAgainDate: callAgainOn.trim() ? callAgainOn : null,
+                callAgainDate: callAgainOn ? toInputDate(callAgainOn) : null,
                 feedback: feedback.trim() ? feedback : null,
             });
             setDetail('');
-            setCallAgainOn('');
-            setCalledOn(toInputDate(new Date().toISOString()));
-            setFeedback(followup.feedback || '');
+            setCallAgainOn(null);
+            setCalledOn(new Date().toISOString());
+            setFeedback('');
         } finally {
             setSaving(false);
         }
@@ -71,6 +85,14 @@ export function FollowupCallHistoryModal({
                     <div>
                         <h2 id="fu-hist-title" className="fu-hist-modal__title">
                             Call history
+                            {!loadingHistory ? (
+                                <span
+                                    className={`fu-hist-modal__count ${countToneClass}`}
+                                    aria-label={`${timeline.length} history entries`}
+                                >
+                                    {timeline.length}
+                                </span>
+                            ) : null}
                         </h2>
                         <p className="fu-hist-modal__sub">
                             {followup.customerName}
@@ -83,7 +105,12 @@ export function FollowupCallHistoryModal({
                 </div>
 
                 <div className="fu-hist-list">
-                    {timeline.length === 0 ? (
+                    {busy ? (
+                        <div className="fu-hist-loading">
+                            <Spinner size="md" />
+                            <p className="fu-hist-loading__msg">{saving ? 'Saving…' : 'Loading…'}</p>
+                        </div>
+                    ) : timeline.length === 0 ? (
                         <div className="fu-hist-empty">No calls logged yet. Use the form below to add the first call.</div>
                     ) : (
                         <ol className="fu-hist-timeline" aria-label="Call history, newest first">
@@ -129,19 +156,17 @@ export function FollowupCallHistoryModal({
                                             <p className="fu-hist-timeline__notes">{entry.detail || '—'}</p>
                                             <div className="fu-hist-timeline__followup">
                                                 <span className="fu-hist-timeline__followup-icon" aria-hidden>
-                                                    <svg
-                                                        width="14"
-                                                        height="14"
-                                                        viewBox="0 0 24 24"
-                                                        fill="none"
-                                                        stroke="currentColor"
-                                                        strokeWidth="2"
-                                                    >
-                                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                                        <path d="M16 2v4M8 2v4M3 10h18" />
-                                                    </svg>
+                                                    {entry.feedback ? getFeedbackEmoji(entry.feedback) : '—'}
                                                 </span>
-                                                <span className="fu-hist-timeline__followup-label">Follow up</span>
+                                                <span className="fu-hist-timeline__followup-label">Feedback</span>
+                                                <span className="fu-hist-timeline__followup-val">
+                                                    {entry.feedback ? entry.feedback : 'Not set'}
+                                                </span>
+                                                <span className="fu-hist-timeline__followup-spacer" aria-hidden />
+                                                <span className="fu-hist-timeline__followup-icon" aria-hidden>
+                                                    ⏱️
+                                                </span>
+                                                <span className="fu-hist-timeline__followup-label">Call back</span>
                                                 <span className="fu-hist-timeline__followup-val">
                                                     {entry.callAgainDate ? formatDate(entry.callAgainDate) : 'Not set'}
                                                 </span>
@@ -159,13 +184,7 @@ export function FollowupCallHistoryModal({
                     <div className="fu-hist-form__grid">
                         <label className="fu-hist-field">
                             <span className="fu-hist-field__lab">Called on</span>
-                            <input
-                                className="fu-hist-field__input"
-                                type="date"
-                                value={calledOn}
-                                onChange={(e) => setCalledOn(e.target.value)}
-                                required
-                            />
+                            <DateInput value={calledOn} onChange={setCalledOn} />
                         </label>
                         <label className="fu-hist-field">
                             <span className="fu-hist-field__lab">Caller</span>
@@ -214,11 +233,10 @@ export function FollowupCallHistoryModal({
                         </label>
                         <label className="fu-hist-field">
                             <span className="fu-hist-field__lab">Call again (optional)</span>
-                            <input
-                                className="fu-hist-field__input"
-                                type="date"
+                            <DateInput
                                 value={callAgainOn}
-                                onChange={(e) => setCallAgainOn(e.target.value)}
+                                onChange={setCallAgainOn}
+                                minDate={new Date().toISOString()}
                             />
                         </label>
                     </div>
