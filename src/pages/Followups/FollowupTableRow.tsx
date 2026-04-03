@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Followup } from '../../utils/followups';
 import type { Order } from '../../utils/orders';
-import { CALLER_OPTIONS, FEEDBACK_OPTIONS } from './followupsConstants';
+import { FEEDBACK_OPTIONS } from './followupsConstants';
 import { formatDate, getCustomerType, getFeedbackEmoji, getFeedbackSelectClass } from './followupsFormat';
 import { DateInput } from './DateInput';
 import { Td } from './FollowupsTableCells';
@@ -95,20 +95,6 @@ export function FollowupTableRow({ followup: f, ordersByCustomer, onCustomerClic
             </Td>
             <Td>
                 <DateInput value={f.callAgainDate} onChange={(value) => onUpdate(f.id, 'callAgainDate', value)} />
-            </Td>
-            <Td>
-                <select
-                    className="input fu-table-select"
-                    value={f.callerName}
-                    onChange={(e) => onUpdate(f.id, 'callerName', e.target.value)}
-                >
-                    <option value="">Select caller</option>
-                    {CALLER_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                            {opt}
-                        </option>
-                    ))}
-                </select>
             </Td>
         </tr>
     );

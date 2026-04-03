@@ -36,7 +36,6 @@ export function FollowupsTable({
                         <col className="fu-col fu-col--180" />
                         <col className="fu-col fu-col--200" />
                         <col className="fu-col fu-col--180" />
-                        <col className="fu-col fu-col--140" />
                     </colgroup>
                     <thead>
                         <tr className="fu-table__head-row">
@@ -48,7 +47,6 @@ export function FollowupsTable({
                             <Th>Calling Date</Th>
                             <Th>Calling Detail</Th>
                             <Th>Call Again Date</Th>
-                            <Th>Caller Name</Th>
                         </tr>
                     </thead>
                     <tbody>
@@ -66,7 +64,7 @@ export function FollowupsTable({
                             : null}
                         {!loading && filtered.length === 0 ? (
                             <tr>
-                                <td colSpan={9} className="fu-table-empty">
+                                <td colSpan={8} className="fu-table-empty">
                                     {baseFollowups.length > 0
                                         ? 'No rows match your filters. Use Clear all in the Filters panel.'
                                         : 'No followups found'}

@@ -35,6 +35,8 @@ export type CallingHistoryEntry = {
 
 export type Followup = {
     id: string;
+    /** Customer document ID from /api/followups/dashboard */
+    customerId: string;
     customerName: string;
     customerPhone: string;
     lastOrder: string; // ISO date
@@ -42,6 +44,8 @@ export type Followup = {
     lastOrderDetail: string;
     feedback: string;
     callingDate: string | null; // ISO date or null
+    /** Caller user ID from /api/users/me (when available) */
+    callerId?: string | null;
     callerName: string;
     callingDetail: string;
     callAgainDate: string | null; // ISO date or null
@@ -94,6 +98,7 @@ export function dashboardRowToFollowup(row: FollowupsDashboardRow): Followup {
             : `FU-${customerPhone}`;
     return {
         id,
+        customerId: row.customer._id,
         customerName: row.customer.name,
         customerPhone,
         lastOrder: row.lastOrderDate,
@@ -101,6 +106,7 @@ export function dashboardRowToFollowup(row: FollowupsDashboardRow): Followup {
         lastOrderDetail: row.lastOrderSummary,
         feedback: row.feedback ?? '',
         callingDate: row.callingDate,
+        callerId: row.caller?._id ?? null,
         callerName: row.caller?.name ?? '',
         callingDetail: row.callingDetail ?? '',
         callAgainDate: row.callAgain,
@@ -221,6 +227,7 @@ export function generateMockFollowups(limit = 50): Followup[] {
         
         followups.push({
             id: `FU-${1000 + i}`,
+            customerId: `CUST-${1000 + i}`,
             customerName: name,
             customerPhone: phone,
             lastOrder: lastOrderDate.toISOString(),
@@ -228,6 +235,7 @@ export function generateMockFollowups(limit = 50): Followup[] {
             lastOrderDetail: orderDetails[Math.floor(rand(seed + 8) * orderDetails.length)],
             feedback: feedbacks[Math.floor(rand(seed + 9) * feedbacks.length)],
             callingDate: callingDate?.toISOString() || null,
+            callerId: null,
             callerName: callers[Math.floor(rand(seed + 10) * callers.length)],
             callingDetail: rand(seed + 11) > 0.5 ? 'Customer requested callback' : 'Follow up on previous order',
             callAgainDate: callAgainDate?.toISOString() || null,

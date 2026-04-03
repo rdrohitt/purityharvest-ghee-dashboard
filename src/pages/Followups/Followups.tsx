@@ -1,13 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Spinner } from '../../components/Spinner';
-import {
-    type Followup,
-    type FollowupData,
-    type CallingHistoryEntry,
-    fetchFollowupsDashboard,
-    dashboardRowToFollowup,
-    updateFollowupData,
-} from '../../utils/followups';
+import { type Followup, type CallingHistoryEntry, fetchFollowupsDashboard, dashboardRowToFollowup } from '../../utils/followups';
+import { apiFetch } from '../../api';
+import { useAppSelector } from '../../store';
 import { loadOrders, type Order } from '../../utils/orders';
 import { CustomerProfileModal } from './CustomerProfileModal';
 import { FollowupCallHistoryModal } from './FollowupCallHistoryModal';
@@ -50,6 +45,7 @@ export default function Followups() {
         limit: number;
     } | null>(null);
     const [toasts, setToasts] = useState<FollowupsToast[]>([]);
+    const currentUser = useAppSelector((state) => state.user.user);
 
     const showToast = useCallback((message: string, type: 'success' | 'error' | 'delete' = 'success') => {
         const id = `toast-${Date.now()}-${Math.random()}`;
@@ -194,25 +190,6 @@ export default function Followups() {
 
             if (isDemoFollowupRow(followup)) {
                 showToast('Sample row — changes stay on this page only.', 'success');
-                return;
-            }
-
-            try {
-                const followupData: Partial<FollowupData> = {
-                    customerPhone: followup.customerPhone,
-                    feedback: updatedFollowup.feedback,
-                    callingDate: updatedFollowup.callingDate,
-                    callerName: updatedFollowup.callerName,
-                    callingDetail: updatedFollowup.callingDetail,
-                    callAgainDate: updatedFollowup.callAgainDate,
-                    callingHistory: updatedFollowup.callingHistory,
-                };
-                await updateFollowupData(followup.customerPhone, followupData);
-                showToast('Followup updated successfully!', 'success');
-            } catch (error) {
-                console.error('Error updating followup:', error);
-                showToast('Failed to save followup. Please try again.', 'error');
-                setFollowups((prev) => prev.map((f) => (f.id === id ? followup : f)));
             }
         },
         [followups, showToast],
@@ -221,7 +198,13 @@ export default function Followups() {
     const appendCallLog = useCallback(
         async (
             followupId: string,
-            payload: { calledOn: string; callerName: string; detail: string; callAgainDate: string | null },
+            payload: {
+                calledOn: string;
+                callerName: string;
+                detail: string;
+                callAgainDate: string | null;
+                feedback: string | null;
+            },
         ) => {
             const followup = followups.find((f) => f.id === followupId);
             if (!followup) return;
@@ -244,6 +227,7 @@ export default function Followups() {
                 callingDetail: newEntry.detail,
                 callerName: newEntry.callerName,
                 callAgainDate: newEntry.callAgainDate,
+                feedback: payload.feedback ?? followup.feedback,
                 callingHistory: nextHistory,
             };
 
@@ -256,15 +240,30 @@ export default function Followups() {
             }
 
             try {
-                await updateFollowupData(followup.customerPhone, {
-                    customerPhone: followup.customerPhone,
-                    feedback: updatedFollowup.feedback,
-                    callingDate: updatedFollowup.callingDate,
-                    callerName: updatedFollowup.callerName,
-                    callingDetail: updatedFollowup.callingDetail,
-                    callAgainDate: updatedFollowup.callAgainDate,
-                    callingHistory: nextHistory,
-                });
+                const callerId = currentUser?._id ?? null;
+                const customerId = followup.customerId;
+
+                if (customerId && callerId) {
+                    const calledOnIso = `${payload.calledOn}T00:00:00.000Z`;
+                    const callAgainIso = payload.callAgainDate
+                        ? `${payload.callAgainDate}T00:00:00.000Z`
+                        : null;
+
+                    await apiFetch('/api/followups', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            customer: customerId,
+                            calledOn: calledOnIso,
+                            caller: callerId,
+                            feedback: updatedFollowup.feedback,
+                            notes: newEntry.detail,
+                            callAgain: callAgainIso,
+                        }),
+                    });
+                }
                 showToast('Call added to history', 'success');
             } catch (error) {
                 console.error('Error saving call history:', error);
@@ -273,7 +272,7 @@ export default function Followups() {
                 setHistoryModalFollowup((cur) => (cur?.id === followupId ? followup : cur));
             }
         },
-        [followups, showToast],
+        [followups, showToast, currentUser],
     );
 
     const onCustomerClick = useCallback(
