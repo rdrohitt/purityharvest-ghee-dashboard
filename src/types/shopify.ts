@@ -98,6 +98,7 @@ export interface ShopifyOrderApi {
     is_shipped?: boolean;
     codCharges: number;
     shippingCharges: number;
+    partialAmount?: number;
     discount: number;
     totalAmount: number;
     notes: string;

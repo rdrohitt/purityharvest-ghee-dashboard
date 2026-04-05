@@ -69,6 +69,33 @@ function normalizeOrder(raw: unknown): ShopifyOrderApi | null {
     const state = String(o.state ?? cust?.state ?? '');
     const updatedBy = o.updatedBy as ShopifyOrderApi['updatedBy'] | undefined;
     const pincode = String(o.pincode ?? cust?.pincode ?? '');
+    const shippingDetailsRaw =
+        o.shippingDetails && typeof o.shippingDetails === 'object'
+            ? (o.shippingDetails as Record<string, unknown>)
+            : null;
+    const trackingNumber = String(
+        shippingDetailsRaw?.trackingNumber ?? o.trackingNumber ?? ''
+    ).trim();
+    const trackingStatus = String(
+        shippingDetailsRaw?.trackingStatus ?? o.trackingStatus ?? ''
+    ).trim();
+    const trackingCompany = String(
+        shippingDetailsRaw?.trackingCompany ??
+            shippingDetailsRaw?.trackingCompanyName ??
+            o.trackingCompany ??
+            o.trackingCompanyName ??
+            ''
+    ).trim();
+    const trackingUrl = buildDefaultTrackingUrlFromCourier(trackingNumber, trackingCompany);
+    const shippingDetails =
+        trackingNumber || trackingStatus || trackingUrl || trackingCompany
+            ? {
+                  trackingNumber,
+                  trackingStatus,
+                  trackingUrl,
+                  trackingCompany,
+              }
+            : undefined;
     return {
         _id,
         shopifyOrderId: o.shopifyOrderId as string | undefined,
@@ -88,11 +115,15 @@ function normalizeOrder(raw: unknown): ShopifyOrderApi | null {
         is_shipped: Boolean((o as any).is_shipped),
         codCharges: Number(o.codCharges) || 0,
         shippingCharges: Number(o.shippingCharges) || 0,
+        partialAmount:
+            o.partialAmount !== undefined && o.partialAmount !== null
+                ? Number(o.partialAmount) || 0
+                : Number(o.shippingCharges) || 0,
         discount: Number(o.discount) || 0,
         totalAmount: Number(o.totalAmount ?? o.amount) || 0,
         notes: String(o.notes ?? ''),
         updatedBy,
-        shippingDetails: o.shippingDetails as ShopifyOrderApi['shippingDetails'],
+        shippingDetails: shippingDetails as ShopifyOrderApi['shippingDetails'],
         createdAt: o.createdAt as string | undefined,
         updatedAt: o.updatedAt as string | undefined,
     };
@@ -181,12 +212,17 @@ export function orderDetailToOrder(o: ShopifyOrderApi): Order {
         pincode: o.pincode,
         codCharges: o.codCharges,
         shippingCharges: o.shippingCharges,
+        partialAmount: o.partialAmount ?? o.shippingCharges,
         discountAmount: o.discount,
         awbNumber: o.shippingDetails?.trackingNumber,
         notes: o.notes,
         platform: platformLabel,
         type: mapOrderType(o.type),
-        shippingTrackingUrl: o.shippingDetails?.trackingUrl,
+        shippingTrackingUrl:
+            buildDefaultTrackingUrlFromCourier(
+                o.shippingDetails?.trackingNumber ?? '',
+                o.shippingDetails?.trackingCompany ?? '',
+            ) || undefined,
         shippingTrackingCompany: o.shippingDetails?.trackingCompany,
         is_shipped: Boolean(o.is_shipped),
     };
@@ -254,6 +290,21 @@ function toBackendFulfillmentStatus(status: FulfillmentStatus): string {
     return 'unfulfilled';
 }
 
+/**
+ * When no explicit tracking URL is stored, build one from AWB and courier partner (case-insensitive).
+ */
+export function buildDefaultTrackingUrlFromCourier(awb: string, courierPartner: string): string {
+    const trimmed = String(awb ?? '').trim();
+    if (!trimmed) return '';
+    const c = String(courierPartner ?? '').trim().toLowerCase();
+    const enc = encodeURIComponent(trimmed);
+    if (c.includes('amazon')) {
+        return `https://track.amazon.in/tracking/${enc}`;
+    }
+    // Delhivery and other couriers: same public tracker used when partner is Delhivery or unspecified
+    return `https://www.delhivery.com/track-v2/package/${enc}`;
+}
+
 function toBackendOrderType(t?: OrderType): string | undefined {
     if (!t) return undefined;
     return t.toLowerCase();
@@ -273,17 +324,11 @@ export function buildShopifyOrderPayloadFromForm(
     const fulfillmentStatus = toBackendFulfillmentStatus(form.fulfillmentStatus);
     const deliveryStatus = toBackendDeliveryStatus(form.deliveryStatus);
     const awb = form.awbNumber || base.shippingDetails?.trackingNumber || '';
-    const delhiveryFromAwb = awb.trim()
-        ? `https://www.delhivery.com/track/package/${encodeURIComponent(awb.trim())}`
-        : '';
-    const trackingUrl =
-        (form.shippingTrackingUrl && form.shippingTrackingUrl.trim()) ||
-        delhiveryFromAwb ||
-        (base.shippingDetails?.trackingUrl ?? '');
     const trackingCompany =
         (form.shippingTrackingCompany && form.shippingTrackingCompany.trim()) ||
         base.shippingDetails?.trackingCompany ||
         'Delhivery';
+    const trackingUrl = buildDefaultTrackingUrlFromCourier(awb, trackingCompany);
 
     const baseProducts = (base.products || []) as ShopifyOrderApi['products'];
 
@@ -363,7 +408,11 @@ export function buildShopifyOrderPayloadFromForm(
         fulfillmentStatus,
         is_shipped: form.is_shipped,
         codCharges: form.codCharges ?? base.codCharges,
-        shippingCharges: form.shippingCharges ?? base.shippingCharges,
+        shippingCharges: base.shippingCharges,
+        partialAmount:
+            form.partialAmount !== undefined && form.partialAmount !== null
+                ? Number(form.partialAmount) || 0
+                : base.partialAmount ?? base.shippingCharges,
         discount: form.discountAmount ?? base.discount,
         totalAmount: form.amount,
         notes: form.notes ?? base.notes,
@@ -434,12 +483,17 @@ export function shopifyOrderToOrder(o: ShopifyOrderApi): Order {
         pincode: o.pincode,
         codCharges: o.codCharges,
         shippingCharges: o.shippingCharges,
+        partialAmount: o.partialAmount ?? o.shippingCharges,
         discountAmount: o.discount,
         awbNumber: o.shippingDetails?.trackingNumber,
         notes: o.notes,
         platform: platformLabel,
         type: mapOrderType(o.type),
-        shippingTrackingUrl: o.shippingDetails?.trackingUrl,
+        shippingTrackingUrl:
+            buildDefaultTrackingUrlFromCourier(
+                o.shippingDetails?.trackingNumber ?? '',
+                o.shippingDetails?.trackingCompany ?? '',
+            ) || undefined,
         shippingTrackingCompany: o.shippingDetails?.trackingCompany,
         is_shipped: Boolean(o.is_shipped),
     };

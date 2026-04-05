@@ -5,20 +5,14 @@ type Props = {
     visibleCount: number;
     dashboardMeta: { total: number } | null;
     totalRecords: number;
-    showingDemoFollowupsOnly: boolean;
 };
 
-export function FollowupsHeader({ loading, visibleCount, dashboardMeta, totalRecords, showingDemoFollowupsOnly }: Props) {
+export function FollowupsHeader({ loading, visibleCount, dashboardMeta, totalRecords }: Props) {
     return (
         <header className="fu-top">
             <div className="fu-top__lead">
                 <h1 className="fu-title">Followups</h1>
                 <p className="fu-sub">Customer call queue and follow-up dates</p>
-                {showingDemoFollowupsOnly ? (
-                    <p className="fu-demo-hint">
-                        No order customers loaded — showing sample rows below. Your real followups appear once orders are available from the server.
-                    </p>
-                ) : null}
             </div>
             <div className="fu-top__meta">
                 <span className="fu-count-pill" title={loading ? undefined : 'Rows on this page after filters'}>

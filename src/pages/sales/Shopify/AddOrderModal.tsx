@@ -34,6 +34,7 @@ import {
 } from './ShopifyShared';
 import { DatePicker } from './DatePicker';
 import { Spinner } from '../../../components/Spinner';
+import { buildDefaultTrackingUrlFromCourier } from '../../../utils/shopify-orders';
 import './Shopify.scss';
 
 const DEBOUNCE_MS = 350;
@@ -156,12 +157,6 @@ const ADD_MODAL_FIELD_ICONS = {
             <path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14" />
         </ModalFieldSvg>
     ),
-    link: (
-        <ModalFieldSvg>
-            <path d="M10 13a5 5 0 0 1 0-7l1-1a5 5 0 0 1 7 7l-1 1" />
-            <path d="M14 11a5 5 0 0 1 0 7l-1 1a5 5 0 0 1-7-7l1-1" />
-        </ModalFieldSvg>
-    ),
 };
 
 function AddModalInputWrap({
@@ -216,9 +211,9 @@ function AddModalSection({
 function normalizeTrackingCompany(v: string | undefined): TrackingCompany | '' {
     if (!v?.trim()) return '';
     const lower = v.trim().toLowerCase();
-    if (lower === 'delhivery') return 'Delhivery';
-    if (lower === 'amazon') return 'Amazon';
-    if (lower === 'shiprocket') return 'Shiprocket';
+    if (lower.includes('delhivery')) return 'Delhivery';
+    if (lower.includes('amazon')) return 'Amazon';
+    if (lower.includes('shiprocket')) return 'Shiprocket';
     return '';
 }
 
@@ -668,8 +663,10 @@ function AddOrderModal({
             initialOrder?.shippingAmount?.toString() ||
             ''
     );
-    const [shippingCharges, setShippingCharges] = useState<string>(
-        initialOrder?.shippingCharges?.toString() || ''
+    const [partialAmount, setPartialAmount] = useState<string>(
+        initialOrder?.partialAmount !== undefined && initialOrder?.partialAmount !== null
+            ? String(initialOrder.partialAmount)
+            : initialOrder?.shippingCharges?.toString() || ''
     );
     const [discount, setDiscount] = useState<string>(
         initialOrder?.discountAmount?.toString() || ''
@@ -713,25 +710,18 @@ function AddOrderModal({
     const [trackingLoading, setTrackingLoading] = useState(false);
     const [trackingError, setTrackingError] = useState<string | null>(null);
 
-    const [shippingTrackingUrlInput, setShippingTrackingUrlInput] = useState(
-        () => initialOrder?.shippingTrackingUrl || ''
-    );
     const [shippingTrackingCompanyInput, setShippingTrackingCompanyInput] = useState<
         TrackingCompany | ''
     >(() => normalizeTrackingCompany(initialOrder?.shippingTrackingCompany));
 
     useEffect(() => {
-        setShippingTrackingUrlInput(initialOrder?.shippingTrackingUrl || '');
         setShippingTrackingCompanyInput(
             normalizeTrackingCompany(initialOrder?.shippingTrackingCompany)
         );
     }, [initialOrder?.id]);
 
-    const delhiveryUrlFromAwb = awb.trim()
-        ? `https://www.delhivery.com/track/package/${encodeURIComponent(awb.trim())}`
-        : '';
-    const resolvedTrackingUrl =
-        shippingTrackingUrlInput.trim() || delhiveryUrlFromAwb;
+    const courierForDefaultUrl = shippingTrackingCompanyInput.trim() || 'Delhivery';
+    const resolvedTrackingUrl = buildDefaultTrackingUrlFromCourier(awb, courierForDefaultUrl);
 
     const [saving, setSaving] = useState(false);
 
@@ -748,11 +738,10 @@ function AddOrderModal({
     useEffect(() => {
         const itemsTotal = items.reduce((sum, it) => sum + it.variantPrice * it.quantity, 0);
         const codChargesAmount = Number(codCharges) || 0;
-        const shippingChargesAmount = Number(shippingCharges) || 0;
         const discountAmount = Number(discount) || 0;
-        const total = itemsTotal + codChargesAmount + shippingChargesAmount - discountAmount;
+        const total = itemsTotal + codChargesAmount - discountAmount;
         setAmount(String(total));
-    }, [items, codCharges, shippingCharges, discount]);
+    }, [items, codCharges, discount]);
 
     useEffect(() => {
         const trimmed = awb.trim();
@@ -911,7 +900,7 @@ function AddOrderModal({
             deliveryStatus: delivery,
             pincode: pincode || undefined,
             codCharges: codCharges ? Number(codCharges) : undefined,
-            shippingCharges: shippingCharges ? Number(shippingCharges) : undefined,
+            partialAmount: partialAmount !== '' ? Number(partialAmount) || 0 : 0,
             discountAmount: discount ? Number(discount) : undefined,
             awbNumber: awb || undefined,
             shippingTrackingUrl: resolvedTrackingUrl || undefined,
@@ -1205,17 +1194,15 @@ function AddOrderModal({
                                         </AddModalInputWrap>
                                     </div>
                                     <div>
-                                        <label className="label">Shipping Charges (₹)</label>
-                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.truck}>
+                                        <label className="label">Partial amount (₹)</label>
+                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.rupee}>
                                             <input
                                                 className="input shopify-add-modal-input"
                                                 type="number"
                                                 min={0}
                                                 step="0.01"
-                                                value={shippingCharges}
-                                                onChange={(e) =>
-                                                    setShippingCharges(e.target.value)
-                                                }
+                                                value={partialAmount}
+                                                onChange={(e) => setPartialAmount(e.target.value)}
                                             />
                                         </AddModalInputWrap>
                                     </div>
@@ -1299,21 +1286,6 @@ function AddOrderModal({
                                                 value={awb}
                                                 onChange={(e) => setAwb(e.target.value)}
                                                 placeholder="Waybill or tracking ID"
-                                            />
-                                        </AddModalInputWrap>
-                                        <label className="label shopify-add-modal-tracking-label">
-                                            Tracking URL
-                                        </label>
-                                        <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.link}>
-                                            <input
-                                                className="input shopify-add-modal-tracking-input"
-                                                type="text"
-                                                inputMode="url"
-                                                value={shippingTrackingUrlInput}
-                                                onChange={(e) =>
-                                                    setShippingTrackingUrlInput(e.target.value)
-                                                }
-                                                placeholder="Optional; Delhivery link is used from AWB if empty"
                                             />
                                         </AddModalInputWrap>
                                         <label className="label shopify-add-modal-tracking-label">

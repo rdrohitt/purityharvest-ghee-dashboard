@@ -27,6 +27,8 @@ export type Order = {
     discountAmount?: number;
     awbNumber?: string;
     notes?: string;
+    /** Partial payment / partial amount (Shopify order flow). */
+    partialAmount?: number;
     state: string;
     /**
      * Optional metadata for who added the order.

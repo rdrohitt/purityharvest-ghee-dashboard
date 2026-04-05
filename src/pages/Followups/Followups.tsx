@@ -5,13 +5,8 @@ import { apiFetch } from '../../api';
 import { useAppSelector } from '../../store';
 import { loadOrders, type Order } from '../../utils/orders';
 import type { FollowupsCustomerHistoryResponse } from '../../types/followups';
-import { CustomerProfileModal } from './CustomerProfileModal';
+import { CustomerProfileModal } from '../sales/Shopify/CustomerProfileModal';
 import { FollowupCallHistoryModal } from './FollowupCallHistoryModal';
-import {
-    applyDummyCallHistoryForUiPreview,
-    cloneDemoFollowups,
-    isDemoFollowupRow,
-} from './followupsConstants';
 import type { FollowupsToast } from './followupsTypes';
 import { filterFollowups } from './filterFollowups';
 import { FollowupsFiltersSection } from './FollowupsFiltersSection';
@@ -19,13 +14,17 @@ import { FollowupsHeader } from './FollowupsHeader';
 import { FollowupsPagination } from './FollowupsPagination';
 import { FollowupsTable } from './FollowupsTable';
 import { ToastContainer } from './ToastContainer';
+import '../sales/Shopify/Shopify.scss';
 import './Followups.scss';
 
 export default function Followups() {
+    const currentYear = String(new Date().getFullYear());
     const [callerFilter, setCallerFilter] = useState('');
     const [feedbackFilter, setFeedbackFilter] = useState('');
     const [monthFilter, setMonthFilter] = useState('');
-    const [yearFilter, setYearFilter] = useState('');
+    const [yearFilter, setYearFilter] = useState(currentYear);
+    const [monthDraft, setMonthDraft] = useState('');
+    const [yearDraft, setYearDraft] = useState(currentYear);
     const [callingDateFilter, setCallingDateFilter] = useState('');
     const [upcomingFilter, setUpcomingFilter] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -33,7 +32,9 @@ export default function Followups() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [ordersByCustomer, setOrdersByCustomer] = useState<Map<string, Order[]>>(new Map());
     const [showCustomerProfile, setShowCustomerProfile] = useState(false);
+    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
+    const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
     const [historyModalFollowup, setHistoryModalFollowup] = useState<Followup | null>(null);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -90,7 +91,12 @@ export default function Followups() {
         (async () => {
             try {
                 setLoading(true);
-                const dashboard = await fetchFollowupsDashboard({ page, limit: pageSize });
+                const dashboard = await fetchFollowupsDashboard({
+                    page,
+                    limit: pageSize,
+                    month: monthFilter ? Number(monthFilter) : undefined,
+                    year: yearFilter ? Number(yearFilter) : undefined,
+                });
                 if (cancelled) return;
                 setDashboardMeta({
                     total: dashboard.total,
@@ -102,14 +108,12 @@ export default function Followups() {
                 if (dashboard.page !== page) {
                     setPage(dashboard.page);
                 }
-                const fromDashboard =
-                    dashboard.rows.length > 0 ? dashboard.rows.map(dashboardRowToFollowup) : cloneDemoFollowups();
-                setFollowups(applyDummyCallHistoryForUiPreview(fromDashboard));
+                setFollowups(dashboard.rows.map(dashboardRowToFollowup));
             } catch (error) {
                 console.error('Error loading followups dashboard:', error);
                 if (!cancelled) {
                     setDashboardMeta(null);
-                    setFollowups(applyDummyCallHistoryForUiPreview(cloneDemoFollowups()));
+                    setFollowups([]);
                 }
             } finally {
                 if (!cancelled) setLoading(false);
@@ -118,7 +122,7 @@ export default function Followups() {
         return () => {
             cancelled = true;
         };
-    }, [page, pageSize]);
+    }, [page, pageSize, monthFilter, yearFilter]);
 
     const totalRecords = dashboardMeta?.total ?? 0;
     const totalPages = Math.max(1, dashboardMeta?.totalPages ?? 1);
@@ -133,30 +137,20 @@ export default function Followups() {
 
     const baseFollowups = followups;
 
-    const showingDemoFollowupsOnly = useMemo(
-        () => followups.length > 0 && followups.every(isDemoFollowupRow),
-        [followups],
-    );
-
     const { monthOptions, yearOptions } = useMemo(() => {
-        const months = new Set<number>();
-        const years = new Set<number>();
-        baseFollowups.forEach((f) => {
-            const date = new Date(f.lastOrder);
-            months.add(date.getMonth() + 1);
-            years.add(date.getFullYear());
+        const mo = Array.from({ length: 12 }, (_, index) => {
+            const month = index + 1;
+            return {
+                value: month.toString(),
+                label: new Date(2000, index, 1).toLocaleDateString('en-US', { month: 'long' }),
+            };
         });
-        const mo = Array.from(months)
-            .sort((a, b) => b - a)
-            .map((m) => ({
-                value: m.toString(),
-                label: new Date(2000, m - 1, 1).toLocaleDateString('en-US', { month: 'long' }),
-            }));
-        const yo = Array.from(years)
-            .sort((a, b) => b - a)
-            .map((y) => ({ value: y.toString(), label: y.toString() }));
+        const yo = ['2024', '2025', '2026'].map((year) => ({
+            value: year,
+            label: year,
+        }));
         return { monthOptions: mo, yearOptions: yo };
-    }, [baseFollowups]);
+    }, []);
 
     const filtered = useMemo(
         () =>
@@ -177,10 +171,21 @@ export default function Followups() {
         setCallerFilter('');
         setFeedbackFilter('');
         setMonthFilter('');
-        setYearFilter('');
+        setYearFilter(currentYear);
+        setMonthDraft('');
+        setYearDraft(currentYear);
         setCallingDateFilter('');
         setUpcomingFilter('');
-    }, []);
+        setPage(1);
+    }, [currentYear]);
+
+    const applyMonthYearFilters = useCallback(() => {
+        setMonthFilter(monthDraft);
+        setYearFilter(yearDraft);
+        setPage(1);
+    }, [monthDraft, yearDraft]);
+
+    const monthYearApplyDisabled = monthDraft === monthFilter && yearDraft === yearFilter;
 
     const updateFollowup = useCallback(
         async (id: string, field: keyof Followup, value: string | null) => {
@@ -190,11 +195,8 @@ export default function Followups() {
             const updatedFollowup = { ...followup, [field]: value };
             setFollowups((prev) => prev.map((f) => (f.id === id ? updatedFollowup : f)));
 
-            if (isDemoFollowupRow(followup)) {
-                showToast('Sample row — changes stay on this page only.', 'success');
-            }
         },
-        [followups, showToast],
+        [followups],
     );
 
     const appendCallLog = useCallback(
@@ -245,11 +247,6 @@ export default function Followups() {
 
             setFollowups((prev) => prev.map((f) => (f.id === followupId ? updatedFollowup : f)));
             setHistoryModalFollowup((cur) => (cur?.id === followupId ? updatedFollowup : cur));
-
-            if (isDemoFollowupRow(followup)) {
-                showToast('Sample row — call saved in this session only.', 'success');
-                return;
-            }
 
             try {
                 const callerId = currentUser?._id ?? null;
@@ -337,10 +334,13 @@ export default function Followups() {
 
     const onCustomerClick = useCallback(
         (f: Followup) => {
-            if (isDemoFollowupRow(f)) {
-                showToast('Sample customer — open a real order to use the profile.', 'delete');
+            const cid = (f.customerId || '').trim();
+            if (!cid) {
+                showToast('Customer ID is missing for this row.', 'error');
                 return;
             }
+            setCustomerProfileLoading(true);
+            setSelectedCustomerId(cid);
             setSelectedCustomerPhone(f.customerPhone);
             setShowCustomerProfile(true);
         },
@@ -357,12 +357,6 @@ export default function Followups() {
                 setHistoryLoading(false);
                 return;
             }
-            if (isDemoFollowupRow(f)) {
-                showToast('Sample row — call history shown from the current session data.', 'success');
-                setHistoryLoading(false);
-                return;
-            }
-
             try {
                 const res = await apiFetch(`/api/followups/customer/${encodeURIComponent(f.customerId)}`);
                 if (!res.ok) {
@@ -424,13 +418,13 @@ export default function Followups() {
     return (
         <section className="followups-page">
             {loading ? <Spinner overlay fixed message="Loading followups…" /> : null}
+            {customerProfileLoading ? <Spinner overlay fixed message="Loading customer…" /> : null}
             <div className="card fu-shell">
                 <FollowupsHeader
                     loading={loading}
                     visibleCount={filtered.length}
                     dashboardMeta={dashboardMeta}
                     totalRecords={totalRecords}
-                    showingDemoFollowupsOnly={showingDemoFollowupsOnly}
                 />
                 <FollowupsFiltersSection
                     searchQuery={searchQuery}
@@ -440,9 +434,14 @@ export default function Followups() {
                     feedbackFilter={feedbackFilter}
                     setFeedbackFilter={setFeedbackFilter}
                     monthFilter={monthFilter}
-                    setMonthFilter={setMonthFilter}
                     yearFilter={yearFilter}
-                    setYearFilter={setYearFilter}
+                    monthDraft={monthDraft}
+                    setMonthDraft={setMonthDraft}
+                    yearDraft={yearDraft}
+                    setYearDraft={setYearDraft}
+                    onApplyMonthYear={applyMonthYearFilters}
+                    monthYearApplyDisabled={monthYearApplyDisabled}
+                    hasPendingMonthYear={monthDraft !== monthFilter || yearDraft !== yearFilter}
                     callingDateFilter={callingDateFilter}
                     setCallingDateFilter={setCallingDateFilter}
                     upcomingFilter={upcomingFilter}
@@ -477,15 +476,17 @@ export default function Followups() {
                 />
             </div>
 
-            {showCustomerProfile && selectedCustomerPhone ? (
+            {showCustomerProfile && selectedCustomerPhone && selectedCustomerId ? (
                 <CustomerProfileModal
+                    customerId={selectedCustomerId}
                     customerPhone={selectedCustomerPhone}
-                    orders={orders}
-                    ordersByCustomer={ordersByCustomer}
                     onClose={() => {
                         setShowCustomerProfile(false);
+                        setSelectedCustomerId(null);
                         setSelectedCustomerPhone(null);
+                        setCustomerProfileLoading(false);
                     }}
+                    onLoaded={() => setCustomerProfileLoading(false)}
                 />
             ) : null}
             {historyModalFollowup ? (

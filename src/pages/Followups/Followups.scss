@@ -190,6 +190,51 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
+.fu-flt--apply {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.fu-flt__lab--apply-spacer {
+  visibility: hidden;
+  user-select: none;
+}
+
+.fu-btn-apply {
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg-elev));
+  color: var(--primary-strong);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.fu-btn-apply:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 22%, var(--bg-elev));
+  border-color: color-mix(in srgb, var(--primary) 85%, var(--border));
+}
+
+.fu-btn-apply:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.fu-btn-apply:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .fu-panel__grid {
   display: grid;
   gap: 12px 14px;
@@ -202,7 +247,7 @@
 
 @media (min-width: 960px) {
   .fu-panel__grid {
-    grid-template-columns: minmax(240px, 1.35fr) repeat(4, minmax(132px, 1fr));
+    grid-template-columns: minmax(240px, 1.35fr) repeat(5, minmax(132px, 1fr));
   }
 
   .fu-search-wrap {
@@ -227,12 +272,16 @@
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg-elev) 94%, var(--bg));
   transition:
+    background 0.18s ease,
+    transform 0.18s ease,
     border-color 0.18s ease,
     box-shadow 0.18s ease;
 }
 
 .fu-flt__box:hover {
+  background: color-mix(in srgb, var(--primary) 2%, var(--bg-elev));
   border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
+  transform: translateY(-1px);
 }
 
 .fu-flt__box:focus-within {
@@ -258,6 +307,44 @@
   outline: none;
   appearance: none;
   -webkit-appearance: none;
+}
+
+.fu-flt__sel--interactive {
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.fu-flt__sel--month,
+.fu-flt__sel--year {
+  font-weight: 700;
+}
+
+.fu-flt__sel--month.fu-flt__sel--active,
+.fu-flt__sel--year.fu-flt__sel--active {
+  color: var(--primary-strong);
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.fu-flt:has(.fu-flt__sel--month):hover .fu-flt__box,
+.fu-flt:has(.fu-flt__sel--year):hover .fu-flt__box {
+  border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.fu-flt:has(.fu-flt__sel--month) .fu-flt__lab,
+.fu-flt:has(.fu-flt__sel--year) .fu-flt__lab {
+  transition: color 0.18s ease;
+}
+
+.fu-flt:has(.fu-flt__sel--month):hover .fu-flt__lab,
+.fu-flt:has(.fu-flt__sel--year):hover .fu-flt__lab {
+  color: color-mix(in srgb, var(--primary) 62%, var(--muted));
+}
+
+.fu-flt:has(.fu-flt__sel--month):focus-within .fu-flt__lab,
+.fu-flt:has(.fu-flt__sel--year):focus-within .fu-flt__lab {
+  color: var(--primary-strong);
 }
 
 /* Search */

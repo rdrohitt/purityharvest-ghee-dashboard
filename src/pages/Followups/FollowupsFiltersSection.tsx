@@ -1,6 +1,7 @@
 import React from 'react';
 import { CALLER_OPTIONS, FEEDBACK_OPTIONS } from './followupsConstants';
 import { CallingDateFilterButton, StatusFilter } from './FollowupFilterControls';
+import { getFeedbackEmoji, getFeedbackSelectClass } from './followupsFormat';
 
 type MonthOpt = { value: string; label: string };
 type YearOpt = { value: string; label: string };
@@ -13,9 +14,14 @@ type Props = {
     feedbackFilter: string;
     setFeedbackFilter: (v: string) => void;
     monthFilter: string;
-    setMonthFilter: (v: string) => void;
     yearFilter: string;
-    setYearFilter: (v: string) => void;
+    monthDraft: string;
+    setMonthDraft: (v: string) => void;
+    yearDraft: string;
+    setYearDraft: (v: string) => void;
+    onApplyMonthYear: () => void;
+    monthYearApplyDisabled: boolean;
+    hasPendingMonthYear: boolean;
     callingDateFilter: string;
     setCallingDateFilter: (v: string) => void;
     upcomingFilter: string;
@@ -33,9 +39,14 @@ export function FollowupsFiltersSection({
     feedbackFilter,
     setFeedbackFilter,
     monthFilter,
-    setMonthFilter,
     yearFilter,
-    setYearFilter,
+    monthDraft,
+    setMonthDraft,
+    yearDraft,
+    setYearDraft,
+    onApplyMonthYear,
+    monthYearApplyDisabled,
+    hasPendingMonthYear,
     callingDateFilter,
     setCallingDateFilter,
     upcomingFilter,
@@ -44,6 +55,8 @@ export function FollowupsFiltersSection({
     yearOptions,
     onClearAll,
 }: Props) {
+    const feedbackFilterClass = `${getFeedbackSelectClass(feedbackFilter)}${feedbackFilter ? ' fu-feedback-sel--filled' : ''}`;
+
     const hasActiveFilters =
         searchQuery ||
         callerFilter ||
@@ -51,7 +64,8 @@ export function FollowupsFiltersSection({
         monthFilter ||
         yearFilter ||
         callingDateFilter ||
-        upcomingFilter;
+        upcomingFilter ||
+        hasPendingMonthYear;
 
     return (
         <div className="fu-body">
@@ -97,21 +111,43 @@ export function FollowupsFiltersSection({
                         </div>
                     </div>
                     <StatusFilter label="Caller" value={callerFilter} onChange={setCallerFilter} options={CALLER_OPTIONS} />
-                    <StatusFilter label="Feedback" value={feedbackFilter} onChange={setFeedbackFilter} options={[...FEEDBACK_OPTIONS]} />
+                    <StatusFilter
+                        label="Feedback"
+                        value={feedbackFilter}
+                        onChange={setFeedbackFilter}
+                        options={FEEDBACK_OPTIONS.map((opt) => `${getFeedbackEmoji(opt)} ${opt}`)}
+                        optionValues={[...FEEDBACK_OPTIONS]}
+                        selectClassName={`fu-flt__sel--interactive ${feedbackFilterClass}`}
+                    />
                     <StatusFilter
                         label="Month"
-                        value={monthFilter}
-                        onChange={setMonthFilter}
+                        value={monthDraft}
+                        onChange={setMonthDraft}
                         options={monthOptions.map((m) => m.label)}
                         optionValues={monthOptions.map((m) => m.value)}
+                        selectClassName={`fu-flt__sel--interactive fu-flt__sel--month${monthDraft ? ' fu-flt__sel--active' : ''}`}
                     />
                     <StatusFilter
                         label="Year"
-                        value={yearFilter}
-                        onChange={setYearFilter}
+                        value={yearDraft}
+                        onChange={setYearDraft}
                         options={yearOptions.map((y) => y.label)}
                         optionValues={yearOptions.map((y) => y.value)}
+                        selectClassName={`fu-flt__sel--interactive fu-flt__sel--year${yearDraft ? ' fu-flt__sel--active' : ''}`}
                     />
+                    <div className="fu-flt fu-flt--apply">
+                        <span className="fu-flt__lab fu-flt__lab--apply-spacer" aria-hidden>
+                            &nbsp;
+                        </span>
+                        <button
+                            type="button"
+                            className="fu-btn-apply"
+                            disabled={monthYearApplyDisabled}
+                            onClick={onApplyMonthYear}
+                        >
+                            Apply
+                        </button>
+                    </div>
                 </div>
             </div>
             <div className="fu-quick">

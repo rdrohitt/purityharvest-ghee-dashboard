@@ -11,6 +11,7 @@ import {
     mapOrderType,
     getShopifyProductUnitPrice,
     getShopifyProductLineAmount,
+    buildDefaultTrackingUrlFromCourier,
 } from '../../../utils/shopify-orders';
 import { Spinner } from '../../../components/Spinner';
 import { formatCurrency, generateWhatsAppSummary, Th, Td, StatusTag, PlatformTag, TypeTag } from './ShopifyShared';
@@ -30,15 +31,22 @@ export type GroupedOrdersByDate = {
 function buildOrderWhatsAppMessage(o: ShopifyOrderApi): string {
     const name = getOrderCustomerName(o) || 'Customer';
     const awb = o.shippingDetails?.trackingNumber || '';
-    const trackingUrl =
-        o.shippingDetails?.trackingUrl ||
-        (awb ? `https://www.delhivery.com/track-v2/package/${encodeURIComponent(awb)}` : '');
+    const courier = o.shippingDetails?.trackingCompany || '';
+    const trackingUrl = buildDefaultTrackingUrlFromCourier(awb, courier);
 
     const lines: string[] = [];
     lines.push(`Dear ${name},`, '');
     // Use Unicode escape sequences so emojis render correctly across environments
     lines.push('Your order has been shipped!'); // 🚚
 
+    if (courier) {
+        const isAmazon = courier.toLowerCase().includes('amazon');
+        const courierLabel =
+            isAmazon && !/\bshipping\b/i.test(courier)
+                ? `${courier.trim()} Shipping`
+                : courier;
+        lines.push(`\uD83D\uDCE6 Courier Partner: ${courierLabel}`); // 📦
+    }
     if (awb) {
         lines.push(`\uD83D\uDCE6 AWB No: ${awb}`); // 📦
     }
@@ -519,7 +527,9 @@ export function ShopifyOrdersTable({
                                                     {o.codCharges ? (
                                                         <span className="shopify-amount-meta">COD: {formatCurrency(o.codCharges)}</span>
                                                     ) : null}
-                                                    {o.shippingCharges ? (
+                                                    {o.partialAmount ? (
+                                                        <span className="shopify-amount-meta">Partial: {formatCurrency(o.partialAmount)}</span>
+                                                    ) : o.shippingCharges ? (
                                                         <span className="shopify-amount-meta">Shipping: {formatCurrency(o.shippingCharges)}</span>
                                                     ) : null}
                                                     {o.discount ? (
@@ -545,16 +555,26 @@ export function ShopifyOrdersTable({
                                                         }
                                                         type="delivery"
                                                     />
-                                                    {o.shippingDetails?.trackingUrl && (
-                                                        <a
-                                                            href={o.shippingDetails.trackingUrl}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="link shopify-shipping-track-link"
-                                                        >
-                                                            Track
-                                                        </a>
-                                                    )}
+                                                    {(() => {
+                                                        const awbLink =
+                                                            o.shippingDetails?.trackingNumber || '';
+                                                        const courierLink =
+                                                            o.shippingDetails?.trackingCompany || '';
+                                                        const href = buildDefaultTrackingUrlFromCourier(
+                                                            awbLink,
+                                                            courierLink
+                                                        );
+                                                        return href ? (
+                                                            <a
+                                                                href={href}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="link shopify-shipping-track-link"
+                                                            >
+                                                                Track
+                                                            </a>
+                                                        ) : null;
+                                                    })()}
                                                 </div>
                                             </Td>
                                             <Td>

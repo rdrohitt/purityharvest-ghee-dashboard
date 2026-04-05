@@ -80,6 +80,10 @@ export type LoadFollowupsDashboardOptions = {
     page?: number;
     /** Page size (default 50) */
     limit?: number;
+    /** Optional month filter (1-12) */
+    month?: number;
+    /** Optional year filter (e.g. 2026) */
+    year?: number;
 };
 
 /** Normalize dashboard customer phone to 10-digit key used across the app. */
@@ -136,6 +140,12 @@ export async function fetchFollowupsDashboard(
         page: String(page),
         limit: String(limit),
     });
+    if (typeof options.month === 'number' && Number.isFinite(options.month)) {
+        params.set('month', String(Math.max(1, Math.min(12, Math.trunc(options.month)))));
+    }
+    if (typeof options.year === 'number' && Number.isFinite(options.year)) {
+        params.set('year', String(Math.trunc(options.year)));
+    }
     const response = await apiFetch(`/api/followups/dashboard?${params.toString()}`);
     if (!response.ok) {
         throw new Error('Failed to load followups from API');

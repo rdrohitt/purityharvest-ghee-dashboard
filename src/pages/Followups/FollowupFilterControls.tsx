@@ -6,12 +6,14 @@ export function StatusFilter<T extends string>({
     onChange,
     options,
     optionValues,
+    selectClassName = '',
 }: {
     label: string;
     value: T | '';
     onChange: (val: T | '') => void;
     options: readonly T[] | T[];
     optionValues?: string[];
+    selectClassName?: string;
 }) {
     const id = `followups-filter-${label.toLowerCase().replace(/\s+/g, '-')}`;
     return (
@@ -22,7 +24,7 @@ export function StatusFilter<T extends string>({
             <div className="fu-flt__box">
                 <select
                     id={id}
-                    className="fu-flt__sel"
+                    className={`fu-flt__sel ${selectClassName}`.trim()}
                     value={value}
                     onChange={(e) => onChange(e.target.value as T | '')}
                 >

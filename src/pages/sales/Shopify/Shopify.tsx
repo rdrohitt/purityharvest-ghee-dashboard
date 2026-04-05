@@ -13,6 +13,7 @@ import {
     getOrderCustomerPhone,
     updateShopifyOrderFromForm,
     getShopifyProductUnitPrice,
+    buildDefaultTrackingUrlFromCourier,
 } from '../../../utils/shopify-orders';
 import type { ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../../../types/shopify';
 import { loadProducts, type ProductApiItem } from '../../../utils/products';
@@ -106,6 +107,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const [customerFilter, setCustomerFilter] = useState('');
     const [customStart, setCustomStart] = useState<string>(toInputDate(new Date()));
     const [customEnd, setCustomEnd] = useState<string>(toInputDate(new Date()));
+    const [appliedCustomStart, setAppliedCustomStart] = useState<string>(toInputDate(new Date()));
+    const [appliedCustomEnd, setAppliedCustomEnd] = useState<string>(toInputDate(new Date()));
     const [showCustom, setShowCustom] = useState(false);
     const [showAddOrder, setShowAddOrder] = useState(false);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
@@ -234,7 +237,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             return { from: '2024-01-01', to: todayStr };
         }
         if (range === 'custom') {
-            return { from: customStart, to: customEnd };
+            return { from: appliedCustomStart, to: appliedCustomEnd };
         }
         if (range === 'today') {
             return { from: todayStr, to: todayStr };
@@ -262,7 +265,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             return { from: getLocalDateString(start), to: getLocalDateString(end) };
         }
         return { from: '2024-01-01', to: todayStr };
-    }, [range, customStart, customEnd]);
+    }, [range, appliedCustomStart, appliedCustomEnd]);
 
     /** GET /api/orders: from/to match selected date filters (`to` is exclusive next day so last day is included). */
     const ordersListQuery = useMemo(
@@ -791,9 +794,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             <FilterButton active={range === 'lastMonth'} onClick={() => { setRange('lastMonth'); setShowCustom(false); }}>Last Month</FilterButton>
                             <FilterButton
                                 refEl={customBtnRef}
-                                active={range === 'custom'}
+                                active={range === 'custom' || showCustom}
                                 onClick={() => {
-                                    setRange('custom');
+                                    if (!showCustom) {
+                                        setCustomStart(appliedCustomStart);
+                                        setCustomEnd(appliedCustomEnd);
+                                    }
                                     setShowCustom((v) => !v);
                                 }}
                             >Custom</FilterButton>
@@ -1023,7 +1029,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             </div>
                             <button
                                 className="button shopify-date-range-apply"
-                                onClick={() => setShowCustom(false)}
+                                onClick={() => {
+                                    setAppliedCustomStart(customStart);
+                                    setAppliedCustomEnd(customEnd);
+                                    setRange('custom');
+                                    setShowCustom(false);
+                                }}
                             >
                                 Apply
                             </button>
@@ -1174,11 +1185,15 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     shippingDetails: {
                                         trackingNumber: o.awbNumber ?? '',
                                         trackingStatus: shippingStatusBackend ?? '',
-                                        trackingUrl: o.shippingTrackingUrl ?? '',
+                                        trackingUrl: buildDefaultTrackingUrlFromCourier(
+                                            o.awbNumber ?? '',
+                                            o.shippingTrackingCompany ?? '',
+                                        ),
                                         trackingCompany: o.shippingTrackingCompany ?? '',
                                     },
                                     totalAmount: o.amount,
                                     codCharges: o.codCharges ?? 0,
+                                    partialAmount: o.partialAmount ?? 0,
                                     discount: o.discountAmount ?? 0,
                                     notes: o.notes ?? '',
                                     is_shipped: o.is_shipped,
