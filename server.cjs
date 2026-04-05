@@ -25,6 +25,7 @@ const MISC_SPEND_PATH = path.join(__dirname, 'public', 'misc-spend.json');
 const GURUGRAM_MARTS_PATH = path.join(__dirname, 'public', 'gurugram-marts.json');
 const DELHI_MARTS_PATH = path.join(__dirname, 'public', 'delhi-marts.json');
 const FOLLOWUPS_PATH = path.join(__dirname, 'public', 'followups.json');
+const AD_SCRIPTS_PATH = path.join(__dirname, 'public', 'ad-scripts.json');
 
 async function readProducts() {
   const data = await fs.readFile(PRODUCTS_PATH, 'utf8');
@@ -309,6 +310,23 @@ async function readFollowups() {
 async function writeFollowups(followups) {
   const json = JSON.stringify(followups, null, 2);
   await fs.writeFile(FOLLOWUPS_PATH, json, 'utf8');
+}
+
+async function readAdScripts() {
+  try {
+    const data = await fs.readFile(AD_SCRIPTS_PATH, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function writeAdScripts(scripts) {
+  const json = JSON.stringify(scripts, null, 2);
+  await fs.writeFile(AD_SCRIPTS_PATH, json, 'utf8');
 }
 
 app.get('/api/products', async (_req, res) => {
@@ -1566,6 +1584,110 @@ app.delete('/api/followups/:customerPhone', async (req, res) => {
   } catch (err) {
     console.error('Error deleting from followups.json', err);
     res.status(500).json({ message: 'Failed to delete followup' });
+  }
+});
+
+app.get('/api/ad-scripts', async (_req, res) => {
+  try {
+    const scripts = await readAdScripts();
+    res.json(scripts);
+  } catch (err) {
+    console.error('Error reading ad-scripts.json', err);
+    res.status(500).json({ message: 'Failed to read ad scripts' });
+  }
+});
+
+app.get('/api/ad-scripts/:id', async (req, res) => {
+  try {
+    const id = decodeURIComponent(String(req.params.id || ''));
+    if (!id) {
+      return res.status(400).json({ message: 'Missing script id' });
+    }
+    const scripts = await readAdScripts();
+    const doc = scripts.find(
+      (s) => String(s._id ?? s.id ?? '') === id || String(s.id ?? '') === id,
+    );
+    if (!doc) {
+      return res.status(404).json({ message: 'Ad script not found' });
+    }
+    res.json(doc);
+  } catch (err) {
+    console.error('Error reading ad script', err);
+    res.status(500).json({ message: 'Failed to read ad script' });
+  }
+});
+
+app.post('/api/ad-scripts', async (req, res) => {
+  try {
+    const body = req.body;
+    if (!body || typeof body !== 'object') {
+      return res.status(400).json({ message: 'Invalid ad script payload' });
+    }
+    const required = ['date', 'author', 'title', 'description', 'status', 'category'];
+    for (const key of required) {
+      const v = body[key];
+      if (v === undefined || v === null || String(v).trim() === '') {
+        return res.status(400).json({ message: `Missing or empty field: ${key}` });
+      }
+    }
+
+    const scripts = await readAdScripts();
+    const doc = {
+      date: String(body.date),
+      author: String(body.author).trim(),
+      title: String(body.title).trim(),
+      description: String(body.description).trim(),
+      status: String(body.status).trim(),
+      category: String(body.category).trim(),
+      _id: `adscript-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      createdAt: new Date().toISOString(),
+    };
+    scripts.unshift(doc);
+    await writeAdScripts(scripts);
+
+    res.status(201).json(doc);
+  } catch (err) {
+    console.error('Error writing ad-scripts.json', err);
+    res.status(500).json({ message: 'Failed to save ad script' });
+  }
+});
+
+app.put('/api/ad-scripts/:id', async (req, res) => {
+  try {
+    const id = decodeURIComponent(String(req.params.id || ''));
+    if (!id) {
+      return res.status(400).json({ message: 'Missing script id' });
+    }
+    const body = req.body;
+    if (!body || typeof body !== 'object') {
+      return res.status(400).json({ message: 'Invalid ad script payload' });
+    }
+
+    const scripts = await readAdScripts();
+    const index = scripts.findIndex(
+      (s) => String(s._id ?? s.id ?? '') === id || String(s.id ?? '') === id,
+    );
+    if (index === -1) {
+      return res.status(404).json({ message: 'Ad script not found' });
+    }
+
+    const prev = scripts[index];
+    const updated = {
+      ...prev,
+      date: body.date !== undefined ? String(body.date) : prev.date,
+      author: body.author !== undefined ? String(body.author).trim() : prev.author,
+      title: body.title !== undefined ? String(body.title).trim() : prev.title,
+      description: body.description !== undefined ? String(body.description).trim() : prev.description,
+      status: body.status !== undefined ? String(body.status).trim() : prev.status,
+      category: body.category !== undefined ? String(body.category).trim() : prev.category,
+      updatedAt: new Date().toISOString(),
+    };
+    scripts[index] = updated;
+    await writeAdScripts(scripts);
+    res.json(updated);
+  } catch (err) {
+    console.error('Error updating ad-scripts.json', err);
+    res.status(500).json({ message: 'Failed to update ad script' });
   }
 });
 

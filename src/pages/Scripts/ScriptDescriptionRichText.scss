@@ -1,0 +1,145 @@
+.script-rich-editor {
+  margin-top: 6px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, #cbd5e1);
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.script-rich-editor--loading {
+  min-height: 200px;
+  background: color-mix(in srgb, var(--border) 8%, #fff);
+}
+
+.script-rich-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.script-rich-editor__tool {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #334155;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.script-rich-editor__tool:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 10%, #fff);
+  border-color: color-mix(in srgb, var(--primary) 25%, var(--border));
+  color: var(--primary-strong, #1d4ed8);
+}
+
+.script-rich-editor__tool:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.script-rich-editor__tool.is-active {
+  background: color-mix(in srgb, var(--primary) 18%, #fff);
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  color: var(--primary-strong, #1d4ed8);
+}
+
+.script-rich-editor__sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.script-rich-editor__content {
+  min-height: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.script-rich-editor__content .tiptap {
+  padding: 14px 16px;
+  min-height: 200px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #0f172a;
+}
+
+.tiptap.script-rich-editor__prose p {
+  margin: 0 0 0.65em;
+}
+
+.tiptap.script-rich-editor__prose p:last-child {
+  margin-bottom: 0;
+}
+
+.tiptap.script-rich-editor__prose h2 {
+  margin: 0.75em 0 0.35em;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.tiptap.script-rich-editor__prose h2:first-child {
+  margin-top: 0;
+}
+
+.tiptap.script-rich-editor__prose h3 {
+  margin: 0.65em 0 0.3em;
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.tiptap.script-rich-editor__prose ul,
+.tiptap.script-rich-editor__prose ol {
+  margin: 0 0 0.65em;
+  padding-left: 1.35em;
+}
+
+.tiptap.script-rich-editor__prose blockquote {
+  margin: 0.5em 0;
+  padding-left: 12px;
+  border-left: 3px solid color-mix(in srgb, var(--primary) 45%, #cbd5e1);
+  color: #475569;
+}
+
+.tiptap.script-rich-editor__prose hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* Placeholder (TipTap) */
+.tiptap.script-rich-editor__prose p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .script-rich-editor {
+  background: var(--bg-elev);
+  border-color: var(--border);
+}
+
+[data-theme='dark'] .script-rich-editor__toolbar {
+  background: color-mix(in srgb, var(--bg) 40%, var(--bg-elev));
+}
+
+[data-theme='dark'] .script-rich-editor__content .tiptap,
+[data-theme='dark'] .tiptap.script-rich-editor__prose {
+  color: var(--text);
+}
+
+[data-theme='dark'] .script-rich-editor__tool {
+  color: var(--text);
+}

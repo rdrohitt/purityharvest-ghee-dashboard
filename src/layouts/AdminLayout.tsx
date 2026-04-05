@@ -224,6 +224,10 @@ export default function AdminLayout() {
                             <span className="mi-label">Follow-ups</span>
                         </NavLink>
                     )}
+                    <NavLink to="/admin/scripts" className={({ isActive }) => (isActive ? 'active' : '')}>
+                        <span className="mi-icon">📝</span>
+                        <span className="mi-label">Scripts</span>
+                    </NavLink>
 
                     {/* Marts group */}
                     {hasMenuLabel('Marts') && (

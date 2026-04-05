@@ -219,7 +219,8 @@ function normalizeTrackingCompany(v: string | undefined): TrackingCompany | '' {
 
 export type ProductVariantOption = { id: string; name: string; size: string; price: number };
 
-function formatVariantLabel(product: ProductVariantOption): string {
+/** Matches how line items are labeled in the add-order UI (name only when there is no size). */
+export function formatVariantLabel(product: ProductVariantOption): string {
     return product.size ? `${product.name} - ${product.size}` : product.name;
 }
 

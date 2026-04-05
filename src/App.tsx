@@ -11,6 +11,7 @@ import Amazon from './pages/sales/Amazon/index';
 import Flipkart from './pages/sales/Flipkart/index';
 import WALeads from './pages/WALeads/index';
 import Followups from './pages/Followups/index';
+import Scripts from './pages/Scripts/index';
 import MarketingSpend from './pages/MarketingSpend/index';
 import Customers from './pages/Customers/index';
 import Products from './pages/Products/index';
@@ -119,6 +120,7 @@ export default function App() {
 						<Route path="modules" element={<Modules />} />
 						<Route path="products" element={<Products />} />
 						<Route path="followups" element={<Followups />} />
+						<Route path="scripts" element={<Scripts />} />
 						<Route path="marketing-spend" element={<MarketingSpend />} />
 						<Route path="gurugram-marts" element={<GurugramMarts />} />
 						<Route path="delhi-marts" element={<DelhiMarts />} />

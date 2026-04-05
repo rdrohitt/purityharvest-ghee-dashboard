@@ -20,7 +20,7 @@ import { loadProducts, type ProductApiItem } from '../../../utils/products';
 import type { MarketingSpendApiItem } from '../../../types/marketing-spend';
 import { loadAllMarketingSpend } from '../../../utils/marketing-spend';
 import { useAppDispatch, useAppSelector, setProducts, setProductsLoading } from '../../../store';
-import AddOrderModal, { type ProductVariantOption } from './AddOrderModal';
+import AddOrderModal, { type ProductVariantOption, formatVariantLabel } from './AddOrderModal';
 import { CustomerProfileModal } from './CustomerProfileModal';
 import { DatePicker } from './DatePicker';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
@@ -62,29 +62,32 @@ function classifyGheeKindFromText(text: string): keyof GheeLitersByKind | null {
 
 /**
  * Pack-size bucket used by the quantity table and headline "total liters" (must stay in sync).
- * Only 500 ml, 1 L, 5 L (plus 250 ml → same bucket as 500 ml for counting).
+ * 500 ml, 1 L, 2 L, 5 L (plus 250 ml → same bucket as 500 ml for counting).
  */
-function resolveShopifyVariantSizeKey(variantName: string): '' | '500ml' | '1ltr' | '5ltr' {
+function resolveShopifyVariantSizeKey(variantName: string): '' | '500ml' | '1ltr' | '2ltr' | '5ltr' {
     const sizeMatch = variantName.match(/-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|L)/i);
     if (!sizeMatch) return '';
     const sizeValue = parseFloat(sizeMatch[1]);
     const sizeUnit = sizeMatch[2].toLowerCase();
-    let sizeKey: '' | '500ml' | '1ltr' | '5ltr' = '';
+    let sizeKey: '' | '500ml' | '1ltr' | '2ltr' | '5ltr' = '';
     if (sizeUnit === 'ml') {
         if (sizeValue === 500) sizeKey = '500ml';
         else if (sizeValue === 1000) sizeKey = '1ltr';
+        else if (sizeValue === 2000) sizeKey = '2ltr';
         else if (sizeValue === 5000) sizeKey = '5ltr';
         else if (sizeValue === 250) sizeKey = '500ml';
     } else if (sizeUnit === 'l' || sizeUnit === 'ltr') {
         if (sizeValue === 1) sizeKey = '1ltr';
+        else if (sizeValue === 2) sizeKey = '2ltr';
         else if (sizeValue === 5) sizeKey = '5ltr';
     }
     return sizeKey;
 }
 
-function litersInTableBucket(sizeKey: '500ml' | '1ltr' | '5ltr', quantity: number): number {
+function litersInTableBucket(sizeKey: '500ml' | '1ltr' | '2ltr' | '5ltr', quantity: number): number {
     if (sizeKey === '500ml') return 0.5 * quantity;
     if (sizeKey === '1ltr') return quantity;
+    if (sizeKey === '2ltr') return 2 * quantity;
     return 5 * quantity;
 }
 
@@ -581,28 +584,32 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         const quantityBySize: { [key: string]: number } = {
             '500ml': 0,
             '1ltr': 0,
-            '5ltr': 0
+            '2ltr': 0,
+            '5ltr': 0,
         };
         
         // Calculate delivered quantities by size
         const deliveredQuantityBySize: { [key: string]: number } = {
             '500ml': 0,
             '1ltr': 0,
-            '5ltr': 0
+            '2ltr': 0,
+            '5ltr': 0,
         };
-        
+
         // Calculate RTO quantities by size
         const rtoQuantityBySize: { [key: string]: number } = {
             '500ml': 0,
             '1ltr': 0,
-            '5ltr': 0
+            '2ltr': 0,
+            '5ltr': 0,
         };
-        
+
         // Calculate In Transit quantities by size
         const inTransitQuantityBySize: { [key: string]: number } = {
             '500ml': 0,
             '1ltr': 0,
-            '5ltr': 0
+            '2ltr': 0,
+            '5ltr': 0,
         };
         
         filtered.forEach((o: ShopifyOrderApi) => {
@@ -1152,7 +1159,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
                                 const productsPayload = o.items.map((it) => {
                                     const option = productOptions.find(
-                                        (p) => `${p.name} - ${p.size}` === it.variant
+                                        (p) => formatVariantLabel(p) === (it.variant || '').trim()
                                     );
                                     const unitPrice =
                                         it.quantity > 0 ? it.lineAmount / it.quantity : 0;
@@ -1161,8 +1168,10 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                         quantity: it.quantity,
                                         variantPrice: unitPrice,
                                         price: it.lineAmount,
-                                        // Send only the variant name (e.g. "1 Ltr") to match product API
-                                        variantName: option?.size,
+                                        // Send only the variant name (e.g. "1 Ltr"); omit or empty when product has no variants
+                                        variantName: option?.size?.trim()
+                                            ? option.size
+                                            : undefined,
                                     };
                                 });
 
@@ -1677,13 +1686,22 @@ function ModernQuantityMetric({
     gheeLitersByKind: GheeLitersByKind;
     isMilkSelected: boolean;
 }) {
-    const totalQuantityInLiters = (quantityBySize['500ml'] || 0) * 0.5 + (quantityBySize['1ltr'] || 0) * 1 + (quantityBySize['5ltr'] || 0) * 5;
-    const totalDeliveredInLiters = (deliveredQuantityBySize['500ml'] || 0) * 0.5 + (deliveredQuantityBySize['1ltr'] || 0) * 1 + (deliveredQuantityBySize['5ltr'] || 0) * 5;
+    const totalQuantityInLiters =
+        (quantityBySize['500ml'] || 0) * 0.5 +
+        (quantityBySize['1ltr'] || 0) * 1 +
+        (quantityBySize['2ltr'] || 0) * 2 +
+        (quantityBySize['5ltr'] || 0) * 5;
+    const totalDeliveredInLiters =
+        (deliveredQuantityBySize['500ml'] || 0) * 0.5 +
+        (deliveredQuantityBySize['1ltr'] || 0) * 1 +
+        (deliveredQuantityBySize['2ltr'] || 0) * 2 +
+        (deliveredQuantityBySize['5ltr'] || 0) * 5;
     const formatLiters = (liters: number): string => (liters % 1 === 0 ? liters.toLocaleString() + ' L' : liters.toFixed(1).replace(/\.?0+$/, '') + ' L');
 
-    const sizeRows: { key: '500ml' | '1ltr' | '5ltr'; label: string }[] = [
+    const sizeRows: { key: '500ml' | '1ltr' | '2ltr' | '5ltr'; label: string }[] = [
         { key: '500ml', label: '500 ml' },
         { key: '1ltr', label: '1 L' },
+        { key: '2ltr', label: '2 L' },
         { key: '5ltr', label: '5 L' },
     ];
 

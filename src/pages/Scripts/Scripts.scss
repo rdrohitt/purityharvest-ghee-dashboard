@@ -1,0 +1,231 @@
+/* Scripts page — extends Modules layout (modules-page, modules-table, etc.) */
+
+.modules-table.scripts-table {
+  min-width: 1100px;
+}
+
+.scripts-refresh-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.scripts-title-cell {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.scripts-desc-cell {
+  display: block;
+  max-width: 360px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Rich-text description preview in table */
+.scripts-desc-html {
+  max-width: 380px;
+  max-height: 140px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.scripts-desc-html p {
+  margin: 0 0 0.4em;
+}
+
+.scripts-desc-html p:last-child {
+  margin-bottom: 0;
+}
+
+.scripts-desc-html h2,
+.scripts-desc-html h3 {
+  margin: 0.35em 0 0.2em;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.scripts-desc-html ul,
+.scripts-desc-html ol {
+  margin: 0.25em 0;
+  padding-left: 1.2em;
+}
+
+.scripts-desc-html blockquote {
+  margin: 0.35em 0;
+  padding-left: 8px;
+  border-left: 2px solid color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.scripts-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.scripts-status--draft {
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.scripts-status--published {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  color: #15803d;
+  border: 1px solid color-mix(in srgb, #22c55e 40%, var(--border));
+}
+
+.scripts-status--approved {
+  background: color-mix(in srgb, #6366f1 18%, transparent);
+  color: #4338ca;
+  border: 1px solid color-mix(in srgb, #6366f1 40%, var(--border));
+}
+
+[data-theme="dark"] .scripts-status--published {
+  color: #86efac;
+}
+
+[data-theme="dark"] .scripts-status--approved {
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .scripts-title-cell {
+  color: var(--text);
+}
+
+.scripts-status--archived {
+  background: color-mix(in srgb, #94a3b8 16%, transparent);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.scripts-modal-detail-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 220px;
+  padding: 32px 28px;
+}
+
+.scripts-modal-detail-loading__msg {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ——— Add script modal: wider layout + Shopify DatePicker (same as Add Order) ——— */
+.card.modules-modal.scripts-add-modal {
+  max-width: min(1040px, calc(100vw - 40px));
+  width: 100%;
+}
+
+.scripts-add-modal .modules-modal-header {
+  padding: 18px 28px;
+}
+
+.scripts-add-modal .modules-modal-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.scripts-add-modal .modules-modal-body {
+  padding: 24px 28px 28px;
+  max-height: min(78vh, 900px);
+}
+
+.scripts-add-modal .modules-form-grid {
+  gap: 20px 28px;
+}
+
+.scripts-add-modal .modules-modal-footer {
+  padding: 16px 28px 20px;
+}
+
+.scripts-add-modal__date-field {
+  min-width: 0;
+}
+
+.scripts-add-modal__date-field > .label {
+  display: block;
+}
+
+.scripts-add-modal .shopify-dp-root {
+  margin-top: 6px;
+}
+
+.scripts-add-modal .shopify-dp-trigger {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+/* Title + category row */
+.scripts-add-modal__title-category-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(200px, 0.85fr);
+  gap: 20px 28px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .scripts-add-modal__title-category-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.scripts-add-modal__title-field,
+.scripts-add-modal__category-field {
+  min-width: 0;
+}
+
+.scripts-add-modal__category-field .label {
+  display: block;
+}
+
+/* ModernSelect in modules-styled modal — match Add Order modal trigger */
+.scripts-add-modal .shopify-modern-select {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.scripts-add-modal .shopify-modern-select--default .shopify-modern-select__trigger {
+  height: 44px;
+  min-height: 44px;
+  width: 100%;
+  padding: 0 32px 0 10px;
+  box-sizing: border-box;
+  font-size: 13px;
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, #cbd5e1);
+  border-radius: 8px;
+}
+
+.scripts-add-modal .shopify-modern-select__label {
+  color: #0f172a;
+}
+
+.scripts-add-modal .shopify-modern-select__label.is-placeholder {
+  color: #9ca3af;
+}
