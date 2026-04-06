@@ -46,6 +46,26 @@
   }
 }
 
+@media (max-width: 768px) {
+  .admin-topbar-title {
+    font-size: 14px;
+    max-width: min(42%, 200px);
+  }
+
+  .admin-topbar-right {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+
+  .admin-topbar-search {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
 .page.permission-blocked {
   position: relative;
   overflow: hidden;

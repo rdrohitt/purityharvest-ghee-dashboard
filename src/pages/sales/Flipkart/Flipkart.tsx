@@ -150,22 +150,16 @@ export default function Flipkart() {
                             <FilterButton refEl={customBtnRef} active={range === 'custom'} onClick={() => { setRange('custom'); setShowCustom((v)=>!v); }}>Custom</FilterButton>
                         </div>
                         <div style={{ flex: 1 }} />
-                        <input className="input" placeholder="Search customer" style={{ width: 240 }} value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} />
+                        <input
+                            className="input admin-fluid-search"
+                            placeholder="Search customer"
+                            value={customerFilter}
+                            onChange={(e) => setCustomerFilter(e.target.value)}
+                        />
                         <button className="button" style={{ width: 'auto', padding: '0 16px' }} onClick={() => setShowAddOrder(true)}>Add Order</button>
                     </div>
                 </div>
-                <div style={{ 
-                    width: '100%', 
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(7, 1fr)',
-                    gap: 0,
-                    padding: '16px 0',
-                    borderTop: '1px solid var(--border)',
-                    borderBottom: '1px solid var(--border)',
-                    marginTop: 8,
-                    background: 'var(--bg)',
-                    borderRadius: 8
-                }}>
+                <div className="admin-sales-metrics-grid">
                     <MetricItem label="Total Sales" value={formatCurrency(metrics.totalSales)} isLast={false} />
                     <MetricItem label="Quantity" value={metrics.quantity.toLocaleString()} isLast={false} />
                     <MetricItemWithAmount label="Delivered" count={metrics.delivered} amount={filtered.filter(o=>o.deliveryStatus==='Delivered').reduce((s,o)=>s+o.amount,0)} isLast={false} />

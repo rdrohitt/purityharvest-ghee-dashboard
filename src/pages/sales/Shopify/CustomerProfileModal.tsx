@@ -290,8 +290,8 @@ export function CustomerProfileModal({
                                             ) : (
                                                 customerOrders.map((order) => (
                                                     <tr key={order.id} className="customer-orders-row">
-                                                        <Td>{formatDate(order.date)}</Td>
-                                                        <Td>
+                                                        <Td dataLabel="Date">{formatDate(order.date)}</Td>
+                                                        <Td dataLabel="Items" className="customer-orders-td--items">
                                                             <div className="customer-orders-items">
                                                                 {(order.items ?? []).length === 0 ? <span>—</span> : null}
                                                                 {(order.items ?? []).map((it, idx: number) => (
@@ -302,11 +302,16 @@ export function CustomerProfileModal({
                                                                 ))}
                                                             </div>
                                                         </Td>
-                                                        <td className="customer-orders-amount">{formatCurrency(order.amount)}</td>
-                                                        <Td>
+                                                        <Td
+                                                            className="customer-orders-amount"
+                                                            dataLabel="Amount"
+                                                        >
+                                                            {formatCurrency(order.amount)}
+                                                        </Td>
+                                                        <Td dataLabel="Payment">
                                                             <StatusTag kind={order.paymentStatus} type="payment" />
                                                         </Td>
-                                                        <Td>
+                                                        <Td dataLabel="Delivery">
                                                             <StatusTag kind={order.deliveryStatus} type="delivery" />
                                                         </Td>
                                                     </tr>

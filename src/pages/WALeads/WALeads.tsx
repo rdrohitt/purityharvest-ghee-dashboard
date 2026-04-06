@@ -164,7 +164,12 @@ export default function WALeads() {
                         ) : null}
                         </div>
                         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <input className="input" placeholder="Search customer" style={{ width: 240 }} value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} />
+                            <input
+                                className="input admin-fluid-search"
+                                placeholder="Search customer"
+                                value={customerFilter}
+                                onChange={(e) => setCustomerFilter(e.target.value)}
+                            />
                             <button className="button" style={{ width: 'auto', padding: '0 16px' }} onClick={() => {
                                 setEditingLead(null);
                                 setShowAddLead(true);
@@ -172,15 +177,7 @@ export default function WALeads() {
                         </div>
                     </div>
                 </div>
-                <div style={{ 
-                    width: '100%', 
-                    display: 'flex',
-                    borderRadius: 4,
-                    overflow: 'hidden',
-                    border: '1px solid var(--border)',
-                    marginTop: 12,
-                    background: 'var(--bg-elev)',
-                }}>
+                <div className="admin-metrics-row">
                     <ModernMetricItem 
                         icon="👥" 
                         label="Total Leads" 

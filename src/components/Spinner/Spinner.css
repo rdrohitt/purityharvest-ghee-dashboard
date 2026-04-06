@@ -57,6 +57,7 @@
 	align-items: center;
 	gap: 16px;
 	padding: 24px;
+	max-width: calc(100vw - 32px);
 	background: var(--bg-elev, #ffffff);
 	border-radius: 12px;
 	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);

@@ -265,8 +265,22 @@ export default function AdminLayout() {
             </aside>
             <main className="content">
                 <div className="topbar">
-                    <button className="icon-btn" onClick={() => setDrawerOpen((v) => !v)} aria-label="Toggle menu">☰</button>
-                    <button className="icon-btn" onClick={() => setCollapsed((v) => !v)} aria-label="Collapse sidebar">⇔</button>
+                    <button
+                        type="button"
+                        className="icon-btn topbar-menu-btn"
+                        onClick={() => setDrawerOpen((v) => !v)}
+                        aria-label="Toggle menu"
+                    >
+                        ☰
+                    </button>
+                    <button
+                        type="button"
+                        className="icon-btn topbar-collapse-btn"
+                        onClick={() => setCollapsed((v) => !v)}
+                        aria-label="Collapse sidebar"
+                    >
+                        ⇔
+                    </button>
                     <div className="admin-topbar-title" title={topbarGreeting}>
                         {topbarGreeting}
                     </div>

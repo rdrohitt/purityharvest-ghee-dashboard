@@ -537,8 +537,28 @@ export function Th({ children, align = 'left' }: { children: string; align?: 'le
     return <th className={`shopify-th${alignClass}`}>{children}</th>;
 }
 
-export function Td({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-    return <td className="shopify-td" style={style}>{children}</td>;
+export function Td({
+    children,
+    style,
+    className,
+    dataLabel,
+}: {
+    children: React.ReactNode;
+    style?: React.CSSProperties;
+    className?: string;
+    /** Used for responsive stacked tables (e.g. customer profile modal). */
+    dataLabel?: string;
+}) {
+    const cls = ['shopify-td', className].filter(Boolean).join(' ');
+    return (
+        <td
+            className={cls || undefined}
+            style={style}
+            {...(dataLabel != null && dataLabel !== '' ? { 'data-label': dataLabel } : {})}
+        >
+            {children}
+        </td>
+    );
 }
 
 export function StatusFilter<T extends string>({

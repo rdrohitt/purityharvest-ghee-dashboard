@@ -277,9 +277,8 @@ export default function GurugramMarts() {
                         </div>
                         <div style={{ flex: 1 }} />
                         <input
-                            className="input"
+                            className="input admin-fluid-search"
                             placeholder="Search customer name or phone"
-                            style={{ width: 240 }}
                             value={customerFilter}
                             onChange={(e) => setCustomerFilter(e.target.value)}
                         />
@@ -315,17 +314,7 @@ export default function GurugramMarts() {
                     </div>
 
                     {/* Summary metrics row (visual only for now) */}
-                    <div
-                        style={{
-                            width: '100%',
-                            display: 'flex',
-                            borderRadius: 4,
-                            overflow: 'hidden',
-                            border: '1px solid var(--border)',
-                            marginTop: 12,
-                            background: 'var(--bg-elev)',
-                        }}
-                    >
+                    <div className="admin-metrics-row">
                         <MetricItem icon="🚫" label="Blocked Amount" value="₹0" isLast={false} isEven={false} />
                         <QuantityMetric
                             label="Blocked Qty"

@@ -43,6 +43,25 @@
   border-right: none;
 }
 
+@media (max-width: 640px) {
+  .marketing-spend-metrics {
+    flex-direction: column;
+  }
+
+  .marketing-spend-metric {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .marketing-spend-metric--last {
+    border-bottom: none;
+  }
+
+  .marketing-spend-page {
+    padding: 8px 4px;
+  }
+}
+
 .marketing-spend-metric--even {
   background: #f8f9fa;
 }
@@ -126,6 +145,160 @@
   margin-top: 6px;
 }
 
+/* Modern platform picker (Marketing Spend form) */
+.marketing-spend-platform-select {
+  position: relative;
+  width: 100%;
+  margin-top: 6px;
+  z-index: 5;
+}
+
+.marketing-spend-unified__form > div:has(.marketing-spend-platform-select--open) {
+  z-index: 6;
+}
+
+.marketing-spend-platform-select__trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  text-align: left;
+  box-sizing: border-box;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.marketing-spend-platform-select__trigger:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  background: color-mix(in srgb, var(--primary-weak) 22%, var(--bg-elev));
+}
+
+.marketing-spend-platform-select--open .marketing-spend-platform-select__trigger {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.marketing-spend-platform-select__trigger:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.marketing-spend-platform-select__icon-cell {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary-weak) 55%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--border) 80%, var(--primary) 12%);
+}
+
+.marketing-spend-platform-select__emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.marketing-spend-platform-select__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketing-spend-platform-select__chev {
+  flex-shrink: 0;
+  font-size: 11px;
+  opacity: 0.65;
+  transition: transform 0.2s ease;
+  margin-left: 2px;
+}
+
+.marketing-spend-platform-select--open .marketing-spend-platform-select__chev {
+  transform: rotate(-180deg);
+}
+
+.marketing-spend-platform-select__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  box-shadow:
+    0 16px 40px rgba(15, 23, 42, 0.12),
+    0 4px 12px rgba(15, 23, 42, 0.06),
+    0 0 0 1px color-mix(in srgb, var(--border) 85%, transparent);
+  max-height: min(320px, 55vh);
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.marketing-spend-platform-select__item {
+  margin: 0;
+  padding: 0;
+}
+
+.marketing-spend-platform-select__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.marketing-spend-platform-select__option:hover {
+  background: color-mix(in srgb, var(--primary-weak) 55%, var(--bg-elev));
+}
+
+.marketing-spend-platform-select__option--active {
+  background: color-mix(in srgb, var(--primary-weak) 75%, var(--bg-elev));
+  font-weight: 650;
+}
+
+.marketing-spend-platform-select__option-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.marketing-spend-platform-select__check {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--primary);
+}
+
 .marketing-spend-unified__submit-label {
   visibility: hidden;
 }
@@ -168,6 +341,12 @@
   border-color: #fde68a;
 }
 
+.platform-tag--amazon-shipping {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fdba74;
+}
+
 .platform-tag--flipkart {
   background: #e0e7ff;
   color: #3730a3;
@@ -190,6 +369,12 @@
   background: #fef3c7;
   color: #92400e;
   border-color: #fed7aa;
+}
+
+.platform-tag--delhivery {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
 }
 
 .platform-tag--misc {

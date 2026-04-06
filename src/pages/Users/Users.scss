@@ -61,6 +61,25 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 640px) {
+  .users-search-row {
+    flex-wrap: wrap;
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .users-search {
+    width: 100%;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .users-role-filter-select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 .users-create-btn {
   width: auto;
   padding: 0 16px;

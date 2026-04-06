@@ -304,16 +304,23 @@ function PhoneDropdown({
         if (isOpen && containerRef.current && popupRef.current) {
             const containerRect = containerRef.current.getBoundingClientRect();
             const popup = popupRef.current;
-            const popupHeight = 300;
-            const popupWidth = 400;
-            let top = containerRect.bottom + window.scrollY + 4;
-            let left = containerRect.left + window.scrollX;
-            if (containerRect.bottom + popupHeight > window.innerHeight) {
-                top = containerRect.top + window.scrollY - popupHeight - 4;
+            const gutter = 12;
+            const popupWidth = Math.min(400, Math.max(260, window.innerWidth - gutter * 2));
+            popup.style.width = `${popupWidth}px`;
+            popup.style.maxWidth = `${popupWidth}px`;
+            popup.style.minWidth = '0';
+
+            const estHeight = Math.min(300, window.innerHeight - gutter * 2);
+            let top = containerRect.bottom + 4;
+            if (containerRect.bottom + estHeight > window.innerHeight - gutter) {
+                top = containerRect.top - estHeight - 4;
             }
-            if (containerRect.left + popupWidth > window.innerWidth) {
-                left = window.innerWidth - popupWidth - 10;
-            }
+            top = Math.max(gutter, Math.min(top, window.innerHeight - estHeight - gutter));
+
+            let left = containerRect.left;
+            left = Math.min(left, window.innerWidth - popupWidth - gutter);
+            left = Math.max(gutter, left);
+
             popup.style.top = `${top}px`;
             popup.style.left = `${left}px`;
         }

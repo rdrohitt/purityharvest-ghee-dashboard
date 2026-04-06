@@ -39,6 +39,20 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 640px) {
+  .modules-search-row {
+    flex-wrap: wrap;
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .modules-search {
+    width: 100%;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+
 .modules-create-btn {
   width: auto;
   padding: 0 16px;

@@ -85,6 +85,7 @@ export async function addMarketingSpend(
     endpoint:
         | 'meta-spend'
         | 'amazon-spend'
+        | 'amazon-shipping-spend'
         | 'flipkart-spend'
         | 'checkout-spend'
         | 'engage-spend'
@@ -115,6 +116,7 @@ export async function updateMarketingSpend(
     endpoint:
         | 'meta-spend'
         | 'amazon-spend'
+        | 'amazon-shipping-spend'
         | 'flipkart-spend'
         | 'checkout-spend'
         | 'engage-spend'
@@ -145,6 +147,7 @@ export async function deleteMarketingSpend(
     endpoint:
         | 'meta-spend'
         | 'amazon-spend'
+        | 'amazon-shipping-spend'
         | 'flipkart-spend'
         | 'checkout-spend'
         | 'engage-spend'

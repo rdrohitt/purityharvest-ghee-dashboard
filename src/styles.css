@@ -1,6 +1,13 @@
 /* Basic reset */
 * { box-sizing: border-box; }
+html {
+	height: 100%;
+	overflow-x: clip;
+}
 html, body, #root { height: 100%; }
+#root {
+	min-width: 0;
+}
 body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
 
 /* Theme variables — cohesive blue / slate UI */
@@ -45,6 +52,11 @@ body { color: var(--text); background: var(--bg); }
 /* Centered auth card */
 .auth-wrapper { min-height: 100%; display: grid; place-items: center; padding: 24px; }
 .auth-card { width: 100%; max-width: 560px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; padding: 32px 40px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.06); }
+@media (max-width: 480px) {
+	.auth-wrapper { padding: 16px; }
+	.auth-card { padding: 24px 20px; }
+	.auth-title { font-size: 24px; }
+}
 .auth-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--accent); display: grid; place-items: center; color: white; margin: 0 auto 16px; font-weight: 700; }
 .auth-title { text-align: center; font-size: 28px; font-weight: 800; margin: 0 0 8px; }
 .auth-subtitle { text-align: center; color: var(--muted); margin: 0 0 24px; }
@@ -60,7 +72,7 @@ select.input:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns='htt
 .link { color: var(--primary); text-decoration: none; font-weight: 600; }
 
 /* Admin layout */
-.layout { display: grid; grid-template-columns: 260px 1fr; height: 100%; }
+.layout { display: grid; grid-template-columns: 260px 1fr; height: 100%; min-width: 0; }
 .sidebar { background: var(--sidebar-bg); color: var(--sidebar-text); padding: 20px 16px; display: flex; flex-direction: column; gap: 8px; transition: width .2s ease, transform .2s ease; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; margin-bottom: 12px; }
 .menu { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
@@ -146,11 +158,11 @@ select.input:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns='htt
 	opacity: 0.8;
 }
 
-.content { background: var(--bg); padding: 0; overflow: auto; }
-.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+.content { background: var(--bg); padding: 0; overflow: auto; min-width: 0; }
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; background: #fff; border-bottom: 1px solid #e2e8f0; min-width: 0; }
 .topbar { background: var(--bg-elev); border-bottom: 1px solid var(--border); }
 .topbar .icon-btn { height: 36px; min-width: 36px; border-radius: 8px; background: var(--primary-weak); color: var(--text); border: 1px solid var(--border); cursor: pointer; }
-.page { padding: 16px 24px 24px; }
+.page { padding: 16px 24px 24px; min-width: 0; }
 .card { background: var(--bg-elev); border-radius: 12px; padding: 20px; }
 
 /* Global table layout for all data tables wrapped in .table-scroll-wrapper */
@@ -253,12 +265,95 @@ select.input:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns='htt
 .collapsed .menu .mi-label, .collapsed .brand span { display: none; }
 .collapsed .sidebar { padding-left: 10px; padding-right: 10px; }
 
+/* Shared: flexible toolbar search (Amazon / Flipkart / Marts / Leads) */
+.input.admin-fluid-search {
+	flex: 1 1 200px;
+	min-width: 0;
+	width: auto;
+	max-width: 420px;
+}
+
+/* Shared: horizontal metric strip that stacks on narrow screens */
+.admin-metrics-row {
+	width: 100%;
+	display: flex;
+	border-radius: 4px;
+	overflow: hidden;
+	border: 1px solid var(--border);
+	margin-top: 12px;
+	background: var(--bg-elev);
+}
+
+/* Shared: Amazon / Flipkart summary metric grid */
+.admin-sales-metrics-grid {
+	width: 100%;
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: 0;
+	padding: 16px 0;
+	border-top: 1px solid var(--border);
+	border-bottom: 1px solid var(--border);
+	margin-top: 8px;
+	background: var(--bg);
+	border-radius: 8px;
+}
+
+@media (max-width: 1100px) {
+	.admin-sales-metrics-grid {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 640px) {
+	.admin-sales-metrics-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		padding: 12px 0;
+	}
+
+	.admin-sales-metrics-grid > div {
+		border-right: none !important;
+		border-bottom: 1px solid var(--border);
+		padding-top: 10px !important;
+		padding-bottom: 10px !important;
+	}
+
+	.admin-sales-metrics-grid > div:last-child {
+		border-bottom: none;
+	}
+
+	.input.admin-fluid-search {
+		max-width: none;
+		flex: 1 1 100%;
+	}
+
+	.admin-metrics-row {
+		flex-direction: column;
+	}
+
+	.admin-metrics-row > * {
+		border-right: none !important;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.admin-metrics-row > *:last-child {
+		border-bottom: none;
+	}
+}
+
 /* Mobile drawer */
 @media (max-width: 768px) {
 	.layout { grid-template-columns: 1fr; }
-	.sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 260px; transform: translateX(-100%); z-index: 30; }
+	.sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: min(280px, 88vw); transform: translateX(-100%); z-index: 30; }
 	.sidebar.open { transform: translateX(0); }
 	.drawer-backdrop { position: fixed; inset: 0; background: rgba(2,6,23,.45); z-index: 20; }
+	.page { padding: 12px 14px 20px; }
+	.topbar { padding: 0 10px; gap: 8px; }
+	.topbar-collapse-btn { display: none; }
+	.admin-topbar-right { flex-shrink: 0; gap: 6px; }
+	.toast {
+		min-width: 0;
+		max-width: min(400px, calc(100vw - 32px));
+	}
 }
 
 /* Filter buttons */
@@ -308,8 +403,13 @@ select.input:focus { background-image: url("data:image/svg+xml,%3Csvg xmlns='htt
 	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
 	padding: 8px;
 	z-index: 20;
-	min-width: 480px;
+	min-width: min(480px, calc(100vw - 24px));
+	max-width: calc(100vw - 16px);
 	animation: slideDown 0.2s ease;
+}
+
+.date-range-popover > div {
+	flex-wrap: wrap;
 }
 
 .status-filters-row {

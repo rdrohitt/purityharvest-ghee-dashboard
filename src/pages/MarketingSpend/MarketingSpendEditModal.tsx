@@ -2,7 +2,16 @@ import { useEffect, useState } from 'react';
 import { DatePicker } from './DatePicker';
 import type { SpendRecord, MiscRecord } from '../../utils/marketing-spend';
 
-type Platform = 'Meta' | 'Amazon' | 'Flipkart' | 'Checkout' | 'Engage' | 'Dolchi' | 'Delhivery' | 'Miscellaneous';
+type Platform =
+    | 'Meta'
+    | 'Amazon'
+    | 'Amazon Shipping'
+    | 'Flipkart'
+    | 'Checkout'
+    | 'Engage'
+    | 'Dolchi'
+    | 'Delhivery'
+    | 'Miscellaneous';
 
 export type MarketingSpendEditModalProps = {
   platform: Platform;
