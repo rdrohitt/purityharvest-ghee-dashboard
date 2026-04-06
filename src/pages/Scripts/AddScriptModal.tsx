@@ -10,6 +10,14 @@ import { ScriptDescriptionRichText, isRichTextEmpty } from './ScriptDescriptionR
 import './Scripts.scss';
 
 const STATUS_OPTIONS = ['draft', 'published', 'approved', 'archived'] as const;
+export type ScriptStatus = (typeof STATUS_OPTIONS)[number];
+
+const SCRIPT_STATUS_LABEL: Record<ScriptStatus, string> = {
+    draft: 'Draft',
+    published: 'Published',
+    approved: 'Approved',
+    archived: 'Archived',
+};
 
 export type ScriptProductCategory = 'Ghee' | 'Milk' | 'Oil' | 'Meta Ads';
 
@@ -69,6 +77,48 @@ function scriptCategoryIcon(cat: ScriptProductCategory): ReactNode {
     );
 }
 
+function scriptStatusIcon(s: ScriptStatus): ReactNode {
+    if (s === 'draft') {
+        return (
+            <CategoryIcon>
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                <path d="M14 2v6h6" />
+                <path d="M12 18v-6" />
+                <path d="M9 15h6" />
+            </CategoryIcon>
+        );
+    }
+    if (s === 'published') {
+        return (
+            <CategoryIcon>
+                <path d="m22 2-7 20-4-9-9-4Z" />
+                <path d="M22 2 11 13" />
+            </CategoryIcon>
+        );
+    }
+    if (s === 'approved') {
+        return (
+            <CategoryIcon>
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+            </CategoryIcon>
+        );
+    }
+    return (
+        <CategoryIcon>
+            <rect width="20" height="5" x="2" y="3" rx="1" />
+            <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+            <path d="M10 12h4" />
+        </CategoryIcon>
+    );
+}
+
+const SCRIPT_STATUS_OPTIONS: ModernSelectOption<ScriptStatus>[] = STATUS_OPTIONS.map((s) => ({
+    value: s,
+    label: SCRIPT_STATUS_LABEL[s],
+    icon: scriptStatusIcon(s),
+}));
+
 const SCRIPT_CATEGORY_OPTIONS: ModernSelectOption<ScriptProductCategory>[] = (
     ['Ghee', 'Milk', 'Oil', 'Meta Ads'] as const
 ).map((c) => ({
@@ -105,6 +155,12 @@ function normalizeCategory(raw: unknown): ScriptProductCategory {
     return 'Ghee';
 }
 
+function normalizeStatus(raw: unknown): ScriptStatus {
+    const s = String(raw ?? '').trim().toLowerCase();
+    if (s === 'draft' || s === 'published' || s === 'approved' || s === 'archived') return s;
+    return 'draft';
+}
+
 export type AddScriptModalProps = {
     onClose: () => void;
     defaultAuthor: string;
@@ -129,7 +185,7 @@ export function AddScriptModal({
     const [author, setAuthor] = useState(() => defaultAuthor.trim() || '');
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [status, setStatus] = useState<string>('draft');
+    const [status, setStatus] = useState<ScriptStatus>('draft');
     const [category, setCategory] = useState<ScriptProductCategory>('Ghee');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -149,7 +205,7 @@ export function AddScriptModal({
                 setTitle(doc.title);
                 setAuthor(doc.author);
                 setDescription(doc.description || '');
-                setStatus(doc.status || 'draft');
+                setStatus(normalizeStatus(doc.status));
                 setCategory(normalizeCategory(doc.category));
                 setDateStr(apiDateToPickerValue(doc.date));
                 setDetailLoading(false);
@@ -291,21 +347,19 @@ export function AddScriptModal({
                                     />
                                 </div>
                                 <div>
-                                    <label className="label" htmlFor="script-modal-status">
+                                    <div className="label" id="script-modal-status-label">
                                         Status
-                                    </label>
-                                    <select
-                                        id="script-modal-status"
-                                        className="input modules-input"
+                                    </div>
+                                    <ModernSelect<ScriptStatus>
                                         value={status}
-                                        onChange={(ev) => setStatus(ev.target.value)}
-                                    >
-                                        {STATUS_OPTIONS.map((s) => (
-                                            <option key={s} value={s}>
-                                                {s}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={(v) => {
+                                            if (v === 'draft' || v === 'published' || v === 'approved' || v === 'archived') {
+                                                setStatus(v);
+                                            }
+                                        }}
+                                        options={SCRIPT_STATUS_OPTIONS}
+                                        aria-label="Status"
+                                    />
                                 </div>
                                 <div className="modules-form-full-row">
                                     <div className="label" id="script-modal-desc-label">

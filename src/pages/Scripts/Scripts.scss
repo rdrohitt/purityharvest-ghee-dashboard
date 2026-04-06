@@ -1,7 +1,26 @@
 /* Scripts page — extends Modules layout (modules-page, modules-table, etc.) */
 
 .modules-table.scripts-table {
-  min-width: 1100px;
+  min-width: 980px;
+}
+
+.scripts-title-author-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  max-width: 100%;
+}
+
+.scripts-title-cell__author {
+  display: block;
+  font-family: Georgia, "Times New Roman", ui-serif, serif;
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .scripts-refresh-btn {
@@ -66,6 +85,63 @@
   margin: 0.35em 0;
   padding-left: 8px;
   border-left: 2px solid color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.scripts-category-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.scripts-category-tag--ghee {
+  background: color-mix(in srgb, #d97706 16%, transparent);
+  color: #b45309;
+  border: 1px solid color-mix(in srgb, #d97706 45%, var(--border));
+}
+
+.scripts-category-tag--milk {
+  background: color-mix(in srgb, #0ea5e9 16%, transparent);
+  color: #0369a1;
+  border: 1px solid color-mix(in srgb, #0ea5e9 40%, var(--border));
+}
+
+.scripts-category-tag--oil {
+  background: color-mix(in srgb, #059669 16%, transparent);
+  color: #047857;
+  border: 1px solid color-mix(in srgb, #059669 40%, var(--border));
+}
+
+.scripts-category-tag--meta {
+  background: color-mix(in srgb, #8b5cf6 16%, transparent);
+  color: #6d28d9;
+  border: 1px solid color-mix(in srgb, #8b5cf6 40%, var(--border));
+}
+
+.scripts-category-tag--default {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .scripts-category-tag--ghee {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .scripts-category-tag--milk {
+  color: #7dd3fc;
+}
+
+[data-theme="dark"] .scripts-category-tag--oil {
+  color: #6ee7b7;
+}
+
+[data-theme="dark"] .scripts-category-tag--meta {
+  color: #c4b5fd;
 }
 
 .scripts-status {

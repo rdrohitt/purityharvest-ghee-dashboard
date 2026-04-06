@@ -31,6 +31,25 @@ function statusClass(status: string): string {
     return 'scripts-status scripts-status--draft';
 }
 
+function scriptStatusLabel(status: string): string {
+    const s = status.trim().toLowerCase();
+    if (s === 'draft') return 'Draft';
+    if (s === 'published') return 'Published';
+    if (s === 'approved') return 'Approved';
+    if (s === 'archived') return 'Archived';
+    if (!status.trim()) return '—';
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+}
+
+function categoryTagClass(category: string): string {
+    const c = category.trim().toLowerCase();
+    if (c === 'ghee') return 'scripts-category-tag scripts-category-tag--ghee';
+    if (c === 'milk') return 'scripts-category-tag scripts-category-tag--milk';
+    if (c === 'oil') return 'scripts-category-tag scripts-category-tag--oil';
+    if (c === 'meta ads') return 'scripts-category-tag scripts-category-tag--meta';
+    return 'scripts-category-tag scripts-category-tag--default';
+}
+
 function htmlToPlainText(html: string): string {
     return String(html ?? '')
         .replace(/<[^>]+>/g, ' ')
@@ -178,7 +197,6 @@ export default function Scripts() {
                                     <ScriptsTh>Title</ScriptsTh>
                                     <ScriptsTh>Category</ScriptsTh>
                                     <ScriptsTh>Status</ScriptsTh>
-                                    <ScriptsTh>Author</ScriptsTh>
                                     <ScriptsTh>Description</ScriptsTh>
                                 </tr>
                             </thead>
@@ -189,7 +207,7 @@ export default function Scripts() {
                                         <ScriptsTd className="modules-td--strong">
                                             <button
                                                 type="button"
-                                                className="modules-name-btn"
+                                                className="modules-name-btn scripts-title-author-btn"
                                                 onClick={() => {
                                                     setEditScriptId(adScriptRowId(row));
                                                     setScriptModalKey((k) => k + 1);
@@ -197,15 +215,19 @@ export default function Scripts() {
                                                 }}
                                             >
                                                 <span className="modules-name scripts-title-cell">{row.title}</span>
+                                                {String(row.author ?? '').trim() ? (
+                                                    <span className="scripts-title-cell__author">
+                                                        - by {String(row.author).trim()}
+                                                    </span>
+                                                ) : null}
                                             </button>
                                         </ScriptsTd>
                                         <ScriptsTd>
-                                            <span className="modules-key-pill">{row.category}</span>
+                                            <span className={categoryTagClass(row.category)}>{row.category}</span>
                                         </ScriptsTd>
                                         <ScriptsTd>
-                                            <span className={statusClass(row.status)}>{row.status}</span>
+                                            <span className={statusClass(row.status)}>{scriptStatusLabel(row.status)}</span>
                                         </ScriptsTd>
-                                        <ScriptsTd>{row.author}</ScriptsTd>
                                         <ScriptsTd>
                                             <ScriptDescriptionCell html={row.description} />
                                         </ScriptsTd>
@@ -213,7 +235,7 @@ export default function Scripts() {
                                 ))}
                                 {filtered.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="modules-empty">
+                                        <td colSpan={5} className="modules-empty">
                                             {items.length === 0
                                                 ? 'No scripts yet. Use “Add script” to create one.'
                                                 : 'No scripts match your search.'}

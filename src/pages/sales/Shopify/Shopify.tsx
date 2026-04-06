@@ -486,19 +486,30 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         const metaSpend = spendInRange
             .filter((rec) => String(rec.platform).toLowerCase() === 'meta1')
             .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
-        // "Misc" here means all platforms except meta1 and delhivery.
-        // (e.g. misc, engage, checkout, amazon, flipkart, dolchi, etc.)
-        const miscSpend = spendInRange
-            .filter((rec) => {
-                const platform = String(rec.platform).toLowerCase();
-                return platform !== 'meta1' && platform !== 'delhivery';
-            })
-            .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
+        const isAmazonShippingPlatform = (platformRaw: string) => {
+            const platform = String(platformRaw).toLowerCase().trim();
+            return platform === 'amazon_shipping' || platform === 'amazon-shipping';
+        };
         const delhiverySpend = spendInRange
             .filter((rec) => String(rec.platform).toLowerCase() === 'delhivery')
             .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
+        const amazonShippingSpend = spendInRange
+            .filter((rec) => isAmazonShippingPlatform(String(rec.platform)))
+            .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
+        const shippingSpend = delhiverySpend + amazonShippingSpend;
+        // "Misc" = marketing platforms other than Meta, Delhivery, and Amazon Shipping.
+        const miscSpend = spendInRange
+            .filter((rec) => {
+                const platform = String(rec.platform).toLowerCase();
+                return (
+                    platform !== 'meta1' &&
+                    platform !== 'delhivery' &&
+                    !isAmazonShippingPlatform(platform)
+                );
+            })
+            .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
 
-        // ROAS denominator: all ad/marketing expenses in range (Meta + other non-Delhivery platforms)
+        // ROAS denominator: all ad/marketing expenses in range (Meta + misc; excludes shipping carriers)
         const totalMarketingSpend = metaSpend + miscSpend;
         const totalMiscCost = miscSpend;
         const roasCurrent = totalMarketingSpend > 0 ? deliveredAmount / totalMarketingSpend : 0;
@@ -572,12 +583,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         }, 0);
 
         const expectedManufacturingCost = manufacturingCost + manufacturingCostInTransit;
-        const ebita = deliveredAmount - manufacturingCost - metaSpend - delhiverySpend - miscSpend;
+        const ebita = deliveredAmount - manufacturingCost - metaSpend - shippingSpend - miscSpend;
         const expectedEbita =
             (deliveredAmount + inTransitAmount) -
             expectedManufacturingCost -
             metaSpend -
-            delhiverySpend -
+            shippingSpend -
             miscSpend;
         
         // Calculate quantities by size
@@ -676,6 +687,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             metaSpend,
             miscSpend,
             delhiverySpend,
+            amazonShippingSpend,
+            shippingSpend,
         };
     }, [filtered, products, marketingSpendRecords, dateRangeForApi.from, dateRangeForApi.to]);
 
@@ -984,7 +997,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         expectedManufacturingCost={metrics.expectedManufacturingCost}
                         metaSpend={metrics.metaSpend}
                         miscCost={metrics.miscSpend}
-                        delhiveryCost={metrics.delhiverySpend}
+                        shippingCost={metrics.shippingSpend}
                         isMilkSelected={categoryTab === 'milk'}
                     />
                     <ModernQuantityMetric
@@ -1430,7 +1443,7 @@ function ModernSalesWithEBITAMetric({
     expectedManufacturingCost,
     metaSpend,
     miscCost,
-    delhiveryCost,
+    shippingCost,
     isMilkSelected,
 }: {
     totalSales: number;
@@ -1440,7 +1453,8 @@ function ModernSalesWithEBITAMetric({
     expectedManufacturingCost: number;
     metaSpend: number;
     miscCost: number;
-    delhiveryCost: number;
+    /** Delhivery + Amazon Shipping marketing spend in range. */
+    shippingCost: number;
     isMilkSelected: boolean;
 }) {
     return (
@@ -1486,7 +1500,10 @@ function ModernSalesWithEBITAMetric({
                         <li><span>Mfg · expected</span><span>{formatCurrency(expectedManufacturingCost)}</span></li>
                         <li><span>Meta ads</span><span>{formatCurrency(metaSpend)}</span></li>
                         <li><span>Misc</span><span>{formatCurrency(miscCost)}</span></li>
-                        <li><span>Delhivery</span><span>{formatCurrency(delhiveryCost)}</span></li>
+                        <li title="Delhivery + Amazon Shipping (marketing spend in range)">
+                            <span>Shipping</span>
+                            <span>{formatCurrency(shippingCost)}</span>
+                        </li>
                     </ul>
                 </section>
             </div>
