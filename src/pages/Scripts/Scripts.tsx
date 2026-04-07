@@ -41,6 +41,15 @@ function scriptStatusLabel(status: string): string {
     return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 }
 
+/** Active tab filters the table (plus search). */
+type ScriptsCategoryTab = 'all' | 'Ghee' | 'Milk';
+
+const SCRIPTS_CATEGORY_TABS: { id: ScriptsCategoryTab; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'Ghee', label: 'Ghee' },
+    { id: 'Milk', label: 'Milk' },
+];
+
 function categoryTagClass(category: string): string {
     const c = category.trim().toLowerCase();
     if (c === 'ghee') return 'scripts-category-tag scripts-category-tag--ghee';
@@ -99,6 +108,7 @@ export default function Scripts() {
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
+    const [categoryTab, setCategoryTab] = useState<ScriptsCategoryTab>('all');
     const [modalOpen, setModalOpen] = useState(false);
     const [editScriptId, setEditScriptId] = useState<string | null>(null);
     const [scriptModalKey, setScriptModalKey] = useState(0);
@@ -138,14 +148,32 @@ export default function Scripts() {
     }, [load]);
 
     const filtered = useMemo(() => {
+        let list = items;
+        if (categoryTab !== 'all') {
+            const want = categoryTab.toLowerCase();
+            list = list.filter((row) => row.category.trim().toLowerCase() === want);
+        }
         const q = search.trim().toLowerCase();
-        if (!q) return items;
-        return items.filter((row) =>
+        if (!q) return list;
+        return list.filter((row) =>
             [row.title, row.author, row.category, row.status, htmlToPlainText(row.description)].some((v) =>
                 v.toLowerCase().includes(q),
             ),
         );
-    }, [items, search]);
+    }, [items, search, categoryTab]);
+
+    const emptyListMessage = useMemo(() => {
+        if (items.length === 0) {
+            return 'No scripts yet. Use “Add script” to create one.';
+        }
+        const hasSearch = search.trim().length > 0;
+        if (categoryTab !== 'all') {
+            return hasSearch
+                ? 'No scripts match this category and search.'
+                : `No ${categoryTab} scripts yet. Try “All” or add a script.`;
+        }
+        return 'No scripts match your search.';
+    }, [items.length, search, categoryTab]);
 
     return (
         <section className="modules-page scripts-page">
@@ -154,7 +182,31 @@ export default function Scripts() {
 
             <div className="card modules-header-card">
                 <div className="modules-header-title">Scripts</div>
-                <div className="modules-header-row">
+                <div className="modules-header-row scripts-page-header-row">
+                    <div
+                        className="scripts-category-tabs"
+                        role="tablist"
+                        aria-label="Filter scripts by category"
+                    >
+                        {SCRIPTS_CATEGORY_TABS.map((tab) => {
+                            const mod = tab.id === 'all' ? 'all' : tab.id.toLowerCase();
+                            return (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={categoryTab === tab.id}
+                                    id={`scripts-category-tab-${mod}`}
+                                    className={`scripts-category-tab scripts-category-tab--${mod}${
+                                        categoryTab === tab.id ? ' is-active' : ''
+                                    }`}
+                                    onClick={() => setCategoryTab(tab.id)}
+                                >
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+                    </div>
                     <div className="modules-search-row">
                         <input
                             className="input modules-search"
@@ -162,9 +214,6 @@ export default function Scripts() {
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
-                        <button type="button" className="icon-btn scripts-refresh-btn" onClick={() => void load()} title="Refresh">
-                            ↻
-                        </button>
                         <button
                             type="button"
                             className="button modules-create-btn"
@@ -193,6 +242,7 @@ export default function Scripts() {
                         <table className="modules-table scripts-table">
                             <thead>
                                 <tr className="modules-row-header">
+                                    <ScriptsTh>S.No</ScriptsTh>
                                     <ScriptsTh>Date</ScriptsTh>
                                     <ScriptsTh>Title</ScriptsTh>
                                     <ScriptsTh>Category</ScriptsTh>
@@ -201,8 +251,9 @@ export default function Scripts() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map((row) => (
+                                {filtered.map((row, index) => (
                                     <tr key={adScriptRowId(row)} className="modules-row">
+                                        <ScriptsTd className="scripts-table-sno">{index + 1}</ScriptsTd>
                                         <ScriptsTd>{formatDisplayDate(row.date)}</ScriptsTd>
                                         <ScriptsTd className="modules-td--strong">
                                             <button
@@ -235,10 +286,8 @@ export default function Scripts() {
                                 ))}
                                 {filtered.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="modules-empty">
-                                            {items.length === 0
-                                                ? 'No scripts yet. Use “Add script” to create one.'
-                                                : 'No scripts match your search.'}
+                                        <td colSpan={6} className="modules-empty">
+                                            {emptyListMessage}
                                         </td>
                                     </tr>
                                 ) : null}

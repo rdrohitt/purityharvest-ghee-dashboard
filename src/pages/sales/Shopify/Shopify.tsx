@@ -1119,30 +1119,35 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             if (editingOrder) {
                                 const base = orders.find((ord) => ord._id === editingOrder.id);
                                 if (base) {
-                                    await updateShopifyOrderFromForm(base, o, (variantLabel) => {
-                                        const label = (variantLabel ?? '').trim();
-                                        if (!label) return undefined;
+                                    await updateShopifyOrderFromForm(
+                                        base,
+                                        o,
+                                        (variantLabel) => {
+                                            const label = (variantLabel ?? '').trim();
+                                            if (!label) return undefined;
 
-                                        const [rawName, ...rest] = label.split('-');
-                                        const name = (rawName ?? '').trim();
-                                        const size = rest.join('-').trim();
+                                            const [rawName, ...rest] = label.split('-');
+                                            const name = (rawName ?? '').trim();
+                                            const size = rest.join('-').trim();
 
-                                        let product: ProductApiItem | undefined =
-                                            products.find((p) => p.name === name) ||
-                                            products.find((p) => label.startsWith(p.name));
+                                            let product: ProductApiItem | undefined =
+                                                products.find((p) => p.name === name) ||
+                                                products.find((p) => label.startsWith(p.name));
 
-                                        if (!product) return undefined;
+                                            if (!product) return undefined;
 
-                                        if (!size) {
-                                            return product._id;
-                                        }
+                                            if (!size) {
+                                                return product._id;
+                                            }
 
-                                        const hasVariant =
-                                            Array.isArray(product.variants) &&
-                                            product.variants.some((v) => v.name === size);
+                                            const hasVariant =
+                                                Array.isArray(product.variants) &&
+                                                product.variants.some((v) => v.name === size);
 
-                                        return hasVariant ? product._id : product._id;
-                                    });
+                                            return hasVariant ? product._id : product._id;
+                                        },
+                                        products,
+                                    );
                                 } else {
                                     await updateOrder(o);
                                 }

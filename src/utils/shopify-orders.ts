@@ -1,6 +1,23 @@
 import { apiFetch } from '../api';
+import type { ProductApiItem } from '../types/products';
 import type { ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../types/shopify';
 import type { Order, PaymentStatus, FulfillmentStatus, DeliveryStatus, OrderType } from './orders';
+
+/** Match Add Order / Shopify product picker label to a catalog product (same rules as Shopify order save UI). */
+function findProductByVariantLabel(
+    products: ProductApiItem[] | undefined,
+    variantLabel: string,
+): ProductApiItem | undefined {
+    if (!products?.length) return undefined;
+    const label = variantLabel.trim();
+    if (!label) return undefined;
+    const name = (label.split('-')[0] ?? '').trim();
+    return (
+        products.find((p) => p.name === name) ||
+        products.find((p) => label.startsWith(p.name)) ||
+        undefined
+    );
+}
 
 /**
  * Unit selling price from an order line (`variantPrice` when set; else legacy `price` as unit).
@@ -319,6 +336,7 @@ export function buildShopifyOrderPayloadFromForm(
     base: ShopifyOrderApi,
     form: Order,
     resolveProductId?: (variantLabel: string) => string | undefined,
+    products?: ProductApiItem[],
 ): ShopifyOrderApi {
     const paymentMode = toBackendPaymentMode(form.paymentStatus);
     const fulfillmentStatus = toBackendFulfillmentStatus(form.fulfillmentStatus);
@@ -369,12 +387,20 @@ export function buildShopifyOrderPayloadFromForm(
 
         const baseRest = (existing as any) ?? {};
 
+        const catalogProduct = findProductByVariantLabel(products, line.variant || '');
+        const catalogVariants = Array.isArray(catalogProduct?.variants) ? catalogProduct!.variants : [];
+        const variantNameForPayload =
+            catalogProduct && catalogVariants.length === 0
+                ? catalogProduct.name.trim()
+                : existing?.variantName ?? parsedVariantName;
+
         return {
             ...baseRest,
             productId,
             variantSku,
-            // Prefer existing.variantName from backend; otherwise send only size (e.g. "1 Ltr")
-            variantName: existing?.variantName ?? parsedVariantName,
+            // No catalog variants: send product name as variantName (backend expects a non-empty label).
+            // Otherwise prefer existing.variantName; else size parsed from "Name - Size" label.
+            variantName: variantNameForPayload,
             quantity: line.quantity,
             price: line.lineAmount,
             variantPrice: unitPrice,
@@ -429,8 +455,9 @@ export async function updateShopifyOrderFromForm(
     base: ShopifyOrderApi,
     form: Order,
     resolveProductId?: (variantLabel: string) => string | undefined,
+    products?: ProductApiItem[],
 ): Promise<ShopifyOrderApi> {
-    const payload = buildShopifyOrderPayloadFromForm(base, form, resolveProductId);
+    const payload = buildShopifyOrderPayloadFromForm(base, form, resolveProductId, products);
     const response = await apiFetch(`/api/orders/${encodeURIComponent(base._id)}`, {
         method: 'PUT',
         headers: {

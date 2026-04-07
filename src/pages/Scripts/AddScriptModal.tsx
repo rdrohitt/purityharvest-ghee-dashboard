@@ -261,7 +261,12 @@ export function AddScriptModal({
     const formDisabled = saving || (isEdit && detailLoading);
 
     return (
-        <div role="dialog" aria-modal="true" className="modules-modal-backdrop" onClick={onClose}>
+        <div
+            role="dialog"
+            aria-modal="true"
+            className="modules-modal-backdrop scripts-add-modal-backdrop"
+            onClick={onClose}
+        >
             <div className="card modules-modal scripts-add-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="modules-modal-header">
                     <h3 className="modules-modal-title">{isEdit ? 'Edit script' : 'Add script'}</h3>
@@ -270,13 +275,19 @@ export function AddScriptModal({
                     </button>
                 </div>
                 {isEdit && detailLoading ? (
-                    <div className="scripts-modal-detail-loading" role="status" aria-live="polite">
+                    <div
+                        className="scripts-modal-detail-loading scripts-add-modal__loading"
+                        role="status"
+                        aria-live="polite"
+                    >
                         <Spinner size="lg" />
                         <p className="scripts-modal-detail-loading__msg">Loading script…</p>
                     </div>
                 ) : isEdit && detailError ? (
-                    <div className="modules-modal-body">
-                        <div className="modules-modal-error">{detailError}</div>
+                    <div className="scripts-add-modal__panel">
+                        <div className="modules-modal-body">
+                            <div className="modules-modal-error">{detailError}</div>
+                        </div>
                         <div className="modules-modal-footer">
                             <button type="button" className="button modules-modal-primary-btn" onClick={onClose}>
                                 Close
@@ -284,7 +295,7 @@ export function AddScriptModal({
                         </div>
                     </div>
                 ) : (
-                    <form onSubmit={handleSubmit}>
+                    <form className="scripts-add-modal__form" onSubmit={handleSubmit}>
                         <div className="modules-modal-body">
                             {error ? <div className="modules-modal-error">{error}</div> : null}
                             <div className="modules-form-grid">
