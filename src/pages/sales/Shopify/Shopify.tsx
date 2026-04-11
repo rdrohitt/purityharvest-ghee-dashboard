@@ -26,10 +26,9 @@ import {
     getShopifyProductUnitPrice,
     buildDefaultTrackingUrlFromCourier,
 } from '../../../utils/shopify-orders';
+import type { ProductVariantApi } from '../../../types/products';
 import type { CustomerSearchResult, ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../../../types/shopify';
 import { loadProducts, type ProductApiItem } from '../../../utils/products';
-import type { MarketingSpendApiItem } from '../../../types/marketing-spend';
-import { loadAllMarketingSpend } from '../../../utils/marketing-spend';
 import { searchCustomersByPhone } from '../../../utils/customers';
 import { useAppDispatch, useAppSelector, setProducts, setProductsLoading } from '../../../store';
 import AddOrderModal, { type ProductVariantOption, formatVariantLabel } from './AddOrderModal';
@@ -176,10 +175,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const products = useAppSelector((state) => state.products.products);
     const productsList = useMemo(() => (Array.isArray(products) ? products : []), [products]);
     const productsLoading = useAppSelector((state) => state.products.loading);
-    // Marketing spend must come directly from the API (not Redux),
-    // otherwise EBITA + misc/shipping values can be stale when navigating modules.
-    const [marketingSpendRecords, setMarketingSpendRecords] = useState<MarketingSpendApiItem[]>([]);
-    const [marketingSpendLoading, setMarketingSpendLoading] = useState(true);
     const [loading, setLoading] = useState(true);
     const [categoryTab, setCategoryTab] = useState<CategoryTab>('ghee');
     const [shippedTab, setShippedTab] = useState<ShippedTab>('shipped');
@@ -298,30 +293,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             cancelled = true;
         };
     }, [dispatch, showAddOrder, editingOrder, productsList.length, productsLoading]);
-
-    useEffect(() => {
-        let cancelled = false;
-        setMarketingSpendLoading(true);
-
-        loadAllMarketingSpend()
-            .then((data) => {
-                if (!cancelled) {
-                    setMarketingSpendRecords(data);
-                }
-            })
-            .catch((err) => {
-                console.error('Failed to load marketing spend data', err);
-            })
-            .finally(() => {
-                if (!cancelled) {
-                    setMarketingSpendLoading(false);
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
 
     const getLocalDateString = (date: Date): string => {
         const year = date.getFullYear();
@@ -516,7 +487,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
     const productOptions = useMemo((): ProductVariantOption[] => {
         return modalProductSource.flatMap((p) => {
-            const variants = Array.isArray(p.variants) ? p.variants : [];
+            const variants: ProductVariantApi[] = Array.isArray(p.variants) ? p.variants : [];
             if (variants.length === 0) {
                 return [
                     {
@@ -653,44 +624,15 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         const inTransit = inTransitOrders.length;
         const inTransitAmount = inTransitOrders.reduce((s, o) => s + o.totalAmount, 0);
 
-        // Marketing spend from Redux store; if store was empty we fetched and populated it above.
-        const fromDate = new Date(`${dateRangeForApi.from}T00:00:00`);
-        const toDate = new Date(`${dateRangeForApi.to}T23:59:59.999`);
-        const spendInRange = marketingSpendRecords.filter((rec) => {
-            const d = new Date(rec.date);
-            return !Number.isNaN(d.getTime()) && d >= fromDate && d <= toDate;
-        });
-        const metaSpend = spendInRange
-            .filter((rec) => String(rec.platform).toLowerCase() === 'meta1')
-            .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
-        const isAmazonShippingPlatform = (platformRaw: string) => {
-            const platform = String(platformRaw).toLowerCase().trim();
-            return platform === 'amazon_shipping' || platform === 'amazon-shipping';
-        };
-        const delhiverySpend = spendInRange
-            .filter((rec) => String(rec.platform).toLowerCase() === 'delhivery')
-            .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
-        const amazonShippingSpend = spendInRange
-            .filter((rec) => isAmazonShippingPlatform(String(rec.platform)))
-            .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
-        const shippingSpend = delhiverySpend + amazonShippingSpend;
-        // "Misc" = marketing platforms other than Meta, Delhivery, and Amazon Shipping.
-        const miscSpend = spendInRange
-            .filter((rec) => {
-                const platform = String(rec.platform).toLowerCase();
-                return (
-                    platform !== 'meta1' &&
-                    platform !== 'delhivery' &&
-                    !isAmazonShippingPlatform(platform)
-                );
-            })
-            .reduce((sum, rec) => sum + Number(rec.amount || 0), 0);
-
-        // ROAS denominator: all ad/marketing expenses in range (Meta + misc; excludes shipping carriers)
-        const totalMarketingSpend = metaSpend + miscSpend;
-        const totalMiscCost = miscSpend;
-        const roasCurrent = totalMarketingSpend > 0 ? deliveredAmount / totalMarketingSpend : 0;
-        const roasExpected = totalMarketingSpend > 0 ? (deliveredAmount + inTransitAmount) / totalMarketingSpend : 0;
+        const metaSpend = 0;
+        const miscSpend = 0;
+        const delhiverySpend = 0;
+        const amazonShippingSpend = 0;
+        const shippingSpend = 0;
+        const totalMarketingSpend = 0;
+        const totalMiscCost = 0;
+        const roasCurrent = 0;
+        const roasExpected = 0;
 
         const orderCountForPaymentMix = filtered.length;
         let paidOrderCount = 0;
@@ -867,18 +809,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             amazonShippingSpend,
             shippingSpend,
         };
-    }, [filtered, productsList, marketingSpendRecords, dateRangeForApi.from, dateRangeForApi.to]);
-
-    const marketingSpendForSummary = useMemo(() => {
-        return marketingSpendRecords.map((rec) => ({
-            id: rec._id,
-            date: rec.date,
-            amount: rec.amount,
-            note: rec.note,
-            createdByName: rec.createdBy?.name,
-            updatedByName: rec.updatedBy?.name,
-        }));
-    }, [marketingSpendRecords]);
+    }, [filtered, productsList]);
 
     useEffect(() => {
         function onDocClick(e: MouseEvent) {
@@ -949,7 +880,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return groups;
     }, [filtered]);
 
-    const showFullPageSpinner = loading || marketingSpendLoading || (isPhoneSearch && phoneSearchLoading);
+    const showFullPageSpinner = loading || (isPhoneSearch && phoneSearchLoading);
 
     return (
         <section className="shopify-page">
@@ -957,7 +888,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 <Spinner
                     overlay
                     fixed
-                    message={isPhoneSearch && phoneSearchLoading && !loading && !marketingSpendLoading ? 'Searching by phone…' : 'Loading Orders'}
+                    message={isPhoneSearch && phoneSearchLoading && !loading ? 'Searching by phone…' : 'Loading Orders'}
                 />
             ) : null}
             <div className="card shopify-header-card">
@@ -1265,7 +1196,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
             <ShopifyOrdersTable
                 groupedByDate={groupedByDate}
-                marketingSpend={marketingSpendForSummary}
+                marketingSpend={[]}
                 loading={false}
                 orderCount={filtered.length}
                 onCustomerClick={(customerId, phone) => {
@@ -1591,7 +1522,7 @@ function ModernRoasMetric({
     codOrdersPct: number;
 }) {
     const formatRoas = (v: number): string => {
-        if (!Number.isFinite(v) || v <= 0) return '—';
+        if (!Number.isFinite(v) || v <= 0) return '0.00';
         return v.toFixed(2);
     };
 

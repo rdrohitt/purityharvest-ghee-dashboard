@@ -1,5 +1,10 @@
 /* Followups — modern filter shell */
 
+/* Nested delete confirm above call-history overlay (see DeleteConfirmModal backdropClassName). */
+.followups-page .delete-modal-backdrop.fu-delete-modal--nested {
+  z-index: 1250;
+}
+
 .followups-page {
   display: grid;
   gap: 12px;
@@ -856,6 +861,46 @@
   justify-content: space-between;
   gap: 8px 12px;
   margin-bottom: 8px;
+}
+
+.fu-hist-timeline__head-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.fu-hist-timeline__delete {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.fu-hist-timeline__delete:hover:not(:disabled) {
+  color: #c0392b;
+  background: rgba(192, 57, 43, 0.08);
+  border-color: rgba(192, 57, 43, 0.12);
+}
+
+.fu-hist-timeline__delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fu-hist-timeline__delete-icon {
+  display: block;
 }
 
 .fu-hist-timeline__when {

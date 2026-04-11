@@ -91,6 +91,11 @@ export function normalizeFollowupDashboardPhone(phoneNumber: string): string {
     return String(phoneNumber).replace(/\D/g, '').slice(-10);
 }
 
+/** True for persisted API history rows (Mongo-style `_id`); false for optimistic `h-…` client ids. */
+export function isFollowupHistoryEntryDeletable(id: string): boolean {
+    return /^[a-f0-9]{24}$/i.test(String(id ?? '').trim());
+}
+
 export function dashboardRowToFollowupData(row: FollowupsDashboardRow): FollowupData {
     const customerPhone = normalizeFollowupDashboardPhone(row.customer.phoneNumber);
     return {

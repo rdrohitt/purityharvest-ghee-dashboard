@@ -1604,6 +1604,24 @@ app.post('/api/followups', async (req, res) => {
   }
 });
 
+/** Delete one call-history row by id (`DELETE /api/followups/history/:id`). Must be registered before `/api/followups/:customerPhone`. */
+app.delete('/api/followups/history/:id', async (req, res) => {
+  try {
+    const id = decodeURIComponent(String(req.params.id || '')).trim();
+    if (!id) {
+      return res.status(400).json({ message: 'Missing history id' });
+    }
+    // Local mock has no per-call store; production should delete the history document and return 204.
+    return res.status(501).json({
+      message:
+        'Deleting call history by id is not implemented in the local mock server. Configure your API or implement persistence here.',
+    });
+  } catch (err) {
+    console.error('Error deleting followup history entry', err);
+    res.status(500).json({ message: 'Failed to delete call history' });
+  }
+});
+
 app.put('/api/followups/:customerPhone', async (req, res) => {
   try {
     const customerPhone = decodeURIComponent(req.params.customerPhone);

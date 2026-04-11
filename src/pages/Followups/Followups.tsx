@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Spinner } from '../../components/Spinner';
-import { type Followup, type CallingHistoryEntry, fetchFollowupsDashboard, dashboardRowToFollowup } from '../../utils/followups';
+import {
+    type Followup,
+    type CallingHistoryEntry,
+    fetchFollowupsDashboard,
+    dashboardRowToFollowup,
+    isFollowupHistoryEntryDeletable,
+} from '../../utils/followups';
 import { apiFetch } from '../../api';
 import { useAppSelector } from '../../store';
 import type { FollowupsCustomerHistoryResponse } from '../../types/followups';
@@ -15,6 +21,9 @@ import { FollowupsTable } from './FollowupsTable';
 import { ToastContainer } from './ToastContainer';
 import '../sales/Shopify/Shopify.scss';
 import './Followups.scss';
+
+/** Thrown after an error toast so callers (e.g. delete confirm) can keep the dialog open. */
+const FOLLOWUP_DELETE_TOASTED = 'FOLLOWUP_DELETE_TOASTED';
 
 async function readFollowupApiErrorMessage(res: Response): Promise<string> {
     try {
@@ -33,6 +42,42 @@ async function readFollowupApiErrorMessage(res: Response): Promise<string> {
     } catch {
         return res.statusText || `Request failed (${res.status})`;
     }
+}
+
+function followupFromCustomerHistoryResponse(
+    base: Followup,
+    data: FollowupsCustomerHistoryResponse,
+): Followup {
+    const mappedHistory: CallingHistoryEntry[] = data.history.map((h) => ({
+        id: h._id,
+        calledAt: h.calledOn,
+        callerName: h.caller?.name ?? '',
+        callerId: h.caller?._id ?? null,
+        detail: h.notes ?? '',
+        callAgainDate: h.callAgain ?? null,
+        feedback: h.feedback ?? null,
+        createdAt: h.createdAt,
+        updatedAt: h.updatedAt,
+        createdByName: h.createdBy?.name ?? null,
+        updatedByName: h.updatedBy?.name ?? null,
+        createdById: h.createdBy?._id ?? null,
+        updatedById: h.updatedBy?._id ?? null,
+        version: typeof h.__v === 'number' ? h.__v : null,
+    }));
+    const sortedHistory = [...mappedHistory].sort(
+        (a, b) => new Date(b.calledAt).getTime() - new Date(a.calledAt).getTime(),
+    );
+    const latest = sortedHistory[0];
+    return {
+        ...base,
+        customerName: data.customer?.name ?? base.customerName,
+        callingHistory: sortedHistory,
+        callingDate: latest?.calledAt ?? base.callingDate,
+        callerName: latest?.callerName ?? base.callerName,
+        callingDetail: latest?.detail ?? base.callingDetail,
+        callAgainDate: latest?.callAgainDate ?? base.callAgainDate,
+        feedback: latest?.feedback ?? base.feedback,
+    };
 }
 
 export default function Followups() {
@@ -54,6 +99,7 @@ export default function Followups() {
     const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
     const [historyModalFollowup, setHistoryModalFollowup] = useState<Followup | null>(null);
     const [historyLoading, setHistoryLoading] = useState(false);
+    const [deletingHistoryEntryId, setDeletingHistoryEntryId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(50);
@@ -307,36 +353,7 @@ export default function Followups() {
                             Array.isArray(historyData.history) &&
                             historyData.customer
                         ) {
-                            const mappedHistory: CallingHistoryEntry[] = historyData.history.map((h) => ({
-                                id: h._id,
-                                calledAt: h.calledOn,
-                                callerName: h.caller?.name ?? '',
-                                callerId: h.caller?._id ?? null,
-                                detail: h.notes ?? '',
-                                callAgainDate: h.callAgain ?? null,
-                                feedback: h.feedback ?? null,
-                                createdAt: h.createdAt,
-                                updatedAt: h.updatedAt,
-                                createdByName: h.createdBy?.name ?? null,
-                                updatedByName: h.updatedBy?.name ?? null,
-                                createdById: h.createdBy?._id ?? null,
-                                updatedById: h.updatedBy?._id ?? null,
-                                version: typeof h.__v === 'number' ? h.__v : null,
-                            }));
-                            const sortedHistory = [...mappedHistory].sort(
-                                (a, b) => new Date(b.calledAt).getTime() - new Date(a.calledAt).getTime(),
-                            );
-                            const latestFromApi = sortedHistory[0];
-                            const refreshedFollowup: Followup = {
-                                ...followup,
-                                customerName: historyData.customer?.name ?? followup.customerName,
-                                callingHistory: sortedHistory,
-                                callingDate: latestFromApi?.calledAt ?? followup.callingDate,
-                                callerName: latestFromApi?.callerName ?? followup.callerName,
-                                callingDetail: latestFromApi?.detail ?? followup.callingDetail,
-                                callAgainDate: latestFromApi?.callAgainDate ?? followup.callAgainDate,
-                                feedback: latestFromApi?.feedback ?? followup.feedback,
-                            };
+                            const refreshedFollowup = followupFromCustomerHistoryResponse(followup, historyData);
                             setFollowups((prev) => prev.map((f) => (f.id === followupId ? refreshedFollowup : f)));
                             setHistoryModalFollowup((cur) =>
                                 cur?.id === followupId ? refreshedFollowup : cur,
@@ -368,6 +385,70 @@ export default function Followups() {
             }
         },
         [followups, showToast, currentUser],
+    );
+
+    const removeCallLogEntry = useCallback(
+        async (followupId: string, entryId: string) => {
+            const followup = followups.find((f) => f.id === followupId);
+            if (!followup?.customerId) {
+                showToast('Customer ID is missing for this row.', 'error');
+                throw new Error(FOLLOWUP_DELETE_TOASTED);
+            }
+            if (!isFollowupHistoryEntryDeletable(entryId)) {
+                showToast('This call cannot be deleted yet.', 'error');
+                throw new Error(FOLLOWUP_DELETE_TOASTED);
+            }
+            setDeletingHistoryEntryId(entryId);
+            try {
+                const res = await apiFetch(`/api/followups/history/${encodeURIComponent(entryId)}`, {
+                    method: 'DELETE',
+                });
+                if (!res.ok) {
+                    const msg = await readFollowupApiErrorMessage(res);
+                    showToast(msg, 'error');
+                    throw new Error(FOLLOWUP_DELETE_TOASTED);
+                }
+
+                const historyRes = await apiFetch(
+                    `/api/followups/customer/${encodeURIComponent(followup.customerId)}`,
+                );
+                if (!historyRes.ok) {
+                    showToast('Deleted, but failed to refresh history.', 'error');
+                    throw new Error(FOLLOWUP_DELETE_TOASTED);
+                }
+                const historyJson: unknown = await historyRes.json();
+                const historyData = historyJson as FollowupsCustomerHistoryResponse;
+                if (
+                    !historyData ||
+                    typeof historyData !== 'object' ||
+                    !Array.isArray(historyData.history) ||
+                    !historyData.customer
+                ) {
+                    showToast('Deleted, but history response was invalid.', 'error');
+                    throw new Error(FOLLOWUP_DELETE_TOASTED);
+                }
+
+                const refreshed = followupFromCustomerHistoryResponse(followup, historyData);
+                const stillThere = refreshed.callingHistory.some((e) => e.id === entryId);
+                if (stillThere) {
+                    showToast('Could not remove this call (server still returned it).', 'error');
+                    throw new Error(FOLLOWUP_DELETE_TOASTED);
+                }
+
+                setFollowups((prev) => prev.map((f) => (f.id === followupId ? refreshed : f)));
+                setHistoryModalFollowup((cur) => (cur?.id === followupId ? refreshed : cur));
+                showToast('Call deleted.', 'delete');
+            } catch (e) {
+                if (!(e instanceof Error && e.message === FOLLOWUP_DELETE_TOASTED)) {
+                    console.error('Error deleting call history:', e);
+                    showToast('Failed to delete call.', 'error');
+                }
+                throw e;
+            } finally {
+                setDeletingHistoryEntryId(null);
+            }
+        },
+        [followups, showToast],
     );
 
     const onCustomerClick = useCallback(
@@ -407,41 +488,12 @@ export default function Followups() {
                     throw new Error('Invalid followup history response shape');
                 }
 
-                const mappedHistory: CallingHistoryEntry[] = data.history.map((h) => ({
-                    id: h._id,
-                    calledAt: h.calledOn,
-                    callerName: h.caller?.name ?? '',
-                    callerId: h.caller?._id ?? null,
-                    detail: h.notes ?? '',
-                    callAgainDate: h.callAgain ?? null,
-                    feedback: h.feedback ?? null,
-                    createdAt: h.createdAt,
-                    updatedAt: h.updatedAt,
-                    createdByName: h.createdBy?.name ?? null,
-                    updatedByName: h.updatedBy?.name ?? null,
-                    createdById: h.createdBy?._id ?? null,
-                    updatedById: h.updatedBy?._id ?? null,
-                    version: typeof h.__v === 'number' ? h.__v : null,
-                }));
-
-                const sortedHistory = [...mappedHistory].sort(
-                    (a, b) => new Date(b.calledAt).getTime() - new Date(a.calledAt).getTime(),
-                );
-                const latest = sortedHistory[0];
+                const hydrated = followupFromCustomerHistoryResponse(f, data);
 
                 setHistoryModalFollowup((cur) => {
                     // Avoid race conditions if user opens another customer before this request finishes.
                     if (!cur || cur.id !== f.id) return cur;
-                    return {
-                        ...f,
-                        customerName: data.customer?.name ?? f.customerName,
-                        callingHistory: sortedHistory,
-                        callingDate: latest?.calledAt ?? f.callingDate,
-                        callerName: latest?.callerName ?? f.callerName,
-                        callingDetail: latest?.detail ?? f.callingDetail,
-                        callAgainDate: latest?.callAgainDate ?? f.callAgainDate,
-                        // Keep `feedback` from the dashboard row; feedback is shown per-history-entry below.
-                    };
+                    return hydrated;
                 });
             } catch (error) {
                 console.error('Error loading call history:', error);
@@ -533,9 +585,12 @@ export default function Followups() {
                     loadingHistory={historyLoading}
                     onClose={() => {
                         setHistoryLoading(false);
+                        setDeletingHistoryEntryId(null);
                         setHistoryModalFollowup(null);
                     }}
                     onAppend={(payload) => appendCallLog(historyModalFollowup.id, payload)}
+                    deletingHistoryEntryId={deletingHistoryEntryId}
+                    onDeleteHistoryEntry={(entryId: string) => removeCallLogEntry(historyModalFollowup.id, entryId)}
                 />
             ) : null}
             <ToastContainer toasts={toasts} />

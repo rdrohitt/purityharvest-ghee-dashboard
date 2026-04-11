@@ -9,6 +9,11 @@ const STORAGE_KEY = 'ph_auth_token';
 // In-memory token to avoid reading localStorage on every request (security best practice)
 let inMemoryToken: string | null = null;
 
+/** Single in-flight GET /api/users/me (avoids duplicate calls from React Strict Mode double-mount). */
+let hydrateInFlight: Promise<void> | null = null;
+/** Token we last successfully hydrated into Redux; skip repeat fetch for same session. */
+let lastHydratedToken: string | null = null;
+
 function syncTokenFromStorage(): void {
 	if (inMemoryToken === null && typeof localStorage !== 'undefined') {
 		const stored = localStorage.getItem(STORAGE_KEY);
@@ -80,6 +85,7 @@ export function loginWithUsernamePassword(username: string, password: string): P
 				throw new Error('Invalid response from server.');
 			}
 			store.dispatch(setMe(me));
+			lastHydratedToken = token;
 			const usernameStored = me.user.username ?? data?.user?.username ?? data?.username ?? username;
 			if (typeof localStorage !== 'undefined') {
 				localStorage.setItem(`${STORAGE_KEY}_username`, usernameStored);
@@ -90,29 +96,50 @@ export function loginWithUsernamePassword(username: string, password: string): P
 
 export function logout(): void {
 	setToken(null);
+	lastHydratedToken = null;
 	store.dispatch(clearMe());
 }
 
 /** Fetch /me and update Redux store. Call when app loads with existing token (e.g. after refresh). */
 export function hydrateUserFromToken(): Promise<void> {
 	const token = getAuthToken();
-	if (!token) return Promise.resolve();
-	return fetch(apiUrl('/api/users/me'), {
+	if (!token) {
+		lastHydratedToken = null;
+		return Promise.resolve();
+	}
+
+	const { user } = store.getState().user;
+	if (lastHydratedToken === token && user) {
+		return Promise.resolve();
+	}
+	if (hydrateInFlight) {
+		return hydrateInFlight;
+	}
+
+	hydrateInFlight = fetch(apiUrl('/api/users/me'), {
 		headers: { Authorization: `Bearer ${token}` },
 	})
 		.then(async (res) => {
 			if (!res.ok) {
 				setToken(null);
+				lastHydratedToken = null;
 				store.dispatch(clearMe());
 				return;
 			}
 			const me = (await res.json()) as MeResponse;
 			if (me?.user) {
 				store.dispatch(setMe(me));
+				lastHydratedToken = token;
 			}
 		})
 		.catch(() => {
 			setToken(null);
+			lastHydratedToken = null;
 			store.dispatch(clearMe());
+		})
+		.finally(() => {
+			hydrateInFlight = null;
 		});
+
+	return hydrateInFlight;
 }
