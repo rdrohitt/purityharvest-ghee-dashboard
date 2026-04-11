@@ -425,6 +425,99 @@
    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
  }
 
+ /* Mobile: four metric cards collapsed by default; expand via control under filters toolbar */
+ .shopify-mobile-metrics-toggle {
+   display: none;
+ }
+
+ .shopify-dash-mobile-wrap {
+   width: 100%;
+ }
+
+ @media (min-width: 901px) {
+   .shopify-dash-mobile-wrap,
+   .shopify-dash-mobile-inner {
+     display: contents;
+   }
+ }
+
+ @media (max-width: 900px) {
+   .shopify-mobile-metrics-toggle {
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     width: 100%;
+     box-sizing: border-box;
+     margin-top: 8px;
+     padding: 11px 14px;
+     border-radius: 14px;
+     border: 1px solid color-mix(in srgb, var(--border) 65%, #94a3b8 35%);
+     background: linear-gradient(
+       125deg,
+       color-mix(in srgb, #ffffff 82%, var(--primary-weak)) 0%,
+       color-mix(in srgb, var(--bg-elev) 92%, var(--primary-weak)) 45%,
+       color-mix(in srgb, #ffffff 75%, var(--bg)) 100%
+     );
+     box-shadow:
+       0 2px 12px rgba(15, 23, 42, 0.06),
+       inset 0 1px 0 rgba(255, 255, 255, 0.9);
+     color: var(--primary-strong);
+     font-size: 0.8125rem;
+     font-weight: 700;
+     letter-spacing: 0.02em;
+     cursor: pointer;
+     transition:
+       background 0.2s ease,
+       box-shadow 0.2s ease,
+       border-color 0.2s ease;
+   }
+
+   .shopify-mobile-metrics-toggle:hover {
+     border-color: color-mix(in srgb, var(--primary) 28%, #e2e8f0);
+   }
+
+   .shopify-mobile-metrics-toggle:focus-visible {
+     outline: none;
+     box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+   }
+
+   .shopify-mobile-metrics-toggle__chev {
+     flex-shrink: 0;
+     transition: transform 0.3s ease;
+     color: var(--muted);
+   }
+
+   .shopify-mobile-metrics-toggle__chev.is-open {
+     transform: rotate(180deg);
+   }
+
+   .shopify-dash-mobile-wrap {
+     display: grid;
+     grid-template-rows: 0fr;
+     transition: grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+     width: 100%;
+     margin-top: 0;
+   }
+
+   .shopify-dash-mobile-wrap--open {
+     grid-template-rows: 1fr;
+     margin-top: 10px;
+   }
+
+   .shopify-dash-mobile-inner {
+     min-height: 0;
+     overflow: hidden;
+   }
+
+   .shopify-dash-mobile-wrap--open .shopify-dash-mobile-inner {
+     overflow: visible;
+   }
+
+   .shopify-dash-mobile-wrap .shopify-dash-grid {
+     margin-top: 0;
+   }
+ }
+
  .shopify-dash-grid {
    width: 100%;
    display: grid;
@@ -4559,11 +4652,83 @@
 
 .shopify-wa-svg { display: block; }
 
-/* —— Mobile refinements —— */
-@media (max-width: 640px) {
+/* —— Shopify header / tabs — narrow viewports: no clipping, horizontal scroll strips —— */
+@media (max-width: 900px) {
+  .shopify-page {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  .shopify-header-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .shopify-header-card,
+  .shopify-header-main {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .shopify-dash-grid {
+    min-width: 0;
+  }
+
+  .shopify-dash-grid > * {
+    min-width: 0;
+  }
+
+  /* Product tabs + shipped / not shipped — single row, scroll */
+  .shopify-category-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    overscroll-behavior-x: contain;
+  }
+
+  .shopify-category-tabs .filter-btn {
+    flex-shrink: 0;
+  }
+
+  /* Date range pills — single row, scroll */
+  .shopify-header-filter-group {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    max-width: 100%;
+    min-width: 0;
+    overscroll-behavior-x: contain;
+  }
+
+  .shopify-header-filter-group .filter-btn {
+    flex-shrink: 0;
+  }
+
+  /* Stack search + actions under date row; drop flex spacer */
+  .shopify-header-filters {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .shopify-header-spacer {
+    display: none;
+  }
+
   .shopify-search-wrapper {
     width: 100%;
     max-width: 100%;
+    min-width: 0;
   }
 
   .shopify-search-wrapper .shopify-search-input {
@@ -4574,16 +4739,48 @@
 
   .shopify-header-actions {
     width: 100%;
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    justify-content: stretch;
+    min-width: 0;
   }
 
   .button.shopify-add-order-btn,
   .button.shopify-refresh-btn {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-width: 0;
   }
 
+  /* Payment / shipping / platform / type + export — one scrollable row */
+  .shopify-status-filters.shopify-status-filters--toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    max-width: 100%;
+    min-width: 0;
+    align-items: center;
+    overscroll-behavior-x: contain;
+  }
+
+  .shopify-status-filters--toolbar .shopify-status-filter--ribbon {
+    flex-shrink: 0;
+  }
+
+  .shopify-export-btn {
+    margin-left: 0;
+    flex-shrink: 0;
+  }
+
+  .shopify-clear-filters-btn {
+    flex-shrink: 0;
+  }
+}
+
+/* —— Mobile refinements —— */
+@media (max-width: 640px) {
   .shopify-toast-container {
     left: 12px;
     right: 12px;

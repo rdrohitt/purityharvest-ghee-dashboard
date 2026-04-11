@@ -243,7 +243,11 @@ export function ModernSelect<T extends string>({
     const triggerRef = useRef<HTMLButtonElement>(null);
     const listRef = useRef<HTMLUListElement>(null);
     const listId = useId();
-    const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+    const [menuRect, setMenuRect] = useState<
+        | { placement: 'below'; top: number; left: number; width: number; maxHeight: number }
+        | { placement: 'above'; bottom: number; left: number; width: number; maxHeight: number }
+        | null
+    >(null);
 
     const selected = options.find((o) => o.value === value);
     const displayLabel = selected?.label ?? placeholder ?? 'Select…';
@@ -258,13 +262,39 @@ export function ModernSelect<T extends string>({
             const el = triggerRef.current;
             if (!el) return;
             const r = el.getBoundingClientRect();
-            const maxH = Math.max(120, Math.min(280, window.innerHeight - r.bottom - 12));
-            setMenuRect({
-                top: r.bottom + 4,
-                left: r.left,
-                width: Math.max(r.width, 140),
-                maxHeight: maxH,
-            });
+            const gap = 4;
+            const edge = 8;
+            const vh = window.innerHeight;
+            const spaceBelow = vh - r.bottom - gap - edge;
+            const spaceAbove = r.top - gap - edge;
+            const w = Math.max(r.width, 140);
+            const maxOpen = 280;
+            /** Never exceed viewport; avoid old bug: min 120px forced menu past bottom of screen */
+            const clampH = (space: number) => Math.max(0, Math.min(maxOpen, space));
+            let openDown = spaceBelow >= spaceAbove;
+            let maxH = clampH(openDown ? spaceBelow : spaceAbove);
+            const altH = clampH(openDown ? spaceAbove : spaceBelow);
+            if (altH > maxH + 20) {
+                openDown = !openDown;
+                maxH = altH;
+            }
+            if (openDown) {
+                setMenuRect({
+                    placement: 'below',
+                    top: r.bottom + gap,
+                    left: r.left,
+                    width: w,
+                    maxHeight: maxH,
+                });
+            } else {
+                setMenuRect({
+                    placement: 'above',
+                    bottom: vh - r.top + gap,
+                    left: r.left,
+                    width: w,
+                    maxHeight: maxH,
+                });
+            }
         }
         place();
         window.addEventListener('scroll', place, true);
@@ -306,10 +336,12 @@ export function ModernSelect<T extends string>({
 			role="listbox"
 			style={{
 				position: 'fixed',
-				top: menuRect.top,
 				left: menuRect.left,
 				width: menuRect.width,
 				maxHeight: menuRect.maxHeight,
+				...(menuRect.placement === 'below'
+					? { top: menuRect.top, bottom: 'auto' as const }
+					: { top: 'auto' as const, bottom: menuRect.bottom }),
 			}}
 		>
 			{options.map((opt) => (

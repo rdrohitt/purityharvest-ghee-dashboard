@@ -224,6 +224,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const [typeFilter, setTypeFilter] = useState<OrderType | ''>('');
     const customBtnRef = useRef<HTMLButtonElement | null>(null);
     const popoverRef = useRef<HTMLDivElement | null>(null);
+    /** Narrow viewports: metric cards start collapsed; expand from filters toolbar */
+    const [mobileMetricsOpen, setMobileMetricsOpen] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -1109,42 +1111,70 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             </button>
                         ) : null}
                     </div>
+                    <button
+                        type="button"
+                        className="shopify-mobile-metrics-toggle"
+                        aria-expanded={mobileMetricsOpen}
+                        onClick={() => setMobileMetricsOpen((o) => !o)}
+                    >
+                        <span className="shopify-mobile-metrics-toggle__label">Metrics summary</span>
+                        <svg
+                            className={`shopify-mobile-metrics-toggle__chev${mobileMetricsOpen ? ' is-open' : ''}`}
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                        >
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
                 </div>
-                <div className="shopify-dash-grid">
-                    <ModernSalesWithEBITAMetric
-                        totalSales={metrics.totalSales}
-                        ebita={metrics.ebita}
-                        expectedEbita={metrics.expectedEbita}
-                        manufacturingCost={metrics.manufacturingCost}
-                        expectedManufacturingCost={metrics.expectedManufacturingCost}
-                        metaSpend={metrics.metaSpend}
-                        miscCost={metrics.miscSpend}
-                        shippingCost={metrics.shippingSpend}
-                        isMilkSelected={categoryTab === 'milk'}
-                    />
-                    <ModernQuantityMetric
-                        quantityBySize={metrics.quantityBySize}
-                        deliveredQuantityBySize={metrics.deliveredQuantityBySize}
-                        rtoQuantityBySize={metrics.rtoQuantityBySize}
-                        inTransitQuantityBySize={metrics.inTransitQuantityBySize}
-                        gheeLitersByKind={metrics.gheeLitersByKind}
-                        isMilkSelected={categoryTab === 'milk'}
-                    />
-                    <ModernDeliveryStatusMetric
-                        delivered={metrics.delivered}
-                        deliveredAmount={metrics.deliveredAmount}
-                        rto={metrics.rto}
-                        rtoAmount={metrics.rtoAmount}
-                        inTransit={metrics.inTransit}
-                        inTransitAmount={metrics.inTransitAmount}
-                        isMilkSelected={categoryTab === 'milk'}
-                    />
-                    <ModernRoasMetric
-                        currentRoas={metrics.roasCurrent}
-                        expectedRoas={metrics.roasExpected}
-                        paidOrdersPct={metrics.paidOrdersPct}
-                        codOrdersPct={metrics.codOrdersPct}
-                    />
+                <div
+                    className={`shopify-dash-mobile-wrap${mobileMetricsOpen ? ' shopify-dash-mobile-wrap--open' : ''}`}
+                >
+                    <div className="shopify-dash-mobile-inner">
+                        <div className="shopify-dash-grid">
+                            <ModernSalesWithEBITAMetric
+                                totalSales={metrics.totalSales}
+                                ebita={metrics.ebita}
+                                expectedEbita={metrics.expectedEbita}
+                                manufacturingCost={metrics.manufacturingCost}
+                                expectedManufacturingCost={metrics.expectedManufacturingCost}
+                                metaSpend={metrics.metaSpend}
+                                miscCost={metrics.miscSpend}
+                                shippingCost={metrics.shippingSpend}
+                                isMilkSelected={categoryTab === 'milk'}
+                            />
+                            <ModernQuantityMetric
+                                quantityBySize={metrics.quantityBySize}
+                                deliveredQuantityBySize={metrics.deliveredQuantityBySize}
+                                rtoQuantityBySize={metrics.rtoQuantityBySize}
+                                inTransitQuantityBySize={metrics.inTransitQuantityBySize}
+                                gheeLitersByKind={metrics.gheeLitersByKind}
+                                isMilkSelected={categoryTab === 'milk'}
+                            />
+                            <ModernDeliveryStatusMetric
+                                delivered={metrics.delivered}
+                                deliveredAmount={metrics.deliveredAmount}
+                                rto={metrics.rto}
+                                rtoAmount={metrics.rtoAmount}
+                                inTransit={metrics.inTransit}
+                                inTransitAmount={metrics.inTransitAmount}
+                                isMilkSelected={categoryTab === 'milk'}
+                            />
+                            <ModernRoasMetric
+                                currentRoas={metrics.roasCurrent}
+                                expectedRoas={metrics.roasExpected}
+                                paidOrdersPct={metrics.paidOrdersPct}
+                                codOrdersPct={metrics.codOrdersPct}
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 {showCustom ? (

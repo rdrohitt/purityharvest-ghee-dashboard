@@ -1247,6 +1247,34 @@
   cursor: not-allowed;
 }
 
+/* Custom menu anchored to trigger (native <select> uses centered sheet on many phones) */
+.fu-pagination__modern-select.shopify-modern-select {
+  width: auto;
+  min-width: 72px;
+}
+
+.fu-pagination__modern-select.shopify-modern-select--default .shopify-modern-select__trigger {
+  margin-top: 0;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 28px 0 10px;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: var(--bg-elev);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.fu-pagination__modern-select.shopify-modern-select--default .shopify-modern-select__trigger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
+.fu-pagination__modern-select.shopify-modern-select--default .shopify-modern-select__trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .fu-pagination__nav {
   display: flex;
   flex-wrap: wrap;
