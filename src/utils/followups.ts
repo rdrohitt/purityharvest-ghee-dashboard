@@ -59,6 +59,8 @@ export type Followup = {
     callingDetail: string;
     callAgainDate: string | null; // ISO date or null
     callingHistory: CallingHistoryEntry[];
+    /** From dashboard `lastOrderReturnStatus`: true = RTO, false = delivered. */
+    lastOrderReturnStatus?: boolean;
 };
 
 /**
@@ -129,6 +131,9 @@ export function dashboardRowToFollowup(row: FollowupsDashboardRow): Followup {
         callingDetail: row.callingDetail ?? '',
         callAgainDate: row.callAgain,
         callingHistory: [],
+        ...(typeof row.lastOrderReturnStatus === 'boolean'
+            ? { lastOrderReturnStatus: row.lastOrderReturnStatus }
+            : {}),
     };
 }
 
@@ -264,6 +269,7 @@ export function generateMockFollowups(limit = 50): Followup[] {
             callingDetail: rand(seed + 11) > 0.5 ? 'Customer requested callback' : 'Follow up on previous order',
             callAgainDate: callAgainDate?.toISOString() || null,
             callingHistory: [],
+            lastOrderReturnStatus: rand(seed + 12) > 0.5,
         });
     }
     

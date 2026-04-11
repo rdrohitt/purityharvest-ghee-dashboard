@@ -39,19 +39,3 @@ export function StatusFilter<T extends string>({
         </div>
     );
 }
-
-export function CallingDateFilterButton({
-    active,
-    onClick,
-    children,
-}: {
-    active: boolean;
-    onClick: () => void;
-    children: React.ReactNode;
-}) {
-    return (
-        <button type="button" onClick={onClick} className={`fu-pill${active ? ' fu-pill--active' : ''}`}>
-            {children}
-        </button>
-    );
-}

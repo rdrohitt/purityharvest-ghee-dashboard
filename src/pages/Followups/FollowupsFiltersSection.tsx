@@ -1,7 +1,30 @@
-import React from 'react';
-import { CALLER_OPTIONS, FEEDBACK_OPTIONS } from './followupsConstants';
-import { CallingDateFilterButton, StatusFilter } from './FollowupFilterControls';
+import React, { useMemo } from 'react';
+import { ModernSelect, type ModernSelectOption } from '../sales/Shopify/ShopifyShared';
+import {
+    CALLER_OPTIONS,
+    FEEDBACK_OPTIONS,
+    FOLLOWUPS_CALL_AGAIN_VALUES,
+    FOLLOWUPS_LAST_CALLING_DATE_VALUES,
+} from './followupsConstants';
+import { StatusFilter } from './FollowupFilterControls';
 import { getFeedbackEmoji, getFeedbackSelectClass } from './followupsFormat';
+
+const LAST_CALLING_DATE_LABELS: Record<(typeof FOLLOWUPS_LAST_CALLING_DATE_VALUES)[number], string> = {
+    '': 'All',
+    'no-calling-date': 'No date',
+    'more-than-15-days': '> 15 days',
+    'more-than-30-days': '> 30 days',
+    'more-than-45-days': '> 45 days',
+    'more-than-60-days': '> 60 days',
+};
+
+const CALL_AGAIN_LABELS: Record<(typeof FOLLOWUPS_CALL_AGAIN_VALUES)[number], string> = {
+    '': 'All',
+    today: 'Today',
+    'next-2-days': 'Next 2 days',
+    'next-7-days': 'Next 7 days',
+    'next-15-days': 'Next 15 days',
+};
 
 type MonthOpt = { value: string; label: string };
 type YearOpt = { value: string; label: string };
@@ -56,6 +79,20 @@ export function FollowupsFiltersSection({
     onClearAll,
 }: Props) {
     const feedbackFilterClass = `${getFeedbackSelectClass(feedbackFilter)}${feedbackFilter ? ' fu-feedback-sel--filled' : ''}`;
+
+    const lastCallingDateOptions = useMemo((): ModernSelectOption<string>[] => {
+        return FOLLOWUPS_LAST_CALLING_DATE_VALUES.map((v) => ({
+            value: v,
+            label: LAST_CALLING_DATE_LABELS[v],
+        }));
+    }, []);
+
+    const callAgainOptions = useMemo((): ModernSelectOption<string>[] => {
+        return FOLLOWUPS_CALL_AGAIN_VALUES.map((v) => ({
+            value: v,
+            label: CALL_AGAIN_LABELS[v],
+        }));
+    }, []);
 
     const hasActiveFilters =
         searchQuery ||
@@ -150,70 +187,28 @@ export function FollowupsFiltersSection({
                     </div>
                 </div>
             </div>
-            <div className="fu-quick">
-                <div className="fu-quick__block">
-                    <span className="fu-quick__label">Last calling date</span>
-                    <div className="fu-pill-group" role="group" aria-label="Calling date filters">
-                        <CallingDateFilterButton
-                            active={callingDateFilter === 'no-calling-date'}
-                            onClick={() => setCallingDateFilter(callingDateFilter === 'no-calling-date' ? '' : 'no-calling-date')}
-                        >
-                            No date
-                        </CallingDateFilterButton>
-                        <CallingDateFilterButton
-                            active={callingDateFilter === 'more-than-15-days'}
-                            onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-15-days' ? '' : 'more-than-15-days')}
-                        >
-                            &gt; 15 days
-                        </CallingDateFilterButton>
-                        <CallingDateFilterButton
-                            active={callingDateFilter === 'more-than-30-days'}
-                            onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-30-days' ? '' : 'more-than-30-days')}
-                        >
-                            &gt; 30 days
-                        </CallingDateFilterButton>
-                        <CallingDateFilterButton
-                            active={callingDateFilter === 'more-than-45-days'}
-                            onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-45-days' ? '' : 'more-than-45-days')}
-                        >
-                            &gt; 45 days
-                        </CallingDateFilterButton>
-                        <CallingDateFilterButton
-                            active={callingDateFilter === 'more-than-60-days'}
-                            onClick={() => setCallingDateFilter(callingDateFilter === 'more-than-60-days' ? '' : 'more-than-60-days')}
-                        >
-                            &gt; 60 days
-                        </CallingDateFilterButton>
-                    </div>
+            <div className="fu-quick fu-quick--dropdowns">
+                <div className="fu-flt fu-quick__flt">
+                    <span className="fu-flt__lab">Last calling date</span>
+                    <ModernSelect<string>
+                        value={callingDateFilter}
+                        onChange={setCallingDateFilter}
+                        options={lastCallingDateOptions}
+                        placeholder="All"
+                        aria-label="Last calling date filter"
+                        className="fu-followups-modern-select"
+                    />
                 </div>
-                <div className="fu-quick__block">
-                    <span className="fu-quick__label">Call again</span>
-                    <div className="fu-pill-group" role="group" aria-label="Upcoming followup filters">
-                        <CallingDateFilterButton
-                            active={upcomingFilter === 'today'}
-                            onClick={() => setUpcomingFilter(upcomingFilter === 'today' ? '' : 'today')}
-                        >
-                            Today
-                        </CallingDateFilterButton>
-                        <CallingDateFilterButton
-                            active={upcomingFilter === 'next-2-days'}
-                            onClick={() => setUpcomingFilter(upcomingFilter === 'next-2-days' ? '' : 'next-2-days')}
-                        >
-                            Next 2 days
-                        </CallingDateFilterButton>
-                        <CallingDateFilterButton
-                            active={upcomingFilter === 'next-7-days'}
-                            onClick={() => setUpcomingFilter(upcomingFilter === 'next-7-days' ? '' : 'next-7-days')}
-                        >
-                            Next 7 days
-                        </CallingDateFilterButton>
-                        <CallingDateFilterButton
-                            active={upcomingFilter === 'next-15-days'}
-                            onClick={() => setUpcomingFilter(upcomingFilter === 'next-15-days' ? '' : 'next-15-days')}
-                        >
-                            Next 15 days
-                        </CallingDateFilterButton>
-                    </div>
+                <div className="fu-flt fu-quick__flt">
+                    <span className="fu-flt__lab">Call again</span>
+                    <ModernSelect<string>
+                        value={upcomingFilter}
+                        onChange={setUpcomingFilter}
+                        options={callAgainOptions}
+                        placeholder="All"
+                        aria-label="Call again filter"
+                        className="fu-followups-modern-select"
+                    />
                 </div>
             </div>
         </div>

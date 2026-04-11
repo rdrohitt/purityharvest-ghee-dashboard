@@ -1,12 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../api';
 import type { CustomerApi, CustomersDashboardResponse } from '../../types/shopify';
 import { searchCustomersByPhone } from '../../utils/customers';
 import { Spinner } from '../../components/Spinner';
 import { CustomerProfileModal } from '../sales/Shopify/CustomerProfileModal';
+import { CustomerEditModal } from './CustomerEditModal';
 import '../sales/Shopify/Shopify.scss';
 
 const MIN_PHONE_SEARCH_DIGITS = 10;
+
+const PROGRESSIVE_ROW_THRESHOLD = 45;
+const PROGRESSIVE_INITIAL_ROWS = 25;
+const PROGRESSIVE_CHUNK_ROWS = 55;
 
 function formatDateTime(iso?: string): string {
     if (!iso) return '—';
@@ -38,6 +43,8 @@ export default function Customers() {
     const [activeCustomerId, setActiveCustomerId] = useState<string | null>(null);
     const [activeCustomerPhone, setActiveCustomerPhone] = useState<string | null>(null);
     const [profileLoading, setProfileLoading] = useState(false);
+    const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
+    const [listRefreshKey, setListRefreshKey] = useState(0);
 
     const phoneDigits = useMemo(() => search.replace(/\D/g, ''), [search]);
     const isPhoneSearch = phoneDigits.length >= MIN_PHONE_SEARCH_DIGITS;
@@ -98,7 +105,7 @@ export default function Customers() {
         return () => {
             cancelled = true;
         };
-    }, [page, pageSize, isPhoneSearch]);
+    }, [page, pageSize, isPhoneSearch, listRefreshKey]);
 
     useEffect(() => {
         if (!isPhoneSearch) return;
@@ -135,9 +142,68 @@ export default function Customers() {
             cancelled = true;
             window.clearTimeout(t);
         };
-    }, [phoneDigits, isPhoneSearch]);
+    }, [phoneDigits, isPhoneSearch, listRefreshKey]);
 
     const total = dashboardMeta?.total ?? customers.length;
+
+    const customersTableKey = useMemo(() => {
+        const mode = isPhoneSearch ? 's' : 'l';
+        if (customers.length === 0) return `p${page}-l${pageSize}-${mode}-empty`;
+        return `p${page}-l${pageSize}-${mode}-n${customers.length}-${customers[0]?._id ?? ''}-${customers[customers.length - 1]?._id ?? ''}`;
+    }, [customers, page, pageSize, isPhoneSearch]);
+
+    const totalCustomerRows = customers.length;
+    const useCustomerProgressive =
+        !loading && !error && totalCustomerRows > PROGRESSIVE_ROW_THRESHOLD;
+
+    const [customerVisibleCap, setCustomerVisibleCap] = useState(PROGRESSIVE_INITIAL_ROWS);
+
+    useLayoutEffect(() => {
+        if (loading || error) return;
+        if (!useCustomerProgressive) {
+            setCustomerVisibleCap(totalCustomerRows);
+            return;
+        }
+        const initial = Math.min(PROGRESSIVE_INITIAL_ROWS, totalCustomerRows);
+        setCustomerVisibleCap(initial);
+        if (initial >= totalCustomerRows) return;
+
+        let cancelled = false;
+        let cap = initial;
+        let idleId = 0;
+        let rafId = 0;
+
+        const bump = () => {
+            if (cancelled) return;
+            cap = Math.min(totalCustomerRows, cap + PROGRESSIVE_CHUNK_ROWS);
+            setCustomerVisibleCap(cap);
+            if (cap < totalCustomerRows) scheduleNext();
+        };
+
+        const scheduleNext = () => {
+            if (cancelled) return;
+            if (typeof requestIdleCallback !== 'undefined') {
+                idleId = requestIdleCallback(bump, { timeout: 200 });
+            } else {
+                rafId = requestAnimationFrame(bump);
+            }
+        };
+
+        scheduleNext();
+
+        return () => {
+            cancelled = true;
+            if (idleId !== 0) cancelIdleCallback(idleId);
+            if (rafId !== 0) cancelAnimationFrame(rafId);
+        };
+    }, [customers, totalCustomerRows, useCustomerProgressive, loading, error]);
+
+    const displayCustomers = useMemo(() => {
+        if (!useCustomerProgressive || customerVisibleCap >= totalCustomerRows) {
+            return customers;
+        }
+        return customers.slice(0, customerVisibleCap);
+    }, [customers, customerVisibleCap, totalCustomerRows, useCustomerProgressive]);
 
     return (
         <section className="shopify-page">
@@ -188,7 +254,14 @@ export default function Customers() {
                         : `${total.toLocaleString()} customer${total === 1 ? '' : 's'}`}
                 </div>
                 {loading ? null : (
-                    <div className="table-scroll-wrapper">
+                    <>
+                        {useCustomerProgressive && customerVisibleCap < totalCustomerRows ? (
+                            <div className="table-progressive-hint" aria-live="polite">
+                                Showing {Math.min(customerVisibleCap, totalCustomerRows).toLocaleString()} of{' '}
+                                {totalCustomerRows.toLocaleString()} rows…
+                            </div>
+                        ) : null}
+                        <div key={customersTableKey} className="table-scroll-wrapper">
                         <table className="orders-table shopify-orders-table">
                             <thead>
                                 <tr className="shopify-orders-header-row">
@@ -199,19 +272,20 @@ export default function Customers() {
                                     <th className="shopify-th">State</th>
                                     <th className="shopify-th">Pincode</th>
                                     <th className="shopify-th">Created At</th>
+                                    <th className="shopify-th shopify-th--right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {!error && customers.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="shopify-orders-empty-cell">
+                                        <td colSpan={8} className="shopify-orders-empty-cell">
                                             {isPhoneSearch
                                                 ? 'No customers match this phone search.'
                                                 : 'No customers found.'}
                                         </td>
                                     </tr>
                                 ) : (
-                                    customers.map((c) => (
+                                    displayCustomers.map((c) => (
                                         <tr key={c._id} className="shopify-orders-row">
                                             <td className="shopify-td">
                                                 <div className="shopify-customer-cell">
@@ -241,12 +315,39 @@ export default function Customers() {
                                             <td className="shopify-td">{c.state}</td>
                                             <td className="shopify-td">{c.pincode}</td>
                                             <td className="shopify-td">{formatDateTime(c.createdAt)}</td>
+                                            <td className="shopify-td shopify-td--actions">
+                                                <div className="shopify-row-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="icon-btn shopify-customer-edit-btn"
+                                                        onClick={() => setEditingCustomerId(c._id)}
+                                                        title="Edit customer"
+                                                        aria-label="Edit customer"
+                                                    >
+                                                        <svg
+                                                            width="14"
+                                                            height="14"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            strokeWidth="2"
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            aria-hidden
+                                                        >
+                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))
                                 )}
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
                 <footer className="shopify-pagination" aria-label="Customers pagination">
                     <div className="shopify-pagination__range">
@@ -339,6 +440,13 @@ export default function Customers() {
                     onLoaded={() => setProfileLoading(false)}
                 />
             )}
+            {editingCustomerId ? (
+                <CustomerEditModal
+                    customerId={editingCustomerId}
+                    onClose={() => setEditingCustomerId(null)}
+                    onSaved={() => setListRefreshKey((k) => k + 1)}
+                />
+            ) : null}
         </section>
     );
 }

@@ -20,6 +20,8 @@ export interface FollowupsDashboardCaller {
 export interface FollowupsDashboardRow {
     customer: FollowupsDashboardCustomer;
     lastOrderDate: string;
+    /** When true, last order was an RTO; when false, delivered successfully. */
+    lastOrderReturnStatus?: boolean | null;
     totalOrders: number;
     lastOrderSummary: string;
     lastOrderAmount: number;

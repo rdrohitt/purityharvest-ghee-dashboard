@@ -172,6 +172,12 @@ export default function Followups() {
 
     const baseFollowups = followups;
 
+    /** Remount table when a new dashboard page loads so progressive row state resets. */
+    const followupsTableKey = useMemo(() => {
+        if (followups.length === 0) return `p${page}-l${pageSize}-empty`;
+        return `p${page}-l${pageSize}-n${followups.length}-${followups[0]?.id ?? ''}-${followups[followups.length - 1]?.id ?? ''}`;
+    }, [followups, page, pageSize]);
+
     const { monthOptions, yearOptions } = useMemo(() => {
         const mo = Array.from({ length: 12 }, (_, index) => {
             const month = index + 1;
@@ -544,6 +550,7 @@ export default function Followups() {
 
             <div className="card fu-table-card">
                 <FollowupsTable
+                    key={followupsTableKey}
                     loading={loading}
                     filtered={filtered}
                     baseFollowups={baseFollowups}

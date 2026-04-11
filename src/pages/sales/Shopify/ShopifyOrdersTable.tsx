@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ShopifyOrderApi, ShopifyOrderCustomer } from '../../../types/shopify';
 import type { Order } from '../../../utils/orders';
 import type { Platform } from '../../../utils/orders';
@@ -28,6 +28,66 @@ export type GroupedOrdersByDate = {
     codCount: number;
     paidCount: number;
 };
+
+/** Below this many rows, render the full table at once (no progressive pass). */
+const PROGRESSIVE_ROW_THRESHOLD = 45;
+const PROGRESSIVE_INITIAL_ROWS = 25;
+const PROGRESSIVE_CHUNK_ROWS = 55;
+
+type FlatOrderRow = {
+    group: GroupedOrdersByDate;
+    order: ShopifyOrderApi;
+};
+
+function flattenGroupedOrders(groups: GroupedOrdersByDate[]): FlatOrderRow[] {
+    const out: FlatOrderRow[] = [];
+    for (const g of groups) {
+        for (const order of g.items) {
+            out.push({ group: g, order });
+        }
+    }
+    return out;
+}
+
+/** Rebuild date groups for a prefix of flattened rows (badges reflect visible rows only). */
+function buildDisplayGroupsFromFlatSlice(slice: FlatOrderRow[]): GroupedOrdersByDate[] {
+    if (slice.length === 0) return [];
+    const result: GroupedOrdersByDate[] = [];
+    for (const fr of slice) {
+        const label = fr.group.label;
+        const last = result[result.length - 1];
+        if (last && last.label === label) {
+            last.items.push(fr.order);
+        } else {
+            result.push({
+                ...fr.group,
+                items: [fr.order],
+                totalAmount: 0,
+                totalShipping: 0,
+                codCount: 0,
+                paidCount: 0,
+                metaSpent: 0,
+            });
+        }
+    }
+    for (const g of result) {
+        let totalAmount = 0;
+        let totalShipping = 0;
+        let codCount = 0;
+        let paidCount = 0;
+        for (const it of g.items) {
+            totalAmount += it.totalAmount;
+            totalShipping += it.shippingCharges ?? 0;
+            if (it.paymentMode === 'COD') codCount += 1;
+            if (it.paymentMode === 'PAID') paidCount += 1;
+        }
+        g.totalAmount = totalAmount;
+        g.totalShipping = totalShipping;
+        g.codCount = codCount;
+        g.paidCount = paidCount;
+    }
+    return result;
+}
 
 function ShopifyOrdersEmptyIcon() {
     const svgProps = {
@@ -417,6 +477,58 @@ export function ShopifyOrdersTable({
     onEdit: (order: Order) => void;
     onDelete: (order: Order) => void;
 }) {
+    const flatRows = useMemo(() => flattenGroupedOrders(groupedByDate), [groupedByDate]);
+    const totalFlatRows = flatRows.length;
+    const useProgressive = totalFlatRows > PROGRESSIVE_ROW_THRESHOLD;
+
+    const [visibleRowCap, setVisibleRowCap] = useState(PROGRESSIVE_INITIAL_ROWS);
+
+    useLayoutEffect(() => {
+        if (!useProgressive) {
+            setVisibleRowCap(totalFlatRows);
+            return;
+        }
+        const initial = Math.min(PROGRESSIVE_INITIAL_ROWS, totalFlatRows);
+        setVisibleRowCap(initial);
+        if (initial >= totalFlatRows) return;
+
+        let cancelled = false;
+        let cap = initial;
+        let idleId = 0;
+        let rafId = 0;
+
+        const bump = () => {
+            if (cancelled) return;
+            cap = Math.min(totalFlatRows, cap + PROGRESSIVE_CHUNK_ROWS);
+            setVisibleRowCap(cap);
+            if (cap < totalFlatRows) scheduleNext();
+        };
+
+        const scheduleNext = () => {
+            if (cancelled) return;
+            if (typeof requestIdleCallback !== 'undefined') {
+                idleId = requestIdleCallback(bump, { timeout: 200 });
+            } else {
+                rafId = requestAnimationFrame(bump);
+            }
+        };
+
+        scheduleNext();
+
+        return () => {
+            cancelled = true;
+            if (idleId !== 0) cancelIdleCallback(idleId);
+            if (rafId !== 0) cancelAnimationFrame(rafId);
+        };
+    }, [groupedByDate, totalFlatRows, useProgressive]);
+
+    const displayGroups = useMemo(() => {
+        if (!useProgressive || visibleRowCap >= totalFlatRows) {
+            return groupedByDate;
+        }
+        return buildDisplayGroupsFromFlatSlice(flatRows.slice(0, visibleRowCap));
+    }, [flatRows, groupedByDate, totalFlatRows, useProgressive, visibleRowCap]);
+
     const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
     const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -438,7 +550,22 @@ export function ShopifyOrdersTable({
     return (
         <div className="card shopify-orders-card">
             <div className="shopify-orders-count-bar">
-                {loading ? '—' : `${orderCount.toLocaleString()} order${orderCount === 1 ? '' : 's'}`}
+                {loading ? (
+                    '—'
+                ) : (
+                    <>
+                        <span>
+                            {orderCount.toLocaleString()} order{orderCount === 1 ? '' : 's'}
+                        </span>
+                        {useProgressive && visibleRowCap < totalFlatRows ? (
+                            <span className="shopify-orders-count-bar__progressive">
+                                {' '}
+                                · Showing {Math.min(visibleRowCap, totalFlatRows).toLocaleString()} of{' '}
+                                {totalFlatRows.toLocaleString()} rows…
+                            </span>
+                        ) : null}
+                    </>
+                )}
             </div>
             {loading ? (
                 <div className="shopify-orders-loading">
@@ -466,7 +593,7 @@ export function ShopifyOrdersTable({
                             </tr>
                         </thead>
                         <tbody>
-                            {groupedByDate.length === 0 ? (
+                            {displayGroups.length === 0 ? (
                                 <tr>
                                     <td colSpan={11} className="shopify-orders-empty-cell shopify-orders-empty-cell--panel">
                                         <div className="shopify-orders-empty-panel">
@@ -478,7 +605,7 @@ export function ShopifyOrdersTable({
                                     </td>
                                 </tr>
                             ) : (
-                                groupedByDate.map((group) =>
+                                displayGroups.map((group) =>
                                     group.items.map((o, idx) => {
                                         const customerPhone = getOrderCustomerPhone(o);
                                         return (

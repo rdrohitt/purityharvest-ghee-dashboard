@@ -364,10 +364,6 @@ export function mapOrderType(t: string): OrderType {
     return 'New';
 }
 
-function toBackendDeliveryStatus(status: DeliveryStatus | string): string {
-    return normalizeDeliveryStatus(String(status));
-}
-
 function toBackendFulfillmentStatus(status: FulfillmentStatus): string {
     const lower = status.toLowerCase();
     if (lower === 'fulfilled') return 'fulfilled';
@@ -408,7 +404,11 @@ export function buildShopifyOrderPayloadFromForm(
 ): ShopifyOrderApi {
     const paymentMode = toBackendPaymentMode(form.paymentStatus);
     const fulfillmentStatus = toBackendFulfillmentStatus(form.fulfillmentStatus);
-    const deliveryStatus = toBackendDeliveryStatus(form.deliveryStatus);
+    const isRto = form.deliveryStatus === 'rto';
+    /** Backend: RTO is indicated by returnStatus; tracking stays "delivered". */
+    const trackingStatusForApi = isRto
+        ? 'delivered'
+        : String(normalizeDeliveryStatus(String(form.deliveryStatus)));
     const awb = form.awbNumber || base.shippingDetails?.trackingNumber || '';
     const trackingCompany =
         (form.shippingTrackingCompany && form.shippingTrackingCompany.trim()) ||
@@ -510,9 +510,10 @@ export function buildShopifyOrderPayloadFromForm(
         discount: form.discountAmount ?? base.discount,
         totalAmount: form.amount,
         notes: form.notes ?? base.notes,
+        returnStatus: isRto,
         shippingDetails: {
             trackingNumber: awb,
-            trackingStatus: deliveryStatus,
+            trackingStatus: trackingStatusForApi,
             trackingUrl,
             trackingCompany,
         },

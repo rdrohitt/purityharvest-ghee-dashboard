@@ -880,6 +880,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return groups;
     }, [filtered]);
 
+    /** Remount orders table when a new API page loads so progressive row state resets cleanly. */
+    const shopifyOrdersTableKey = useMemo(() => {
+        if (orders.length === 0) return `p${page}-l${pageSize}-empty`;
+        return `p${page}-l${pageSize}-n${orders.length}-${orders[0]._id}-${orders[orders.length - 1]._id}`;
+    }, [orders, page, pageSize]);
+
     const showFullPageSpinner = loading || (isPhoneSearch && phoneSearchLoading);
 
     return (
@@ -1195,6 +1201,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             </div>
 
             <ShopifyOrdersTable
+                key={shopifyOrdersTableKey}
                 groupedByDate={groupedByDate}
                 marketingSpend={[]}
                 loading={false}

@@ -29,6 +29,25 @@ const GURUGRAM_MARTS_PATH = path.join(__dirname, 'public', 'gurugram-marts.json'
 const DELHI_MARTS_PATH = path.join(__dirname, 'public', 'delhi-marts.json');
 const FOLLOWUPS_PATH = path.join(__dirname, 'public', 'followups.json');
 const AD_SCRIPTS_PATH = path.join(__dirname, 'public', 'ad-scripts.json');
+const CUSTOMERS_PATH = path.join(__dirname, 'public', 'customers.json');
+
+async function readCustomers() {
+  try {
+    const data = await fs.readFile(CUSTOMERS_PATH, 'utf8');
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function writeCustomers(customers) {
+  const json = JSON.stringify(customers, null, 2);
+  await fs.writeFile(CUSTOMERS_PATH, json, 'utf8');
+}
 
 async function readProducts() {
   const data = await fs.readFile(PRODUCTS_PATH, 'utf8');
@@ -437,6 +456,96 @@ app.put('/api/products/:id', async (req, res) => {
   } catch (err) {
     console.error('Error updating products.json', err);
     res.status(500).json({ message: 'Failed to update product' });
+  }
+});
+
+/** Register `/search` before `/:id` so "search" is not treated as an id. */
+app.get('/api/customers/search', async (req, res) => {
+  try {
+    const phoneRaw = typeof req.query.phone === 'string' ? req.query.phone : '';
+    const digits = phoneRaw.replace(/\D/g, '');
+    if (!digits) {
+      return res.json([]);
+    }
+    const customers = await readCustomers();
+    const matches = customers.filter((c) => {
+      const p = String(c?.phoneNumber ?? '').replace(/\D/g, '');
+      return p.includes(digits);
+    });
+    res.json(matches);
+  } catch (err) {
+    console.error('Error searching customers.json', err);
+    res.status(500).json({ message: 'Failed to search customers' });
+  }
+});
+
+app.get('/api/customers', async (req, res) => {
+  try {
+    const pageRaw = parseInt(String(req.query.page), 10);
+    const limitRaw = parseInt(String(req.query.limit), 10);
+    const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(1000, limitRaw)) : 20;
+    const all = await readCustomers();
+    const total = all.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+    const rows = all.slice(start, start + limit);
+    res.json({
+      count: rows.length,
+      total,
+      page,
+      limit,
+      totalPages,
+      rows,
+    });
+  } catch (err) {
+    console.error('Error reading customers.json', err);
+    res.status(500).json({ message: 'Failed to load customers' });
+  }
+});
+
+app.get('/api/customers/:id', async (req, res) => {
+  try {
+    const id = decodeURIComponent(req.params.id);
+    const customers = await readCustomers();
+    const found = customers.find((c) => String(c?._id) === id);
+    if (!found) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+    res.json(found);
+  } catch (err) {
+    console.error('Error reading customer from customers.json', err);
+    res.status(500).json({ message: 'Failed to load customer' });
+  }
+});
+
+app.put('/api/customers/:id', async (req, res) => {
+  try {
+    const id = decodeURIComponent(req.params.id);
+    const updated = req.body;
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ message: 'Invalid customer payload' });
+    }
+    const customers = await readCustomers();
+    const index = customers.findIndex((c) => String(c?._id) === id);
+    if (index === -1) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+    const now = new Date().toISOString();
+    const prev = customers[index];
+    const merged = {
+      ...prev,
+      ...updated,
+      _id: id,
+      updatedAt: now,
+      createdAt: prev.createdAt || updated.createdAt || now,
+    };
+    customers[index] = merged;
+    await writeCustomers(customers);
+    res.json(merged);
+  } catch (err) {
+    console.error('Error updating customers.json', err);
+    res.status(500).json({ message: 'Failed to update customer' });
   }
 });
 
@@ -1551,7 +1660,7 @@ app.get('/api/followups/dashboard', async (req, res) => {
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const start = (page - 1) * limit;
     const slice = followups.slice(start, start + limit);
-    const rows = slice.map((f) => ({
+    const rows = slice.map((f, i) => ({
       customer: {
         _id: '',
         name: String(f.customerPhone || 'Customer'),
@@ -1561,6 +1670,7 @@ app.get('/api/followups/dashboard', async (req, res) => {
         tag: 'LOCAL',
       },
       lastOrderDate: new Date().toISOString(),
+      lastOrderReturnStatus: i % 2 === 0,
       totalOrders: 1,
       lastOrderSummary: '',
       lastOrderAmount: 0,
