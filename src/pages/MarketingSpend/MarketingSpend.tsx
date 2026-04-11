@@ -980,7 +980,6 @@ function DateFilterBar({ mode, setMode, customFrom, setCustomFrom, customTo, set
                 <div
                     ref={popoverRef}
                     className="date-range-popover marketing-spend-filter-group__popover"
-                    style={{ left: customBtnRef.current ? customBtnRef.current.offsetLeft : 0 }}
                 >
                     <div className="marketing-spend-filter-group__popover-inner">
                         <div className="marketing-spend-filter-group__date-field">

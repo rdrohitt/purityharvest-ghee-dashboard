@@ -107,12 +107,22 @@
   gap: 12px;
   margin: 0 auto;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 8px;
+  box-sizing: border-box;
+}
+
+.marketing-spend-page > .card {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .marketing-spend-summary {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .marketing-spend-summary__title {
@@ -149,20 +159,38 @@
 
 @media (max-width: 640px) {
   .marketing-spend-metrics {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .marketing-spend-metric {
-    border-right: none;
+    border-right: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
   }
 
+  .marketing-spend-metric:nth-child(2n) {
+    border-right: none;
+  }
+
+  .marketing-spend-metric:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    border-right: none;
+  }
+
   .marketing-spend-metric--last {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .marketing-spend-metric:last-child {
     border-bottom: none;
   }
 
   .marketing-spend-page {
     padding: 8px 4px;
+  }
+
+  .marketing-spend-page > .card {
+    padding: 12px;
   }
 }
 
@@ -205,12 +233,16 @@
 .marketing-spend-unified {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .marketing-spend-unified__header {
   display: flex;
   align-items: baseline;
   gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .marketing-spend-unified__title {
@@ -227,6 +259,8 @@
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .marketing-spend-unified__form-wrapper {
@@ -235,17 +269,47 @@
 
 .marketing-spend-unified__table-wrapper {
   padding: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .marketing-spend-unified__form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  /* min(100%, 180px) keeps tracks from forcing width wider than the card on narrow viewports */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
   gap: 12px;
   align-items: flex-end;
+  min-width: 0;
+}
+
+.marketing-spend-unified__form > div {
+  min-width: 0;
+}
+
+.marketing-spend-unified__form .input,
+.marketing-spend-unified__form input.input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.marketing-spend-unified__form .ms-date-picker {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.marketing-spend-unified__form .ms-date-picker__display {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.marketing-spend-unified__form .marketing-spend-unified__actions {
+  width: 100%;
 }
 
 .marketing-spend-unified__field {
   width: 100%;
+  max-width: 100%;
   margin-top: 6px;
 }
 
@@ -253,6 +317,8 @@
 .marketing-spend-platform-select {
   position: relative;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin-top: 6px;
   z-index: 5;
 }
@@ -266,6 +332,8 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: 44px;
   min-height: 44px;
   max-height: 44px;
@@ -507,12 +575,26 @@
 .marketing-spend-table__wrapper {
   overflow-x: auto;
   padding: 0;
+  min-width: 0;
+  max-width: 100%;
+  display: block;
 }
 
 .marketing-spend-table {
   width: 100%;
   border-collapse: collapse;
   min-width: 720px;
+}
+
+.marketing-spend-table__header-cell {
+  padding: 12px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .marketing-spend-table__row {
@@ -534,11 +616,26 @@
   flex-wrap: wrap;
   align-items: center;
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.marketing-spend-page .marketing-spend-filter-group.filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
 }
 
 .marketing-spend-filter-group__popover {
   position: absolute;
-  top: 44px;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  z-index: 25;
+  box-sizing: border-box;
 }
 
 .marketing-spend-filter-group__popover-inner {
@@ -546,6 +643,7 @@
   align-items: center;
   gap: 12px;
   padding: 4px;
+  flex-wrap: wrap;
 }
 
 .marketing-spend-filter-group__date-field {
@@ -820,5 +918,127 @@
   width: auto !important;
   padding: 0 24px;
   flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .marketing-spend-unified__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .marketing-spend-unified__subtitle {
+    line-height: 1.35;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  .marketing-spend-unified__form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .marketing-spend-unified__form-wrapper {
+    padding: 10px;
+  }
+
+  .marketing-spend-filter-group .filter-btn {
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+
+  .marketing-spend-filter-group__popover-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .marketing-spend-filter-group__date-field {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .marketing-spend-filter-group__date-input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .marketing-spend-filter-group__apply-btn {
+    width: 100%;
+  }
+
+  .marketing-spend-table {
+    min-width: 600px;
+  }
+
+  .marketing-spend-table__header-cell,
+  .marketing-spend-table__cell {
+    padding: 8px 6px;
+    font-size: 0.8125rem;
+  }
+
+  .marketing-spend-table__cell:nth-child(4) {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .marketing-spend-table__row-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .marketing-spend-table__row-actions .icon-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .platform-tag {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .marketing-toast-container {
+    left: 12px;
+    right: 12px;
+    top: 12px;
+    align-items: stretch;
+  }
+
+  .marketing-spend-modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .marketing-spend-modal {
+    width: 100%;
+    max-width: 100%;
+    max-height: min(92vh, 100dvh);
+    border-radius: 16px 16px 0 0;
+  }
+
+  .marketing-spend-modal__header,
+  .marketing-spend-modal__body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .marketing-spend-modal__footer {
+    padding-left: 16px;
+    padding-right: 16px;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .marketing-spend-modal__footer .icon-btn,
+  .marketing-spend-modal__footer .button.marketing-spend-modal__submit-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 

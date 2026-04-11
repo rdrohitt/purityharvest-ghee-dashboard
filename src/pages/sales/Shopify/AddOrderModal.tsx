@@ -360,6 +360,7 @@ function PhoneDropdown({
     phone,
     required,
     skipSearch,
+    disabled,
 }: {
     selectedPhone: string;
     phone: string;
@@ -368,6 +369,8 @@ function PhoneDropdown({
     required?: boolean;
     /** When true, do not call customer search API (e.g. in edit mode when phone is prefilled). */
     skipSearch?: boolean;
+    /** When true, phone cannot be changed (e.g. edit order — customer identity is fixed). */
+    disabled?: boolean;
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -394,8 +397,14 @@ function PhoneDropdown({
     }, []);
 
     useEffect(() => {
+        if (disabled) {
+            setIsOpen(false);
+        }
+    }, [disabled]);
+
+    useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        if (skipSearch || !digits) {
+        if (skipSearch || disabled || !digits) {
             if (!digits) setSearchResults([]);
             return;
         }
@@ -403,7 +412,7 @@ function PhoneDropdown({
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current);
         };
-    }, [digits, runSearch, skipSearch]);
+    }, [digits, runSearch, skipSearch, disabled]);
 
     const showCreateNew =
         digits.length >= 10 &&
@@ -461,9 +470,10 @@ function PhoneDropdown({
                 <span className="shopify-add-modal-input-wrap__icon">{ADD_MODAL_FIELD_ICONS.phone}</span>
                 <input
                     type="tel"
-                    className="input shopify-phonedrop-input shopify-add-modal-input--with-prefix"
+                    className={`input shopify-phonedrop-input shopify-add-modal-input--with-prefix${disabled ? ' shopify-add-modal-input--readonly' : ''}`}
                     value={phone}
                     onChange={(e) => {
+                        if (disabled) return;
                         const value = e.target.value.replace(/\D/g, '');
                         if (value.length <= 10) {
                             if (onNewPhone) onNewPhone(value);
@@ -471,17 +481,26 @@ function PhoneDropdown({
                             setIsOpen(true);
                         }
                     }}
-                    onFocus={() => setIsOpen(true)}
+                    onFocus={() => {
+                        if (!disabled) setIsOpen(true);
+                    }}
                     placeholder="Type phone number to search..."
                     maxLength={10}
                     pattern="[0-9]{10}"
-                    required={required}
+                    required={required && !disabled}
+                    disabled={disabled}
                 />
-                <div className="shopify-phonedrop-chevron" onClick={() => setIsOpen((o) => !o)}>
+                <div
+                    className={`shopify-phonedrop-chevron${disabled ? ' shopify-phonedrop-chevron--disabled' : ''}`}
+                    onClick={() => {
+                        if (!disabled) setIsOpen((o) => !o);
+                    }}
+                    aria-hidden
+                >
                     <span>▼</span>
                 </div>
             </div>
-            {isOpen && (
+            {isOpen && !disabled && (
                 <div ref={popupRef} className="shopify-phonedrop-popup" onClick={(e) => e.stopPropagation()}>
                     <input
                         ref={inputRef}
@@ -770,6 +789,7 @@ function AddOrderModal({
         if (lower === 'calling') return 'Calling';
         return p;
     };
+
     const [date, setDate] = useState<string>(
         initialOrder ? toInputDate(new Date(initialOrder.date)) : toInputDate(new Date())
     );
@@ -783,6 +803,9 @@ function AddOrderModal({
     const [state, setState] = useState(initialOrder?.state || '');
     const [pincode, setPincode] = useState(initialOrder?.pincode || '');
     const [type, setType] = useState<OrderType | ''>(initialOrder?.type || (mode === 'add' ? 'New' : ''));
+    /** Edit or add+Repeat: lock customer fields (not Date). Type is driven by phone/order only (dropdown always disabled). */
+    const customerSectionLocked =
+        mode === 'edit' || (mode === 'add' && type === 'Repeat');
     const [payment, setPayment] = useState<PaymentStatus | ''>(
         initialOrder?.paymentStatus || ''
     );
@@ -1194,18 +1217,23 @@ function AddOrderModal({
                                                     setType('New');
                                                 }}
                                                 required
-                                                skipSearch={mode === 'edit'}
+                                                skipSearch={
+                                                    mode === 'edit' ||
+                                                    (mode === 'add' && type === 'Repeat')
+                                                }
+                                                disabled={customerSectionLocked}
                                             />
                                         </div>
                                         <div>
                                             <label className="label">Customer name</label>
                                             <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.user}>
                                                 <input
-                                                    className="input shopify-add-modal-input"
+                                                    className={`input shopify-add-modal-input${customerSectionLocked ? ' shopify-add-modal-input--readonly' : ''}`}
                                                     type="text"
                                                     value={name}
                                                     onChange={(e) => setName(e.target.value)}
-                                                    required
+                                                    required={!customerSectionLocked}
+                                                    disabled={customerSectionLocked}
                                                 />
                                             </AddModalInputWrap>
                                         </div>
@@ -1218,6 +1246,7 @@ function AddOrderModal({
                                                 options={ORDER_MODAL_TYPE_OPTIONS}
                                                 placeholder="Select type"
                                                 aria-label="Order type"
+                                                disabled
                                             />
                                         </div>
                                     </div>
@@ -1226,10 +1255,11 @@ function AddOrderModal({
                                             <label className="label">Address</label>
                                             <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.mapPin}>
                                                 <input
-                                                    className="input shopify-add-modal-input"
+                                                    className={`input shopify-add-modal-input${customerSectionLocked ? ' shopify-add-modal-input--readonly' : ''}`}
                                                     value={address}
                                                     onChange={(e) => setAddress(e.target.value)}
-                                                    required
+                                                    required={!customerSectionLocked}
+                                                    disabled={customerSectionLocked}
                                                 />
                                             </AddModalInputWrap>
                                         </div>
@@ -1239,7 +1269,7 @@ function AddOrderModal({
                                             <label className="label">Pincode</label>
                                             <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.hash}>
                                                 <input
-                                                    className="input shopify-add-modal-input"
+                                                    className={`input shopify-add-modal-input${customerSectionLocked ? ' shopify-add-modal-input--readonly' : ''}`}
                                                     type="tel"
                                                     value={pincode}
                                                     onChange={(e) => {
@@ -1250,7 +1280,8 @@ function AddOrderModal({
                                                     }}
                                                     maxLength={6}
                                                     pattern="[0-9]{6}"
-                                                    required
+                                                    required={!customerSectionLocked}
+                                                    disabled={customerSectionLocked}
                                                 />
                                             </AddModalInputWrap>
                                         </div>
@@ -1258,10 +1289,11 @@ function AddOrderModal({
                                             <label className="label">State</label>
                                             <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.building}>
                                                 <input
-                                                    className="input shopify-add-modal-input"
+                                                    className={`input shopify-add-modal-input${customerSectionLocked ? ' shopify-add-modal-input--readonly' : ''}`}
                                                     value={state}
                                                     onChange={(e) => setState(e.target.value)}
-                                                    required
+                                                    required={!customerSectionLocked}
+                                                    disabled={customerSectionLocked}
                                                 />
                                             </AddModalInputWrap>
                                         </div>

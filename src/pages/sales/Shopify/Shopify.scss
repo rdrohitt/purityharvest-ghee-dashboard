@@ -920,10 +920,10 @@
     background-color 0.15s ease;
 }
 
-/* Ensure modal inputs stay white even if global .input overrides */
-.shopify-add-modal-card .shopify-add-modal-input,
-.shopify-add-modal-card .shopify-add-modal-notes-textarea,
-.shopify-add-modal-card .shopify-add-modal-tracking-input {
+/* Ensure enabled modal inputs stay white even if global .input overrides */
+.shopify-add-modal-card .shopify-add-modal-input:not(:disabled):not(.shopify-add-modal-input--readonly),
+.shopify-add-modal-card .shopify-add-modal-notes-textarea:not(:disabled),
+.shopify-add-modal-card .shopify-add-modal-tracking-input:not(:disabled):not(.shopify-add-modal-input--readonly) {
   background: #ffffff !important;
   color: #000000 !important;
 }
@@ -1030,6 +1030,25 @@
 
 .shopify-add-modal-input-wrap--phonedrop .shopify-phonedrop-chevron {
   margin-top: 0;
+}
+
+/* Disabled / locked fields: grey fill (inner prefixed inputs are transparent, so tint the wrap) */
+.shopify-add-modal-card .shopify-add-modal-input-wrap:has(.shopify-add-modal-input:disabled),
+.shopify-add-modal-card .shopify-add-modal-input-wrap:has(.shopify-phonedrop-input:disabled),
+.shopify-add-modal-card
+  .shopify-add-modal-input-wrap:has(.shopify-add-modal-input--readonly.shopify-add-modal-input--with-prefix) {
+  background: #e8eaef !important;
+  border-color: color-mix(in srgb, var(--border) 88%, transparent);
+}
+
+.shopify-add-modal-card .shopify-add-modal-input-wrap:has(.shopify-add-modal-input:disabled):focus-within,
+.shopify-add-modal-card .shopify-add-modal-input-wrap:has(.shopify-phonedrop-input:disabled):focus-within,
+.shopify-add-modal-card
+  .shopify-add-modal-input-wrap:has(
+    .shopify-add-modal-input--readonly.shopify-add-modal-input--with-prefix
+  ):focus-within {
+  box-shadow: none;
+  border-color: color-mix(in srgb, var(--border) 88%, transparent);
 }
 
 /* Custom dropdown (modal + toolbar filters) */
@@ -1206,6 +1225,21 @@
   color: #000000 !important;
 }
 
+.shopify-add-modal-card .shopify-modern-select--default .shopify-modern-select__trigger:disabled {
+  background: #e8eaef !important;
+  color: #4b5563 !important;
+  opacity: 1;
+  cursor: not-allowed;
+  border-color: color-mix(in srgb, var(--border) 88%, transparent);
+}
+
+.shopify-add-modal-card
+  .shopify-modern-select--default
+  .shopify-modern-select__trigger:disabled
+  .shopify-modern-select__label {
+  color: #4b5563 !important;
+}
+
 .shopify-add-modal-card .shopify-modern-select__label {
   color: #0f172a;
 }
@@ -1226,10 +1260,19 @@
   grid-column: span 2;
 }
 
- .shopify-add-modal-input--readonly {
-   background-color: var(--bg);
-   cursor: not-allowed;
- }
+.shopify-add-modal-input:disabled,
+.shopify-add-modal-input.shopify-add-modal-input--readonly {
+  background-color: #e8eaef !important;
+  color: #4b5563 !important;
+  border-color: color-mix(in srgb, var(--border) 88%, transparent);
+  cursor: not-allowed;
+}
+
+.shopify-add-modal-input:disabled:focus-visible,
+.shopify-add-modal-input.shopify-add-modal-input--readonly:focus-visible {
+  box-shadow: none;
+  border-color: color-mix(in srgb, var(--border) 88%, transparent);
+}
 
 .shopify-add-modal-backdrop {
   position: fixed;
@@ -1558,8 +1601,11 @@
 
  .shopify-add-modal-footer {
    display: flex;
+   flex-direction: row;
+   flex-wrap: nowrap;
+   align-items: stretch;
+   justify-content: stretch;
    gap: 12px;
-   justify-content: flex-end;
    border-top: 1px solid var(--border);
    padding: 16px 24px;
    flex-shrink: 0;
@@ -4079,6 +4125,13 @@
 .shopify-phonedrop-inner.shopify-add-modal-input-wrap--phonedrop .shopify-phonedrop-chevron {
   margin-top: 0;
 }
+
+.shopify-phonedrop-chevron--disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .shopify-phonedrop-popup {
   position: fixed;
   background: #fff;
@@ -4510,14 +4563,35 @@
 // ----- AddOrderModal footer -----
 .shopify-add-modal-footer {
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: stretch;
   gap: 12px;
-  justify-content: flex-end;
   border-top: none;
   padding: 12px 14px;
   flex-shrink: 0;
   background: #e5e7eb;
-  .icon-btn { padding: 0 20px; }
+  .icon-btn {
+    padding: 0 20px;
+  }
 }
+
+.shopify-add-modal-footer .icon-btn,
+.shopify-add-modal-footer .button.shopify-add-modal-submit {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
+.shopify-add-modal-footer > .icon-btn:only-child,
+.shopify-add-modal-footer > .button.shopify-add-modal-submit:only-child {
+  flex: 1 1 100%;
+}
+
 .button.shopify-add-modal-submit {
   width: auto;
   padding: 0 24px;
@@ -4894,16 +4968,27 @@
   }
 
   .shopify-add-modal-footer {
-    flex-direction: column-reverse;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: stretch;
+    justify-content: stretch;
     gap: 10px;
     padding: 12px;
   }
 
   .shopify-add-modal-footer .icon-btn,
   .shopify-add-modal-footer .button.shopify-add-modal-submit {
+    flex: 1 1 0;
+    min-width: 0;
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     justify-content: center;
+  }
+
+  .shopify-add-modal-footer > .icon-btn:only-child,
+  .shopify-add-modal-footer > .button.shopify-add-modal-submit:only-child {
+    flex: 1 1 100%;
   }
 
   .shopify-timeline-header-row {

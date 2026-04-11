@@ -1,6 +1,11 @@
+/** Populated user ref on script documents from the API. */
+export interface AdScriptUserRef {
+    _id: string;
+    name?: string;
+}
+
 /**
- * Ad / marketing script document from GET /api/ad-scripts.
- * Server may add `_id`, `id`, `createdAt`, `updatedAt`.
+ * Ad / marketing script document from GET /api/ad-scripts or GET /api/ad-scripts/:id.
  */
 export interface AdScriptApi {
     _id?: string;
@@ -14,6 +19,21 @@ export interface AdScriptApi {
     category: string;
     createdAt?: string;
     updatedAt?: string;
+    createdBy?: AdScriptUserRef;
+    updatedBy?: AdScriptUserRef;
+    __v?: number;
+}
+
+/**
+ * Paginated list response from GET /api/ad-scripts?page=&limit=&category=.
+ */
+export interface AdScriptsListResponse {
+    count: number;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    rows: AdScriptApi[];
 }
 
 /**

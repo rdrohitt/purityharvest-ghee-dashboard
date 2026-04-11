@@ -34,11 +34,6 @@
   gap: 10px;
 }
 
-.admin-topbar-search {
-  height: 36px;
-  width: 220px;
-}
-
 @media (max-width: 980px) {
   .admin-topbar-title {
     font-size: 18px;
@@ -56,13 +51,6 @@
     flex: 1 1 auto;
     min-width: 0;
     justify-content: flex-end;
-  }
-
-  .admin-topbar-search {
-    width: auto;
-    flex: 1 1 0;
-    min-width: 0;
-    max-width: none;
   }
 }
 

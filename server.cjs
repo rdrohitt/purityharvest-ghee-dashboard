@@ -1781,10 +1781,35 @@ app.delete('/api/followups/:customerPhone', async (req, res) => {
   }
 });
 
-app.get('/api/ad-scripts', async (_req, res) => {
+app.get('/api/ad-scripts', async (req, res) => {
   try {
-    const scripts = await readAdScripts();
-    res.json(scripts);
+    let scripts = await readAdScripts();
+    const categoryQ = req.query.category;
+    if (categoryQ && typeof categoryQ === 'string' && categoryQ.trim() && categoryQ.trim().toLowerCase() !== 'all') {
+      const want = categoryQ.trim().toLowerCase();
+      scripts = scripts.filter((s) => String(s.category ?? '').trim().toLowerCase() === want);
+    }
+    const sorted = [...scripts].sort((a, b) => {
+      const da = new Date(a.date || a.createdAt || 0).getTime();
+      const db = new Date(b.date || b.createdAt || 0).getTime();
+      return db - da;
+    });
+    const total = sorted.length;
+    const page = Math.max(1, parseInt(String(req.query.page || '1'), 10) || 1);
+    const limitRaw = parseInt(String(req.query.limit || '20'), 10);
+    const limit = Math.min(500, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 20));
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * limit;
+    const rows = sorted.slice(start, start + limit);
+    res.json({
+      count: rows.length,
+      total,
+      page: safePage,
+      limit,
+      totalPages,
+      rows,
+    });
   } catch (err) {
     console.error('Error reading ad-scripts.json', err);
     res.status(500).json({ message: 'Failed to read ad scripts' });

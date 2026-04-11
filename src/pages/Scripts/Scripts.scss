@@ -326,7 +326,29 @@
 }
 
 .scripts-add-modal .modules-modal-footer {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 12px;
   padding: 16px 28px 20px;
+}
+
+/* Cancel + Save: equal halves of the footer row */
+.scripts-add-modal .modules-modal-footer .icon-btn,
+.scripts-add-modal .modules-modal-footer .button.modules-modal-primary-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
+/* Single action (e.g. Close on error) uses full width */
+.scripts-add-modal .modules-modal-footer > .button.modules-modal-primary-btn:only-child {
+  flex: 1 1 100%;
 }
 
 .scripts-add-modal__date-field {
@@ -465,14 +487,24 @@
     padding: 12px max(16px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px))
       max(16px, env(safe-area-inset-left, 0px));
     gap: 10px;
-    flex-wrap: wrap;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: stretch;
+    align-items: stretch;
   }
 
   .scripts-add-modal .modules-modal-footer .icon-btn,
   .scripts-add-modal .modules-modal-footer .button.modules-modal-primary-btn {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     justify-content: center;
+  }
+
+  .scripts-add-modal .modules-modal-footer > .button.modules-modal-primary-btn:only-child {
+    flex: 1 1 100%;
   }
 
   .scripts-add-modal .modules-form-grid {
@@ -493,15 +525,3 @@
   }
 }
 
-@media (max-width: 480px) {
-  .scripts-add-modal .modules-modal-footer {
-    flex-direction: column-reverse;
-    align-items: stretch;
-  }
-
-  .scripts-add-modal .modules-modal-footer .icon-btn,
-  .scripts-add-modal .modules-modal-footer .button.modules-modal-primary-btn {
-    width: 100%;
-    flex: 0 0 auto;
-  }
-}

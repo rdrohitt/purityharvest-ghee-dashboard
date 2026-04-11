@@ -285,7 +285,6 @@ export default function AdminLayout() {
                         {topbarGreeting}
                     </div>
                     <div className="admin-topbar-right">
-                        <input className="input admin-topbar-search" placeholder="Search" />
                         <button className="icon-btn" onClick={toggleTheme} title="Toggle theme">{theme === 'dark' ? '🌙' : '🌞'}</button>
                         <div title="Account">🙂</div>
                     </div>

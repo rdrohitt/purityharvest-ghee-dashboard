@@ -2,7 +2,8 @@
 * { box-sizing: border-box; }
 html {
 	height: 100%;
-	overflow-x: clip;
+	/* auto: inner regions (e.g. tables) scroll first; root scroll appears only if something still overflows */
+	overflow-x: auto;
 }
 html, body, #root { height: 100%; }
 #root {
