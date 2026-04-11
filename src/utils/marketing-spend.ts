@@ -18,11 +18,17 @@ export interface CreateMarketingSpendPayload {
     note?: string;
 }
 
+export type LoadMarketingSpendOptions = {
+    from?: string;
+    to?: string;
+};
+
 function extractMarketingSpendArray(json: unknown): MarketingSpendApiItem[] {
     if (Array.isArray(json)) return json as MarketingSpendApiItem[];
     if (!json || typeof json !== 'object') return [];
 
     const obj = json as Record<string, unknown>;
+    if (Array.isArray(obj.rows)) return obj.rows as MarketingSpendApiItem[];
     if (Array.isArray(obj.data)) return obj.data as MarketingSpendApiItem[];
     if (Array.isArray(obj.records)) return obj.records as MarketingSpendApiItem[];
     if (Array.isArray(obj.result)) return obj.result as MarketingSpendApiItem[];
@@ -33,6 +39,7 @@ function extractMarketingSpendArray(json: unknown): MarketingSpendApiItem[] {
     const data = obj.data;
     if (data && typeof data === 'object' && !Array.isArray(data)) {
         const nested = data as Record<string, unknown>;
+        if (Array.isArray(nested.rows)) return nested.rows as MarketingSpendApiItem[];
         if (Array.isArray(nested.data)) return nested.data as MarketingSpendApiItem[];
         if (Array.isArray(nested.records)) return nested.records as MarketingSpendApiItem[];
         if (Array.isArray(nested.result)) return nested.result as MarketingSpendApiItem[];
@@ -48,8 +55,12 @@ function extractMarketingSpendArray(json: unknown): MarketingSpendApiItem[] {
  * Load all marketing spend records from the backend API.
  * Single GET `/api/marketing` that returns an array of MarketingSpendApiItem.
  */
-export async function loadAllMarketingSpend(): Promise<MarketingSpendApiItem[]> {
-    const response = await apiFetch(`/api/marketing`);
+export async function loadAllMarketingSpend(options: LoadMarketingSpendOptions = {}): Promise<MarketingSpendApiItem[]> {
+    const params = new URLSearchParams();
+    if (options.from) params.set('from', options.from);
+    if (options.to) params.set('to', options.to);
+    const query = params.toString();
+    const response = await apiFetch(query ? `/api/marketing?${query}` : '/api/marketing');
     if (!response.ok) {
         throw new Error('Failed to load marketing spend data from API');
     }

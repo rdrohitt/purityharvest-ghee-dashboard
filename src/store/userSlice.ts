@@ -10,7 +10,7 @@ export type MenuItem = MeMenuItem;
 /** Payload from GET /api/users/me */
 export type MeResponse = MeResponseType;
 
-type UserState = {
+export type UserState = {
 	user: User | null;
 	menu: MenuItem[];
 };

@@ -19,8 +19,8 @@ export function FollowupCallHistoryModal({
         calledOn: string;
         callerName: string;
         detail: string;
-        callAgainDate: string | null;
-        feedback: string | null;
+        callAgainDate: string;
+        feedback: string;
     }) => Promise<void>;
 }) {
     const currentUser = useAppSelector((state) => state.user.user);
@@ -30,7 +30,7 @@ export function FollowupCallHistoryModal({
     const [callerName, setCallerName] = useState(
         loggedInCallerName || followup.callerName || CALLER_OPTIONS[0] || '',
     );
-    const [detail, setDetail] = useState('');
+    const [detail, setDetail] = useState('-');
     const [feedback, setFeedback] = useState('');
     const [callAgainOn, setCallAgainOn] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
@@ -52,19 +52,22 @@ export function FollowupCallHistoryModal({
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!detail.trim() || !callerName.trim() || !calledOn) return;
+        if (!feedback.trim()) return;
         setSaving(true);
         try {
             await onAppend({
                 calledOn: toInputDate(calledOn),
                 callerName,
                 detail,
-                callAgainDate: callAgainOn ? toInputDate(callAgainOn) : null,
-                feedback: feedback.trim() ? feedback : null,
+                callAgainDate: callAgainOn ? toInputDate(callAgainOn) : '',
+                feedback: feedback.trim(),
             });
-            setDetail('');
+            setDetail('-');
             setCallAgainOn(null);
             setCalledOn(new Date().toISOString());
             setFeedback('');
+        } catch {
+            /* Parent shows toast and keeps modal open; form values unchanged. */
         } finally {
             setSaving(false);
         }
@@ -217,13 +220,17 @@ export function FollowupCallHistoryModal({
                             />
                         </label>
                         <label className="fu-hist-field">
-                            <span className="fu-hist-field__lab">Feedback</span>
+                            <span className="fu-hist-field__lab">Feedback (required)</span>
                             <select
                                 className="fu-hist-field__input"
                                 value={feedback}
                                 onChange={(e) => setFeedback(e.target.value)}
+                                required
+                                aria-required="true"
                             >
-                                <option value="">{feedback ? 'Clear feedback' : 'Select feedback'}</option>
+                                <option value="" disabled>
+                                    Select feedback
+                                </option>
                                 {FEEDBACK_OPTIONS.map((opt) => (
                                     <option key={opt} value={opt}>
                                         {getFeedbackEmoji(opt)} {opt}

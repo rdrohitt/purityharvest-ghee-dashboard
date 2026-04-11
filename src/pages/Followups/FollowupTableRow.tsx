@@ -1,6 +1,5 @@
 import React from 'react';
 import type { Followup } from '../../utils/followups';
-import type { Order } from '../../utils/orders';
 import { FEEDBACK_OPTIONS } from './followupsConstants';
 import { formatDate, getCustomerType, getFeedbackEmoji, getFeedbackSelectClass } from './followupsFormat';
 import { DateInput } from './DateInput';
@@ -8,15 +7,12 @@ import { Td } from './FollowupsTableCells';
 
 type Props = {
     followup: Followup;
-    ordersByCustomer: Map<string, Order[]>;
     onCustomerClick: (f: Followup) => void;
     onOpenHistory: (f: Followup) => void;
     onUpdate: (id: string, field: keyof Followup, value: string | null) => void;
 };
 
-export function FollowupTableRow({ followup: f, ordersByCustomer, onCustomerClick, onOpenHistory, onUpdate }: Props) {
-    const customerOrders = ordersByCustomer.get(f.customerPhone) || [];
-    const hasRto = customerOrders.some((o) => o.deliveryStatus === 'RTO');
+export function FollowupTableRow({ followup: f, onCustomerClick, onOpenHistory, onUpdate }: Props) {
     const customerType = getCustomerType(f.totalOrders);
 
     return (
@@ -46,7 +42,6 @@ export function FollowupTableRow({ followup: f, ordersByCustomer, onCustomerClic
                     </a>
                     <span className="fu-customer-badges">
                         <span className={`fu-customer-badge fu-customer-badge--${customerType}`}>{customerType}</span>
-                        {hasRto ? <span className="fu-customer-badge fu-customer-badge--rto">RTO</span> : null}
                     </span>
                 </div>
             </Td>

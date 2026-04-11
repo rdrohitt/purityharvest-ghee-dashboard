@@ -18,6 +18,9 @@ import {
     type DeliveryStatus,
     type Platform,
     type OrderType,
+    DELIVERY_STATUSES,
+    deliveryStatusLabel,
+    normalizeDeliveryStatus,
 } from '../../../utils/orders';
 import type { CustomerSearchResult } from '../../../types/shopify';
 import { searchCustomersByPhone } from '../../../utils/customers';
@@ -35,6 +38,7 @@ import {
 import { DatePicker } from './DatePicker';
 import { Spinner } from '../../../components/Spinner';
 import { buildDefaultTrackingUrlFromCourier } from '../../../utils/shopify-orders';
+import { apiFetch } from '../../../api';
 import './Shopify.scss';
 
 const DEBOUNCE_MS = 350;
@@ -222,6 +226,125 @@ export type ProductVariantOption = { id: string; name: string; size: string; pri
 /** Matches how line items are labeled in the add-order UI (name only when there is no size). */
 export function formatVariantLabel(product: ProductVariantOption): string {
     return product.size ? `${product.name} - ${product.size}` : product.name;
+}
+
+/** Must match the warehouse name registered in your Delhivery account (case-sensitive). */
+const DELHIVERY_PICKUP_WAREHOUSE_NAME = 'Gurugram';
+
+function guessCityFromAddress(addr: string, stateFallback: string): string {
+    const parts = addr
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    if (parts.length >= 2) return parts[parts.length - 1];
+    return stateFallback.trim() || '';
+}
+
+function buildDelhiveryCmuPayload(params: {
+    name: string;
+    phone: string;
+    address: string;
+    pincode: string;
+    state: string;
+    payment: PaymentStatus;
+    amount: string;
+    items: Array<{ variant: string; quantity: number }>;
+    orderRef: string;
+    orderDateIso: string;
+}): { shipments: Record<string, unknown>[]; pickup_location: { name: string } } {
+    const digits = params.phone.replace(/\D/g, '').slice(-10);
+    const phoneNum = Number(digits);
+    const pinNum = Number(params.pincode);
+    const totalQty = params.items.reduce((s, i) => s + Math.max(0, i.quantity), 0);
+    const payMode = params.payment === 'COD' ? 'COD' : 'Prepaid';
+    const amt = Number(params.amount) || 0;
+    const codAmt = params.payment === 'COD' ? amt : 0;
+    const d = params.orderDateIso ? new Date(params.orderDateIso) : new Date();
+    const orderDate = Number.isNaN(d.getTime())
+        ? new Date().toISOString().slice(0, 19).replace('T', ' ')
+        : d.toISOString().slice(0, 19).replace('T', ' ');
+
+    const city = guessCityFromAddress(params.address, params.state) || params.state || 'India';
+    const productsDesc =
+        params.items
+            .filter((i) => i.variant)
+            .map((i) => `${i.variant} x${i.quantity}`)
+            .join('; ') || 'Ghee';
+
+    return {
+        shipments: [
+            {
+                add: params.address,
+                address_type: 'home',
+                phone: phoneNum,
+                payment_mode: payMode,
+                name: params.name,
+                pin: pinNum,
+                order: params.orderRef,
+                shipping_mode: 'Surface',
+                hsn_code: '04059020',
+                city,
+                commodity_value: String(amt),
+                weight: String(Math.max(200, totalQty * 450 || 500)),
+                fragile_shipment: false,
+                shipment_height: 10,
+                shipment_width: 11,
+                shipment_length: 12,
+                category_of_goods: 'Ghee',
+                cod_amount: codAmt,
+                products_desc: productsDesc,
+                state: params.state,
+                dangerous_good: 'False',
+                waybill: '',
+                order_date: orderDate,
+                total_amount: amt,
+                country: 'India',
+                quantity: String(Math.max(1, totalQty || 1)),
+                invoice_reference: params.orderRef,
+            },
+        ],
+        pickup_location: { name: DELHIVERY_PICKUP_WAREHOUSE_NAME },
+    };
+}
+
+function delhiveryCreateErrorMessage(data: unknown): string | null {
+    if (!data || typeof data !== 'object') return null;
+    const o = data as Record<string, unknown>;
+    const succ = o.success;
+    if (succ === false || succ === 'false') {
+        const rmk = o.rmk ?? o.message ?? o.error;
+        if (typeof rmk === 'string') return rmk;
+        if (rmk != null) return String(rmk);
+        return 'Delhivery rejected the shipment.';
+    }
+    return null;
+}
+
+function parseWaybillFromDelhiveryCreate(data: unknown): string | null {
+    if (!data || typeof data !== 'object') return null;
+    const o = data as Record<string, unknown>;
+    const pkgs = o.packages;
+    if (Array.isArray(pkgs) && pkgs[0] && typeof pkgs[0] === 'object') {
+        const w = (pkgs[0] as Record<string, unknown>).waybill;
+        if (w != null && String(w).trim()) return String(w).trim();
+    }
+    const single = o.waybill;
+    if (single != null && String(single).trim()) return String(single).trim();
+
+    const upload = o.upload_wbn;
+    if (Array.isArray(upload) && upload[0] != null && String(upload[0]).trim()) {
+        return String(upload[0]).trim();
+    }
+
+    const shipmentData = o.ShipmentData;
+    if (Array.isArray(shipmentData) && shipmentData[0] && typeof shipmentData[0] === 'object') {
+        const sh = (shipmentData[0] as Record<string, unknown>).Shipment;
+        if (sh && typeof sh === 'object') {
+            const awb = (sh as Record<string, unknown>).AWB;
+            if (awb != null && String(awb).trim()) return String(awb).trim();
+        }
+    }
+    return null;
 }
 
 function PhoneDropdown({
@@ -661,7 +784,7 @@ function AddOrderModal({
         initialOrder?.fulfillmentStatus || 'Fulfilled'
     );
     const [delivery, setDelivery] = useState<DeliveryStatus>(
-        initialOrder?.deliveryStatus || 'In Transit'
+        initialOrder?.deliveryStatus || 'in_transit'
     );
     const [platform, setPlatform] = useState<Platform | ''>(
         normalizePlatform(initialOrder?.platform as Platform | '')
@@ -717,6 +840,8 @@ function AddOrderModal({
     } | null>(null);
     const [trackingLoading, setTrackingLoading] = useState(false);
     const [trackingError, setTrackingError] = useState<string | null>(null);
+    const [delhiveryWaybillLoading, setDelhiveryWaybillLoading] = useState(false);
+    const [delhiveryWaybillError, setDelhiveryWaybillError] = useState<string | null>(null);
 
     const [shippingTrackingCompanyInput, setShippingTrackingCompanyInput] = useState<
         TrackingCompany | ''
@@ -763,15 +888,7 @@ function AddOrderModal({
         setTrackingLoading(true);
         setTrackingError(null);
 
-        fetch(
-                `https://track.delhivery.com/api/v1/packages/json/?waybill=${encodeURIComponent(trimmed)}`,
-                {
-                    headers: {
-                        Authorization: 'Token cd8c22b7d58baf249855b7c02e66c71a07779a02',
-                        'Content-Type': 'application/json',
-                    },
-                }
-            )
+        apiFetch(`/api/delhivery-track?awb=${encodeURIComponent(trimmed)}`)
             .then(async (res) => {
                 if (!res.ok) {
                     const text = await res.text();
@@ -840,6 +957,97 @@ function AddOrderModal({
             cancelled = true;
         };
     }, [awb]);
+
+    const generateDelhiveryWaybill = useCallback(async () => {
+        if (delhiveryWaybillLoading) return;
+        setDelhiveryWaybillError(null);
+        if (!name.trim()) {
+            setDelhiveryWaybillError('Customer name is required.');
+            return;
+        }
+        if (phone.replace(/\D/g, '').length < 10) {
+            setDelhiveryWaybillError('Valid 10-digit phone is required.');
+            return;
+        }
+        if (!address.trim()) {
+            setDelhiveryWaybillError('Address is required.');
+            return;
+        }
+        if (pincode.length !== 6) {
+            setDelhiveryWaybillError('6-digit pincode is required.');
+            return;
+        }
+        if (!state.trim()) {
+            setDelhiveryWaybillError('State is required.');
+            return;
+        }
+        if (!payment) {
+            setDelhiveryWaybillError('Select payment mode first.');
+            return;
+        }
+        const orderRef =
+            (initialOrder?.id && String(initialOrder.id).trim()) ||
+            `PH-${phone.replace(/\D/g, '').slice(-10)}-${pincode}-${Date.now()}`;
+        const payload = buildDelhiveryCmuPayload({
+            name: name.trim(),
+            phone,
+            address: address.trim(),
+            pincode,
+            state: state.trim(),
+            payment,
+            amount,
+            items,
+            orderRef,
+            orderDateIso: new Date(date).toISOString(),
+        });
+
+        try {
+            setDelhiveryWaybillLoading(true);
+            const res = await apiFetch('/api/delhivery-create-waybill', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            const data: unknown = await res.json().catch(() => null);
+            if (!res.ok) {
+                const o = data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
+                const msg =
+                    (o?.message != null && String(o.message)) ||
+                    (o?.rmk != null && String(o.rmk)) ||
+                    `Request failed (${res.status})`;
+                throw new Error(msg);
+            }
+            const apiErr = delhiveryCreateErrorMessage(data);
+            if (apiErr) throw new Error(apiErr);
+            const wb = parseWaybillFromDelhiveryCreate(data);
+            if (!wb) {
+                throw new Error(
+                    'No waybill in Delhivery response. Confirm pickup warehouse name and GST/HSN settings with Delhivery.'
+                );
+            }
+            setAwb(wb);
+            setShippingTrackingCompanyInput('Delhivery');
+        } catch (e) {
+            setDelhiveryWaybillError(e instanceof Error ? e.message : 'Failed to generate waybill');
+        } finally {
+            setDelhiveryWaybillLoading(false);
+        }
+    }, [
+        delhiveryWaybillLoading,
+        name,
+        phone,
+        address,
+        pincode,
+        state,
+        payment,
+        amount,
+        items,
+        date,
+        initialOrder?.id,
+    ]);
 
     function addItem() {
         setItems((prev) => [...prev, { variant: '', quantity: 1, variantPrice: 0 }]);
@@ -1324,6 +1532,43 @@ function AddOrderModal({
                                                 shippingTrackingCompanyInput || undefined
                                             }
                                         />
+                                        <div className="shopify-delhivery-waybill-actions">
+                                            <button
+                                                type="button"
+                                                className="button shopify-delhivery-waybill-btn"
+                                                onClick={() => void generateDelhiveryWaybill()}
+                                                disabled={
+                                                    delhiveryWaybillLoading ||
+                                                    saving ||
+                                                    !name.trim() ||
+                                                    phone.replace(/\D/g, '').length < 10 ||
+                                                    !address.trim() ||
+                                                    pincode.length !== 6 ||
+                                                    !state.trim() ||
+                                                    !payment
+                                                }
+                                            >
+                                                {delhiveryWaybillLoading ? (
+                                                    <>
+                                                        <Spinner
+                                                            size="sm"
+                                                            className="shopify-delhivery-waybill-btn-spinner"
+                                                        />{' '}
+                                                        Generating…
+                                                    </>
+                                                ) : (
+                                                    'Generate waybill'
+                                                )}
+                                            </button>
+                                            {delhiveryWaybillError ? (
+                                                <p
+                                                    className="shopify-delhivery-waybill-error"
+                                                    role="alert"
+                                                >
+                                                    {delhiveryWaybillError}
+                                                </p>
+                                            ) : null}
+                                        </div>
                                         {resolvedTrackingUrl ? (
                                             <div className="shopify-tracking-link-wrap">
                                                 <a
@@ -1397,7 +1642,7 @@ function ShippingTimeline({
     error: string | null;
     trackingCompany?: string;
 }) {
-    const steps: DeliveryStatus[] = ['Pending Pickup', 'In Transit', 'Delivered', 'RTO'];
+    const steps: DeliveryStatus[] = [...DELIVERY_STATUSES];
     const [blinkOn, setBlinkOn] = useState(true);
 
     useEffect(() => {
@@ -1453,7 +1698,13 @@ function ShippingTimeline({
 
     return (
         <div className="shopify-timeline-card">
-            <div className={`shopify-timeline-header${tracking?.statusText === 'Delivered' ? ' shopify-timeline-header--delivered' : ''}`}>
+            <div
+                className={`shopify-timeline-header${
+                    normalizeDeliveryStatus(tracking?.statusText) === 'delivered'
+                        ? ' shopify-timeline-header--delivered'
+                        : ''
+                }`}
+            >
                 <div className="shopify-timeline-header-row">
                     <div className="shopify-timeline-awb-wrap">
                         <div className="shopify-timeline-awb-label">AWB</div>
@@ -1487,13 +1738,13 @@ function ShippingTimeline({
 
                         let activeColor = '#0f172a';
                         let glowColor = 'rgba(15,23,42,0.15)';
-                        if (step === 'In Transit') {
+                        if (step === 'in_transit') {
                             activeColor = '#2563eb';
                             glowColor = 'rgba(37,99,235,0.20)';
-                        } else if (step === 'Delivered') {
+                        } else if (step === 'delivered') {
                             activeColor = '#2563eb';
                             glowColor = 'rgba(22,163,74,0.20)';
-                        } else if (step === 'RTO') {
+                        } else if (step === 'rto') {
                             activeColor = '#b91c1c';
                             glowColor = 'rgba(185,28,28,0.25)';
                         }
@@ -1516,7 +1767,7 @@ function ShippingTimeline({
                                         color: isActive ? activeColor : isPast ? '#4b5563' : '#9ca3af',
                                     }}
                                 >
-                                    {step}
+                                    {deliveryStatusLabel(step)}
                                 </div>
                             </div>
                         );

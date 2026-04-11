@@ -2,10 +2,10 @@
  * Shipping/tracking details from Shopify order API.
  */
 export interface ShopifyShippingDetails {
-    trackingNumber: string;
-    trackingStatus: string;
-    trackingUrl: string;
-    trackingCompany: string;
+    trackingNumber?: string;
+    trackingStatus?: string;
+    trackingUrl?: string;
+    trackingCompany?: string;
 }
 
 /**
@@ -32,6 +32,15 @@ export interface CustomerSearchResult {
  */
 export interface CustomerApi extends CustomerSearchResult {}
 
+export interface CustomersDashboardResponse {
+    count: number;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    rows: CustomerApi[];
+}
+
 /**
  * Customer as returned in Shopify order (populated or ref).
  */
@@ -39,11 +48,12 @@ export interface ShopifyOrderCustomer {
     _id: string;
     name: string;
     phoneNumber: string;
-    email: string;
+    email?: string;
     address: string;
     state: string;
     pincode: string;
-    shopifyCustomerId: string;
+    shopifyCustomerId?: string;
+    countryCode?: string;
     createdAt?: string;
     updatedAt?: string;
     __v?: number;
@@ -62,9 +72,9 @@ export interface ShopifyOrderProduct {
               name: string;
           }
         | string;
-    variantId: string;
+    variantId?: string;
     variantName: string;
-    variantSku: string | null;
+    variantSku?: string | null;
     variantPrice: number;
     quantity: number;
     price: number;

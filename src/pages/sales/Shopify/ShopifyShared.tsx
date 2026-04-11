@@ -8,13 +8,8 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import type { Order } from '../../../utils/orders';
-import type {
-    Platform,
-    OrderType,
-    PaymentStatus,
-    FulfillmentStatus,
-    DeliveryStatus,
-} from '../../../utils/orders';
+import type { Platform, OrderType, PaymentStatus, FulfillmentStatus, DeliveryStatus } from '../../../utils/orders';
+import { DELIVERY_STATUSES, deliveryStatusLabel, normalizeDeliveryStatus } from '../../../utils/orders';
 import type { SpendRecord } from '../../../utils/marketing-spend';
 
 function MsIcon({ children }: { children: React.ReactNode }) {
@@ -147,14 +142,15 @@ function fulfillmentIcon(status: string) {
 }
 
 function deliveryIcon(status: string) {
-    if (status === 'Delivered')
+    const k = normalizeDeliveryStatus(status);
+    if (k === 'delivered')
 	return (
 		<MsIcon>
 			<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
 			<polyline points="22 4 12 14.01 9 11.01" />
 		</MsIcon>
 	);
-    if (status === 'In Transit')
+    if (k === 'in_transit')
 	return (
 		<MsIcon>
 			<rect x="1" y="3" width="15" height="13" />
@@ -163,14 +159,14 @@ function deliveryIcon(status: string) {
 			<circle cx="18.5" cy="18.5" r="2.5" />
 		</MsIcon>
 	);
-    if (status === 'RTO')
+    if (k === 'rto')
 	return (
 		<MsIcon>
 			<polyline points="1 4 1 10 7 10" />
 			<path d="M3.51 15a9 9 0 0 1 14.85-3.36L23 10M1 10l4 4 4-4" />
 		</MsIcon>
 	);
-    if (status === 'Pending Pickup')
+    if (k === 'pending_pickup')
 	return (
 		<MsIcon>
 			<circle cx="12" cy="12" r="10" />
@@ -398,9 +394,11 @@ export const ORDER_MODAL_FULFILLMENT_OPTIONS: ModernSelectOption<FulfillmentStat
     ['Unfulfilled', 'Fulfilled', 'Partial'] as FulfillmentStatus[]
 ).map((p) => ({ value: p, label: p, icon: fulfillmentIcon(p) }));
 
-export const ORDER_MODAL_DELIVERY_OPTIONS: ModernSelectOption<DeliveryStatus>[] = (
-    ['In Transit', 'Delivered', 'RTO', 'Pending Pickup'] as DeliveryStatus[]
-).map((p) => ({ value: p, label: p, icon: deliveryIcon(p) }));
+export const ORDER_MODAL_DELIVERY_OPTIONS: ModernSelectOption<DeliveryStatus>[] = DELIVERY_STATUSES.map((p) => ({
+    value: p,
+    label: deliveryStatusLabel(p),
+    icon: deliveryIcon(p),
+}));
 
 /** Carrier options for order tracking (Shopify add/edit modal). */
 export type TrackingCompany = 'Delhivery' | 'Amazon' | 'Shiprocket';
@@ -567,6 +565,7 @@ export function StatusFilter<T extends string>({
     onChange,
     options,
     layout = 'default',
+    formatOptionLabel,
 }: {
     label: string;
     value: T | '';
@@ -574,6 +573,8 @@ export function StatusFilter<T extends string>({
     options: T[];
     /** `ribbon`: compact pill used on Shopify filter bar */
     layout?: 'default' | 'ribbon';
+    /** When option values are API codes, use this for visible labels (e.g. shipping status). */
+    formatOptionLabel?: (opt: T) => string;
 }) {
     const ribbon = layout === 'ribbon';
     const modernOptions = useMemo((): ModernSelectOption<T>[] => {
@@ -584,11 +585,11 @@ export function StatusFilter<T extends string>({
         };
         const rest = options.map((opt) => ({
             value: opt,
-            label: opt,
+            label: formatOptionLabel ? formatOptionLabel(opt) : opt,
             icon: statusFilterOptionIcon(label, opt),
         }));
         return [all, ...rest];
-    }, [label, options]);
+    }, [label, options, formatOptionLabel]);
 
     return (
         <div className={`shopify-status-filter${ribbon ? ' shopify-status-filter--ribbon' : ''}`}>
@@ -615,17 +616,18 @@ export function StatusTag({ kind, type }: { kind: string; type: 'payment' | 'del
                   : 'shopify-payment-tag--default';
         return <span className={`shopify-payment-tag ${mod}`}>{kind}</span>;
     }
+    const d = normalizeDeliveryStatus(kind);
     const mod =
-        kind === 'Delivered'
+        d === 'delivered'
             ? 'shopify-delivery-tag--delivered'
-            : kind === 'In Transit'
+            : d === 'in_transit'
               ? 'shopify-delivery-tag--transit'
-              : kind === 'Pending Pickup'
+              : d === 'pending_pickup'
                 ? 'shopify-delivery-tag--pending'
-                : kind === 'RTO'
+                : d === 'rto'
                   ? 'shopify-delivery-tag--rto'
                   : 'shopify-delivery-tag--default';
-    return <span className={`shopify-delivery-tag ${mod}`}>{kind}</span>;
+    return <span className={`shopify-delivery-tag ${mod}`}>{deliveryStatusLabel(d)}</span>;
 }
 
 export function PlatformTag({ platform }: { platform?: Platform | string }) {

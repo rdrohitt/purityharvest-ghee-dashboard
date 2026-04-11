@@ -32,6 +32,7 @@ export function getFeedbackSelectClass(feedback: string): string {
     if (value.includes('price') || value.includes('high')) return 'fu-feedback-sel--price';
     if (value.includes('packaging')) return 'fu-feedback-sel--packaging';
     if (value.includes('delay') || value.includes('delivery')) return 'fu-feedback-sel--delay';
+    if (value.includes('not answering')) return 'fu-feedback-sel--delay';
     return 'fu-feedback-sel--other';
 }
 
@@ -43,5 +44,6 @@ export function getFeedbackEmoji(feedback: string): string {
     if (value.includes('price')) return '💸';
     if (value.includes('packaging')) return '📦';
     if (value.includes('delay')) return '⏱️';
+    if (value.includes('not answering')) return '📵';
     return '💬';
 }

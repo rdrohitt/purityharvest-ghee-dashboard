@@ -34,6 +34,22 @@ export interface ProductApiItem {
   createdAt?: string;
   updatedAt?: string;
   __v?: number;
+  updatedBy?: {
+    _id: string;
+    name: string;
+  };
+}
+
+/**
+ * Paginated product response shape from GET /api/products (or /products).
+ */
+export interface ProductsApiResponse {
+  count: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  rows: ProductApiItem[];
 }
 
 /**

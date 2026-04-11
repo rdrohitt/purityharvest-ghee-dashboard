@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment, useCallback } from 'react';
 import { Spinner } from '../../components/Spinner';
 import type { ProductApiItem, ProductVariantRow } from '../../types/products';
-import { loadProducts, addProduct, updateProduct, deleteProduct, syncShopify } from '../../utils/products';
+import { loadProductsPage, addProduct, updateProduct, deleteProduct, syncShopify } from '../../utils/products';
 import { useAppDispatch, useAppSelector, setProducts, setProductsLoading, addProductToStore, updateProductInStore, removeProduct } from '../../store';
 import { Categories } from './Categories';
 import { ProductModal } from './ProductModal';
@@ -68,25 +68,57 @@ export default function Products() {
     const [categoryFilter, setCategoryFilter] = useState<string>('');
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [syncLoading, setSyncLoading] = useState(false);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [dashboardMeta, setDashboardMeta] = useState<{
+        total: number;
+        totalPages: number;
+        count: number;
+        page: number;
+        limit: number;
+    } | null>(null);
+
+    const refreshProductsPage = useCallback(async (targetPage = page, targetLimit = pageSize) => {
+        const dash = await loadProductsPage({ page: targetPage, limit: targetLimit });
+        dispatch(setProducts(dash.rows));
+        setDashboardMeta({
+            total: dash.total,
+            totalPages: dash.totalPages,
+            count: dash.count,
+            page: dash.page,
+            limit: dash.limit,
+        });
+        if (dash.page !== targetPage) setPage(dash.page);
+    }, [dispatch, page, pageSize]);
 
     useEffect(() => {
-        if (products.length > 0) {
-            dispatch(setProductsLoading(false));
-            return;
-        }
         let cancelled = false;
-        loadProducts()
+        dispatch(setProductsLoading(true));
+        loadProductsPage({ page, limit: pageSize })
             .then((data) => {
-                if (!cancelled) dispatch(setProducts(data));
+                if (!cancelled) {
+                    dispatch(setProducts(data.rows));
+                    setDashboardMeta({
+                        total: data.total,
+                        totalPages: data.totalPages,
+                        count: data.count,
+                        page: data.page,
+                        limit: data.limit,
+                    });
+                    if (data.page !== page) setPage(data.page);
+                }
             })
             .catch(() => {
-                if (!cancelled) dispatch(setProductsLoading(false));
+                if (!cancelled) {
+                    dispatch(setProductsLoading(false));
+                    setDashboardMeta(null);
+                }
             });
 
         return () => {
             cancelled = true;
         };
-    }, [dispatch, products.length]);
+    }, [dispatch, page, pageSize]);
 
     const allVariantRows = useMemo(() => products.flatMap(productToVariantRows), [products]);
 
@@ -167,6 +199,8 @@ export default function Products() {
         try {
             const saved = await addProduct(newProduct);
             dispatch(addProductToStore(saved));
+            await refreshProductsPage(1, pageSize);
+            setPage(1);
             setEditingProduct(null);
             setShowAddProduct(false);
             showToast('Product added successfully!', 'success');
@@ -191,6 +225,7 @@ export default function Products() {
                     : saved.category;
             const merged = { ...saved, category: categoryForDisplay };
             dispatch(updateProductInStore(merged));
+            await refreshProductsPage(page, pageSize);
             setEditingProduct(null);
             setShowAddProduct(false);
             showToast('Product updated successfully!', 'success');
@@ -206,6 +241,7 @@ export default function Products() {
         try {
             await deleteProduct(id);
             dispatch(removeProduct(id));
+            await refreshProductsPage(page, pageSize);
             showToast('Product deleted successfully!', 'delete');
         } catch (err) {
             console.error('Failed to delete product', err);
@@ -217,8 +253,8 @@ export default function Products() {
         setSyncLoading(true);
         try {
             await syncShopify();
-            const data = await loadProducts();
-            dispatch(setProducts(data));
+            await refreshProductsPage(1, pageSize);
+            setPage(1);
             showToast('Shopify products synced successfully!', 'success');
         } catch (err) {
             console.error('Failed to sync Shopify', err);
@@ -309,7 +345,9 @@ export default function Products() {
 
             <div className="card products-table-card">
                 <div className="products-count-bar">
-                    {loading ? 'Loading…' : `Showing ${groupedByProduct.length} products (${filteredRows.length} variants)`}
+                    {loading
+                        ? 'Loading…'
+                        : `Showing ${groupedByProduct.length} products (${filteredRows.length} variants) · ${dashboardMeta?.total ?? groupedByProduct.length} total`}
                 </div>
                 {loading ? (
                     null
@@ -400,6 +438,53 @@ export default function Products() {
                     </table>
                 </div>
                 )}
+                <div className="products-pagination" style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px' }}>
+                    <div>
+                        {loading ? 'Loading…' : `Page ${page} of ${Math.max(1, dashboardMeta?.totalPages ?? 1)}`}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <label>
+                            Rows:
+                            <select
+                                className="input"
+                                value={pageSize}
+                                onChange={(e) => {
+                                    setPageSize(Number(e.target.value));
+                                    setPage(1);
+                                }}
+                                style={{ marginLeft: 6 }}
+                            >
+                                {[20, 50, 100].map((n) => (
+                                    <option key={n} value={n}>
+                                        {n}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <button type="button" className="icon-btn" disabled={loading || page <= 1} onClick={() => setPage(1)}>
+                            First
+                        </button>
+                        <button type="button" className="icon-btn" disabled={loading || page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                            Prev
+                        </button>
+                        <button
+                            type="button"
+                            className="icon-btn"
+                            disabled={loading || page >= Math.max(1, dashboardMeta?.totalPages ?? 1)}
+                            onClick={() => setPage((p) => p + 1)}
+                        >
+                            Next
+                        </button>
+                        <button
+                            type="button"
+                            className="icon-btn"
+                            disabled={loading || page >= Math.max(1, dashboardMeta?.totalPages ?? 1)}
+                            onClick={() => setPage(Math.max(1, dashboardMeta?.totalPages ?? 1))}
+                        >
+                            Last
+                        </button>
+                    </div>
+                </div>
             </div>
                     </>
                 )}

@@ -3,7 +3,6 @@ import { Spinner } from '../../components/Spinner';
 import { type Followup, type CallingHistoryEntry, fetchFollowupsDashboard, dashboardRowToFollowup } from '../../utils/followups';
 import { apiFetch } from '../../api';
 import { useAppSelector } from '../../store';
-import { loadOrders, type Order } from '../../utils/orders';
 import type { FollowupsCustomerHistoryResponse } from '../../types/followups';
 import { CustomerProfileModal } from '../sales/Shopify/CustomerProfileModal';
 import { FollowupCallHistoryModal } from './FollowupCallHistoryModal';
@@ -17,20 +16,38 @@ import { ToastContainer } from './ToastContainer';
 import '../sales/Shopify/Shopify.scss';
 import './Followups.scss';
 
+async function readFollowupApiErrorMessage(res: Response): Promise<string> {
+    try {
+        const text = await res.text();
+        if (!text.trim()) {
+            return res.statusText || `Request failed (${res.status})`;
+        }
+        try {
+            const j = JSON.parse(text) as Record<string, unknown>;
+            if (typeof j.message === 'string' && j.message.trim()) return j.message.trim();
+            if (typeof j.error === 'string' && j.error.trim()) return j.error.trim();
+        } catch {
+            /* not JSON */
+        }
+        return text.length > 240 ? `${text.slice(0, 240)}…` : text;
+    } catch {
+        return res.statusText || `Request failed (${res.status})`;
+    }
+}
+
 export default function Followups() {
     const currentYear = String(new Date().getFullYear());
+    const currentMonth = String(new Date().getMonth() + 1);
     const [callerFilter, setCallerFilter] = useState('');
     const [feedbackFilter, setFeedbackFilter] = useState('');
-    const [monthFilter, setMonthFilter] = useState('');
+    const [monthFilter, setMonthFilter] = useState(currentMonth);
     const [yearFilter, setYearFilter] = useState(currentYear);
-    const [monthDraft, setMonthDraft] = useState('');
+    const [monthDraft, setMonthDraft] = useState(currentMonth);
     const [yearDraft, setYearDraft] = useState(currentYear);
     const [callingDateFilter, setCallingDateFilter] = useState('');
     const [upcomingFilter, setUpcomingFilter] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [followups, setFollowups] = useState<Followup[]>([]);
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [ordersByCustomer, setOrdersByCustomer] = useState<Map<string, Order[]>>(new Map());
     const [showCustomerProfile, setShowCustomerProfile] = useState(false);
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
@@ -62,39 +79,11 @@ export default function Followups() {
         let cancelled = false;
         (async () => {
             try {
-                const raw = await loadOrders();
-                if (cancelled) return;
-                const ordersSafe = Array.isArray(raw) ? raw : [];
-                const map = new Map<string, Order[]>();
-                ordersSafe.forEach((order) => {
-                    const phone = order.customerPhone;
-                    if (!map.has(phone)) map.set(phone, []);
-                    map.get(phone)!.push(order);
-                });
-                setOrders(ordersSafe);
-                setOrdersByCustomer(map);
-            } catch (error) {
-                console.error('Error loading orders for followups:', error);
-                if (!cancelled) {
-                    setOrders([]);
-                    setOrdersByCustomer(new Map());
-                }
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
                 setLoading(true);
                 const dashboard = await fetchFollowupsDashboard({
                     page,
                     limit: pageSize,
-                    month: monthFilter ? Number(monthFilter) : undefined,
+                    month: Number(monthFilter || currentMonth),
                     year: yearFilter ? Number(yearFilter) : undefined,
                 });
                 if (cancelled) return;
@@ -122,7 +111,7 @@ export default function Followups() {
         return () => {
             cancelled = true;
         };
-    }, [page, pageSize, monthFilter, yearFilter]);
+    }, [page, pageSize, monthFilter, yearFilter, currentMonth]);
 
     const totalRecords = dashboardMeta?.total ?? 0;
     const totalPages = Math.max(1, dashboardMeta?.totalPages ?? 1);
@@ -170,14 +159,14 @@ export default function Followups() {
         setSearchQuery('');
         setCallerFilter('');
         setFeedbackFilter('');
-        setMonthFilter('');
+        setMonthFilter(currentMonth);
         setYearFilter(currentYear);
-        setMonthDraft('');
+        setMonthDraft(currentMonth);
         setYearDraft(currentYear);
         setCallingDateFilter('');
         setUpcomingFilter('');
         setPage(1);
-    }, [currentYear]);
+    }, [currentYear, currentMonth]);
 
     const applyMonthYearFilters = useCallback(() => {
         setMonthFilter(monthDraft);
@@ -206,12 +195,30 @@ export default function Followups() {
                 calledOn: string;
                 callerName: string;
                 detail: string;
-                callAgainDate: string | null;
-                feedback: string | null;
+                callAgainDate: string;
+                feedback: string;
             },
         ) => {
             const followup = followups.find((f) => f.id === followupId);
             if (!followup) return;
+
+            const callerId = currentUser?._id ?? null;
+            const customerId = followup.customerId;
+
+            if (!customerId || !callerId) {
+                showToast(
+                    !customerId
+                        ? 'Cannot save call: customer is missing for this row.'
+                        : 'Cannot save call: you must be logged in as a caller.',
+                    'error',
+                );
+                throw new Error('BLOCKED');
+            }
+
+            if (!payload.feedback.trim()) {
+                showToast('Please select feedback before saving.', 'error');
+                return;
+            }
 
             const calledAt = new Date(`${payload.calledOn}T12:00:00`).toISOString();
             const actorName = (currentUser?.name || currentUser?.username || '').trim() || null;
@@ -221,10 +228,10 @@ export default function Followups() {
                 callerName: payload.callerName.trim(),
                 callerId: null,
                 detail: payload.detail.trim(),
-                callAgainDate: payload.callAgainDate
+                callAgainDate: payload.callAgainDate.trim()
                     ? new Date(`${payload.callAgainDate}T12:00:00`).toISOString()
                     : null,
-                feedback: payload.feedback ?? null,
+                feedback: payload.feedback.trim(),
                 createdAt: calledAt,
                 updatedAt: calledAt,
                 createdByName: actorName,
@@ -241,42 +248,56 @@ export default function Followups() {
                 callingDetail: newEntry.detail,
                 callerName: newEntry.callerName,
                 callAgainDate: newEntry.callAgainDate,
-                feedback: payload.feedback ?? followup.feedback,
+                feedback: payload.feedback.trim(),
                 callingHistory: nextHistory,
             };
 
             setFollowups((prev) => prev.map((f) => (f.id === followupId ? updatedFollowup : f)));
             setHistoryModalFollowup((cur) => (cur?.id === followupId ? updatedFollowup : cur));
 
+            const revert = () => {
+                setFollowups((prev) => prev.map((f) => (f.id === followupId ? followup : f)));
+                setHistoryModalFollowup((cur) => (cur?.id === followupId ? followup : cur));
+            };
+
+            let postSucceeded = false;
+
             try {
-                const callerId = currentUser?._id ?? null;
-                const customerId = followup.customerId;
+                const calledOnIso = `${payload.calledOn}T00:00:00.000Z`;
+                const callAgainIso = payload.callAgainDate.trim()
+                    ? `${payload.callAgainDate}T00:00:00.000Z`
+                    : '';
 
-                if (customerId && callerId) {
-                    const calledOnIso = `${payload.calledOn}T00:00:00.000Z`;
-                    const callAgainIso = payload.callAgainDate
-                        ? `${payload.callAgainDate}T00:00:00.000Z`
-                        : null;
+                const res = await apiFetch('/api/followups', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        customer: customerId,
+                        calledOn: calledOnIso,
+                        caller: callerId,
+                        feedback: payload.feedback.trim(),
+                        notes: newEntry.detail.trim(),
+                        callAgain: callAgainIso,
+                    }),
+                });
 
-                    await apiFetch('/api/followups', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            customer: customerId,
-                            calledOn: calledOnIso,
-                            caller: callerId,
-                            feedback: updatedFollowup.feedback,
-                            notes: newEntry.detail,
-                            callAgain: callAgainIso,
-                        }),
-                    });
+                if (!res.ok) {
+                    const msg = await readFollowupApiErrorMessage(res);
+                    revert();
+                    showToast(msg || `Could not save call (${res.status})`, 'error');
+                    const err = new Error(msg) as Error & { __followupSaveErrorToasted?: boolean };
+                    err.__followupSaveErrorToasted = true;
+                    throw err;
                 }
 
-                // Re-fetch latest history from backend after save so modal/table stay in sync with server state.
-                if (customerId) {
-                    const historyRes = await apiFetch(`/api/followups/customer/${encodeURIComponent(customerId)}`);
+                postSucceeded = true;
+
+                try {
+                    const historyRes = await apiFetch(
+                        `/api/followups/customer/${encodeURIComponent(customerId)}`,
+                    );
                     if (historyRes.ok) {
                         const historyJson: unknown = await historyRes.json();
                         const historyData = historyJson as FollowupsCustomerHistoryResponse;
@@ -317,16 +338,33 @@ export default function Followups() {
                                 feedback: latestFromApi?.feedback ?? followup.feedback,
                             };
                             setFollowups((prev) => prev.map((f) => (f.id === followupId ? refreshedFollowup : f)));
-                            setHistoryModalFollowup((cur) => (cur?.id === followupId ? refreshedFollowup : cur));
+                            setHistoryModalFollowup((cur) =>
+                                cur?.id === followupId ? refreshedFollowup : cur,
+                            );
+                        }
+                    }
+                } catch {
+                    /* POST succeeded; keep optimistic UI if history refresh fails */
+                }
+
+                showToast('Call saved successfully.', 'success');
+            } catch (error: unknown) {
+                console.error('Error saving call history:', error);
+                if (!postSucceeded) {
+                    revert();
+                    const toasted =
+                        error &&
+                        typeof error === 'object' &&
+                        (error as { __followupSaveErrorToasted?: boolean }).__followupSaveErrorToasted;
+                    if (!toasted) {
+                        if (error instanceof Error && error.message === 'BLOCKED') {
+                            /* toast already shown */
+                        } else {
+                            showToast('Failed to save call. Please try again.', 'error');
                         }
                     }
                 }
-                showToast('Call added to history', 'success');
-            } catch (error) {
-                console.error('Error saving call history:', error);
-                showToast('Failed to save call. Please try again.', 'error');
-                setFollowups((prev) => prev.map((f) => (f.id === followupId ? followup : f)));
-                setHistoryModalFollowup((cur) => (cur?.id === followupId ? followup : cur));
+                throw error;
             }
         },
         [followups, showToast, currentUser],
@@ -457,7 +495,6 @@ export default function Followups() {
                     loading={loading}
                     filtered={filtered}
                     baseFollowups={baseFollowups}
-                    ordersByCustomer={ordersByCustomer}
                     onCustomerClick={onCustomerClick}
                     onOpenHistory={onOpenHistory}
                     onUpdate={updateFollowup}

@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../api';
 import { Spinner } from '../../components/Spinner';
-import type { CreateUserPayload, UserRecord } from '../../types/users';
+import type {
+    CreateUserPayload,
+    UserRecord,
+    UsersListDashboardResponse,
+    UsersListRowApi,
+} from '../../types/users';
 import { CreateUserModal } from './CreateUserModal';
+import { FollowupsPagination } from '../Followups/FollowupsPagination';
+import '../Followups/Followups.scss';
 import './Users.scss';
 import {
     useAppDispatch,
@@ -21,11 +28,75 @@ type Toast = {
 
 const ROLE_OPTIONS = ['Admin', 'Manager', 'Agent'];
 
+const ROLE_FILTER_OPTIONS = [
+    { value: 'admin', label: 'Admin' },
+    { value: 'manager', label: 'Manager' },
+    { value: 'agent', label: 'Agent' },
+] as const;
+
+const USERS_PAGE_SIZE_OPTIONS = [20, 50, 100, 200, 500] as const;
+
 const ACTIONS = [
     { key: 'view', label: 'View' },
     { key: 'add', label: 'Add' },
     { key: 'modify', label: 'Modify' },
+    { key: 'delete', label: 'Delete' },
 ] as const;
+
+type UsersDashboardMeta = {
+    total: number;
+    totalPages: number;
+    count: number;
+    page: number;
+    limit: number;
+};
+
+function normalizeUserRow(u: UsersListRowApi | Record<string, unknown>): UserRecord {
+    const row = u as Record<string, unknown>;
+    const createdBy = row.createdBy as UserRecord['createdBy'];
+    const updatedBy = row.updatedBy as UserRecord['updatedBy'];
+    return {
+        id: (row.id as string) ?? (row._id as string) ?? '',
+        name: (row.name as string) ?? '',
+        username: (row.username as string) ?? '',
+        mobile: (row.mobile as string) ?? (row.phoneNumber as string) ?? '',
+        password: (row.password as string) ?? '',
+        role: (row.role as string) ?? '',
+        permissions: Array.isArray(row.permissions) ? (row.permissions as string[]) : [],
+        createdAt: typeof row.createdAt === 'string' ? row.createdAt : undefined,
+        updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : undefined,
+        createdBy: createdBy && typeof createdBy === 'object' && '_id' in createdBy ? createdBy : undefined,
+        updatedBy: updatedBy && typeof updatedBy === 'object' && '_id' in updatedBy ? updatedBy : undefined,
+        __v: typeof row.__v === 'number' ? row.__v : undefined,
+    };
+}
+
+function parseUsersListResponse(data: unknown): { users: UserRecord[]; meta: UsersDashboardMeta | null } {
+    if (Array.isArray(data)) {
+        return {
+            users: data.map((u) => normalizeUserRow(u as Record<string, unknown>)),
+            meta: null,
+        };
+    }
+    if (
+        data &&
+        typeof data === 'object' &&
+        Array.isArray((data as UsersListDashboardResponse).rows)
+    ) {
+        const d = data as UsersListDashboardResponse;
+        return {
+            users: d.rows.map((r) => normalizeUserRow(r)),
+            meta: {
+                total: d.total,
+                totalPages: d.totalPages,
+                count: d.count,
+                page: d.page,
+                limit: d.limit,
+            },
+        };
+    }
+    return { users: [], meta: null };
+}
 
 export default function Users() {
     const dispatch = useAppDispatch();
@@ -39,57 +110,50 @@ export default function Users() {
     const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
     const [userToDelete, setUserToDelete] = useState<UserRecord | null>(null);
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [dashboardMeta, setDashboardMeta] = useState<UsersDashboardMeta | null>(null);
 
-    const normalizeUsers = useCallback((data: unknown): UserRecord[] => {
-        const list = Array.isArray(data) ? data : [];
-        return list.map((u: Record<string, unknown>) => ({
-            id: (u.id as string) ?? (u._id as string) ?? '',
-            name: (u.name as string) ?? '',
-            username: (u.username as string) ?? '',
-            mobile: (u.mobile as string) ?? (u.phoneNumber as string) ?? '',
-            password: (u.password as string) ?? '',
-            role: (u.role as string) ?? '',
-            permissions: Array.isArray(u.permissions) ? (u.permissions as string[]) : [],
-        }));
-    }, []);
-
-    // Load once when the list is empty. Do not depend on `users` (array identity) or the effect
-    // re-runs after every failed load (setUsers([])) and spams /api/users.
     useEffect(() => {
         let cancelled = false;
-        if (users.length > 0) {
-            dispatch(setUsersLoading(false));
-            return;
-        }
-        dispatch(setUsersLoading(true));
-        setLoadError(null);
-        apiFetch('/api/users')
-            .then((res) => {
+        (async () => {
+            dispatch(setUsersLoading(true));
+            setLoadError(null);
+            try {
+                const qs = new URLSearchParams({
+                    page: String(page),
+                    limit: String(pageSize),
+                });
+                const res = await apiFetch(`/api/users?${qs}`);
                 if (cancelled) return;
                 if (res.status === 403) {
                     setLoadError('You do not have permission to view this section.');
                     dispatch(setUsersInStore([]));
+                    setDashboardMeta(null);
                     return;
                 }
                 if (!res.ok) throw new Error(res.statusText || 'Failed to load users');
-                return res.json();
-            })
-            .then((data: unknown) => {
-                if (cancelled) return;
-                if (data === undefined) return;
-                dispatch(setUsersInStore(normalizeUsers(data)));
-            })
-            .catch((err: Error) => {
-                if (!cancelled) {
-                    setLoadError(err.message || 'Failed to load users');
-                    dispatch(setUsersInStore([]));
+                const data: unknown = await res.json();
+                const { users: next, meta } = parseUsersListResponse(data);
+                if (meta && meta.page !== page) {
+                    setPage(meta.page);
                 }
-            });
+                dispatch(setUsersInStore(next));
+                setDashboardMeta(meta);
+            } catch (err) {
+                if (!cancelled) {
+                    setLoadError(err instanceof Error ? err.message : 'Failed to load users');
+                    dispatch(setUsersInStore([]));
+                    setDashboardMeta(null);
+                }
+            } finally {
+                if (!cancelled) dispatch(setUsersLoading(false));
+            }
+        })();
         return () => {
             cancelled = true;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only when empty vs non-empty
-    }, [dispatch, normalizeUsers, users.length]);
+    }, [dispatch, page, pageSize]);
 
     function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
         const id = `toast-${Date.now()}-${Math.random()}`;
@@ -117,18 +181,69 @@ export default function Users() {
                 u.mobile.includes(q) ||
                 u.role.toLowerCase().includes(q) ||
                 u.permissions.some((p) => p.toLowerCase().includes(q));
-            const matchesRole = !roleFilter || u.role === roleFilter;
+            const matchesRole =
+                !roleFilter || u.role.toLowerCase() === roleFilter.toLowerCase();
             return matchesText && matchesRole;
         });
     }, [users, search, roleFilter]);
 
+    const paginationMeta = useMemo((): UsersDashboardMeta | null => {
+        if (dashboardMeta) return dashboardMeta;
+        if (users.length === 0) return null;
+        return {
+            total: users.length,
+            totalPages: 1,
+            count: users.length,
+            page: 1,
+            limit: users.length,
+        };
+    }, [dashboardMeta, users.length]);
+
+    const totalRecords = paginationMeta?.total ?? 0;
+    const totalPages = Math.max(1, paginationMeta?.totalPages ?? 1);
+    const rangeStart =
+        !paginationMeta || totalRecords === 0 || paginationMeta.count === 0
+            ? 0
+            : (paginationMeta.page - 1) * paginationMeta.limit + 1;
+    const rangeEnd =
+        !paginationMeta || totalRecords === 0 || paginationMeta.count === 0
+            ? 0
+            : Math.min(
+                  (paginationMeta.page - 1) * paginationMeta.limit + paginationMeta.count,
+                  totalRecords,
+              );
+
     const refetchUsers = useCallback(() => {
+        const qs = new URLSearchParams({
+            page: String(page),
+            limit: String(pageSize),
+        });
         dispatch(setUsersLoading(true));
-        apiFetch('/api/users')
-            .then((res) => (res.ok ? res.json() : []))
-            .then((data: unknown) => dispatch(setUsersInStore(normalizeUsers(data))))
-            .catch(() => dispatch(setUsersInStore([])));
-    }, [dispatch, normalizeUsers]);
+        apiFetch(`/api/users?${qs}`)
+            .then((res) => {
+                if (res.status === 403) {
+                    setLoadError('You do not have permission to view this section.');
+                    return null;
+                }
+                if (!res.ok) throw new Error(res.statusText || 'Failed to load users');
+                return res.json();
+            })
+            .then((data: unknown) => {
+                if (data === null) {
+                    dispatch(setUsersInStore([]));
+                    setDashboardMeta(null);
+                    return;
+                }
+                const { users: next, meta } = parseUsersListResponse(data);
+                dispatch(setUsersInStore(next));
+                setDashboardMeta(meta);
+            })
+            .catch(() => {
+                dispatch(setUsersInStore([]));
+                setDashboardMeta(null);
+            })
+            .finally(() => dispatch(setUsersLoading(false)));
+    }, [dispatch, page, pageSize]);
 
     function payloadToUserRecord(payload: CreateUserPayload): Omit<UserRecord, 'id'> {
         return {
@@ -142,8 +257,9 @@ export default function Users() {
     }
 
     function handleCreateSuccess() {
-        refetchUsers();
         showToast('User created successfully', 'success');
+        if (page !== 1) setPage(1);
+        else refetchUsers();
     }
 
     function handleSubmitUser(payload: CreateUserPayload) {
@@ -164,6 +280,7 @@ export default function Users() {
             dispatch(removeUserFromStore(userToDelete.id));
             showToast('User deleted successfully!', 'delete');
             setUserToDelete(null);
+            refetchUsers();
         } catch (err) {
             console.error('Failed to delete user', err);
             showToast('Failed to delete user. Please try again.', 'error');
@@ -183,11 +300,16 @@ export default function Users() {
                         <select
                             className="input users-role-filter-select"
                             value={roleFilter}
-                            onChange={(e) => setRoleFilter(e.target.value)}
+                            onChange={(e) => {
+                                setRoleFilter(e.target.value);
+                                setPage(1);
+                            }}
                         >
                             <option value="">All</option>
-                            {ROLE_OPTIONS.map((role) => (
-                                <option key={role} value={role}>{role}</option>
+                            {ROLE_FILTER_OPTIONS.map((role) => (
+                                <option key={role.value} value={role.value}>
+                                    {role.label}
+                                </option>
                             ))}
                         </select>
                     </div>
@@ -216,12 +338,13 @@ export default function Users() {
                     {loading
                         ? 'Loading…'
                         : loadError
-                            ? loadError
+                          ? loadError
+                          : dashboardMeta
+                            ? `${filtered.length.toLocaleString()} on this page · ${totalRecords.toLocaleString()} total`
                             : `${filtered.length.toLocaleString()} user${filtered.length === 1 ? '' : 's'}`}
                 </div>
-                {loading ? (
-                    null
-                ) : !loadError ? (
+                {loading ? null : !loadError ? (
+                <>
                 <div className="table-scroll-wrapper">
                     <table className="users-table">
                         <colgroup>
@@ -314,6 +437,21 @@ export default function Users() {
                         </tbody>
                     </table>
                 </div>
+                <FollowupsPagination
+                    loading={loading}
+                    dashboardMeta={paginationMeta}
+                    totalRecords={totalRecords}
+                    totalPages={totalPages}
+                    rangeStart={rangeStart}
+                    rangeEnd={rangeEnd}
+                    page={page}
+                    pageSize={pageSize}
+                    setPage={setPage}
+                    setPageSize={setPageSize}
+                    pageSizeOptions={USERS_PAGE_SIZE_OPTIONS}
+                    ariaLabel="Users pagination"
+                />
+                </>
                 ) : null}
             </div>
 

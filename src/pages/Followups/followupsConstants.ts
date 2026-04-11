@@ -5,6 +5,7 @@ export const FEEDBACK_OPTIONS = [
     'High price',
     'Packaging issue',
     'Delayed delivery',
+    'Not Answering',
     'Other feedback',
 ] as const;
 

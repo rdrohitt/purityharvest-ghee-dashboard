@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Spinner } from '../../components/Spinner';
-import { loadAllMarketingSpend, createMarketingSpend, addMarketingSpend, updateMarketingSpend, deleteMarketingSpend, type SpendRecord, type MiscRecord } from '../../utils/marketing-spend';
+import {
+    loadAllMarketingSpend,
+    createMarketingSpend,
+    updateMarketingSpend,
+    deleteMarketingSpend,
+    type LoadMarketingSpendOptions,
+    type SpendRecord,
+    type MiscRecord,
+} from '../../utils/marketing-spend';
 import type { MarketingSpendApiItem } from '../../types/marketing-spend';
 import { useAppDispatch, setMarketingSpendLoading, setMarketingSpendRecords } from '../../store';
 import './MarketingSpend.scss';
@@ -141,8 +149,14 @@ function formatDate(date: string | Date): string {
     return `${day}-${month}-${year}`;
 }
 
+function toYmd(d: Date): string {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 export default function MarketingSpend() {
-    const today = toInputDate(new Date());
     const dispatch = useAppDispatch();
 
     const [meta, setMeta] = useState<SpendRecord[]>([]);
@@ -158,6 +172,11 @@ export default function MarketingSpend() {
     const [customFrom, setCustomFrom] = useState<string>('');
     const [customTo, setCustomTo] = useState<string>('');
     const [loading, setLoading] = useState(true);
+
+    const marketingLoadOptions: LoadMarketingSpendOptions = useMemo(
+        () => marketingSpendApiRange(mode, customFrom, customTo),
+        [mode, customFrom, customTo],
+    );
     
     // Toast notifications
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -214,11 +233,11 @@ export default function MarketingSpend() {
         setMisc(miscItems);
     }
 
-    async function refreshFromServer() {
+    const refreshFromServer = useCallback(async () => {
         try {
             setLoading(true);
             dispatch(setMarketingSpendLoading(true));
-            const all = await loadAllMarketingSpend();
+            const all = await loadAllMarketingSpend(marketingLoadOptions);
             dispatch(setMarketingSpendRecords(all));
             applyApiData(all);
         } catch (err) {
@@ -228,12 +247,13 @@ export default function MarketingSpend() {
         } finally {
             setLoading(false);
         }
-    }
+    }, [dispatch, marketingLoadOptions]);
 
     useEffect(() => {
         let cancelled = false;
-
-        loadAllMarketingSpend()
+        setLoading(true);
+        dispatch(setMarketingSpendLoading(true));
+        loadAllMarketingSpend(marketingLoadOptions)
             .then((all: MarketingSpendApiItem[]) => {
                 if (cancelled) return;
                 dispatch(setMarketingSpendRecords(all));
@@ -253,49 +273,32 @@ export default function MarketingSpend() {
         return () => {
             cancelled = true;
         };
-    }, [dispatch]);
+    }, [dispatch, marketingLoadOptions]);
 
-    const filteredMeta = useFilterRows(meta, mode, customFrom, customTo);
-    const filteredAmazon = useFilterRows(amazon, mode, customFrom, customTo);
-    const filteredAmazonShipping = useFilterRows(amazonShipping, mode, customFrom, customTo);
-    const filteredFlipkart = useFilterRows(flipkart, mode, customFrom, customTo);
-    const filteredCheckout = useFilterRows(checkout, mode, customFrom, customTo);
-    const filteredEngage = useFilterRows(engage, mode, customFrom, customTo);
-    const filteredDolchi = useFilterRows(dolchi, mode, customFrom, customTo);
-    const filteredDelhivery = useFilterRows(delhivery, mode, customFrom, customTo);
-    const filteredMisc = useFilterRows(misc, mode, customFrom, customTo);
-
-    const totals = useMemo(() => ({
-        meta: filteredMeta.reduce((s, r) => s + r.amount, 0),
-        amazon: filteredAmazon.reduce((s, r) => s + r.amount, 0),
-        amazonShipping: filteredAmazonShipping.reduce((s, r) => s + r.amount, 0),
-        flipkart: filteredFlipkart.reduce((s, r) => s + r.amount, 0),
-        checkout: filteredCheckout.reduce((s, r) => s + r.amount, 0),
-        engage: filteredEngage.reduce((s, r) => s + r.amount, 0),
-        dolchi: filteredDolchi.reduce((s, r) => s + r.amount, 0),
-        delhivery: filteredDelhivery.reduce((s, r) => s + r.amount, 0),
-        misc: filteredMisc.reduce((s, r) => s + r.amount, 0),
-        totalExpense:
-            filteredMeta.reduce((s, r) => s + r.amount, 0) +
-            filteredAmazon.reduce((s, r) => s + r.amount, 0) +
-            filteredAmazonShipping.reduce((s, r) => s + r.amount, 0) +
-            filteredFlipkart.reduce((s, r) => s + r.amount, 0) +
-            filteredCheckout.reduce((s, r) => s + r.amount, 0) +
-            filteredEngage.reduce((s, r) => s + r.amount, 0) +
-            filteredDolchi.reduce((s, r) => s + r.amount, 0) +
-            filteredDelhivery.reduce((s, r) => s + r.amount, 0) +
-            filteredMisc.reduce((s, r) => s + r.amount, 0),
-    }), [
-        filteredMeta,
-        filteredAmazon,
-        filteredAmazonShipping,
-        filteredFlipkart,
-        filteredCheckout,
-        filteredEngage,
-        filteredDolchi,
-        filteredDelhivery,
-        filteredMisc,
-    ]);
+    const totals = useMemo(
+        () => ({
+            meta: meta.reduce((s, r) => s + r.amount, 0),
+            amazon: amazon.reduce((s, r) => s + r.amount, 0),
+            amazonShipping: amazonShipping.reduce((s, r) => s + r.amount, 0),
+            flipkart: flipkart.reduce((s, r) => s + r.amount, 0),
+            checkout: checkout.reduce((s, r) => s + r.amount, 0),
+            engage: engage.reduce((s, r) => s + r.amount, 0),
+            dolchi: dolchi.reduce((s, r) => s + r.amount, 0),
+            delhivery: delhivery.reduce((s, r) => s + r.amount, 0),
+            misc: misc.reduce((s, r) => s + r.amount, 0),
+            totalExpense:
+                meta.reduce((s, r) => s + r.amount, 0) +
+                amazon.reduce((s, r) => s + r.amount, 0) +
+                amazonShipping.reduce((s, r) => s + r.amount, 0) +
+                flipkart.reduce((s, r) => s + r.amount, 0) +
+                checkout.reduce((s, r) => s + r.amount, 0) +
+                engage.reduce((s, r) => s + r.amount, 0) +
+                dolchi.reduce((s, r) => s + r.amount, 0) +
+                delhivery.reduce((s, r) => s + r.amount, 0) +
+                misc.reduce((s, r) => s + r.amount, 0),
+        }),
+        [meta, amazon, amazonShipping, flipkart, checkout, engage, dolchi, delhivery, misc],
+    );
 
     return (
         <section className="marketing-spend-page">
@@ -400,6 +403,7 @@ export default function MarketingSpend() {
                     mode={mode}
                     customFrom={customFrom}
                     customTo={customTo}
+                    serverDateFiltered
                     loading={loading}
                     onAdd={async (platform, rec) => {
                         try {
@@ -554,7 +558,6 @@ export default function MarketingSpend() {
                         }
                     }}
                 />
-            
             <ToastContainer toasts={toasts} />
         </section>
     );
@@ -588,11 +591,29 @@ export type UnifiedRecord =
     | (SpendRecord & { _source: Platform; _type: 'spend' })
     | (MiscRecord & { _source: 'Miscellaneous'; _type: 'misc'; updatedByName?: string });
 
-function UnifiedSpendSection({ meta, amazon, amazonShipping, flipkart, checkout, engage, dolchi, delhivery, misc, onAdd, onUpdate, onDelete, mode, customFrom, customTo, loading }: { 
-    meta: SpendRecord[]; 
-    amazon: SpendRecord[]; 
+function UnifiedSpendSection({
+    meta,
+    amazon,
+    amazonShipping,
+    flipkart,
+    checkout,
+    engage,
+    dolchi,
+    delhivery,
+    misc,
+    onAdd,
+    onUpdate,
+    onDelete,
+    mode,
+    customFrom,
+    customTo,
+    serverDateFiltered,
+    loading,
+}: {
+    meta: SpendRecord[];
+    amazon: SpendRecord[];
     amazonShipping: SpendRecord[];
-    flipkart: SpendRecord[]; 
+    flipkart: SpendRecord[];
     checkout: SpendRecord[];
     engage: SpendRecord[];
     dolchi: SpendRecord[];
@@ -601,9 +622,11 @@ function UnifiedSpendSection({ meta, amazon, amazonShipping, flipkart, checkout,
     onAdd: (platform: Platform, rec: SpendRecord | MiscRecord) => Promise<void>;
     onUpdate: (platform: Platform, rec: SpendRecord | MiscRecord) => Promise<void>;
     onDelete: (platform: Platform, id: string) => Promise<void>;
-    mode: DateFilterMode; 
-    customFrom: string; 
+    mode: DateFilterMode;
+    customFrom: string;
     customTo: string;
+    /** When true, date range is applied via API — do not filter rows again in the client. */
+    serverDateFiltered?: boolean;
     loading: boolean;
 }) {
     const [platform, setPlatform] = useState<Platform>('Meta');
@@ -651,7 +674,12 @@ function UnifiedSpendSection({ meta, amazon, amazonShipping, flipkart, checkout,
         return [...m, ...a, ...aship, ...f, ...c, ...e, ...d, ...dl, ...miscRecords].sort((p, q) => new Date(q.date).getTime() - new Date(p.date).getTime());
     }, [meta, amazon, amazonShipping, flipkart, checkout, engage, dolchi, delhivery, misc]);
 
-    const filtered = useFilterRows(combined, mode, customFrom, customTo);
+    const filtered = useFilterRows(
+        combined,
+        serverDateFiltered ? 'all' : mode,
+        serverDateFiltered ? '' : customFrom,
+        serverDateFiltered ? '' : customTo,
+    );
 
     return (
         <div className="card marketing-spend-unified">
@@ -870,6 +898,24 @@ function presetBounds(mode: DateFilterMode): { from: Date; to: Date } | null {
         return { from, to };
     }
     return null;
+}
+
+/** `from` / `to` as YYYY-MM-DD for GET /api/marketing — matches active filter chips. */
+function marketingSpendApiRange(mode: DateFilterMode, customFrom: string, customTo: string): LoadMarketingSpendOptions {
+    if (mode === 'all') {
+        return {};
+    }
+    if (mode === 'custom') {
+        const from = customFrom.trim();
+        const to = customTo.trim();
+        return {
+            ...(from ? { from } : {}),
+            ...(to ? { to } : {}),
+        };
+    }
+    const pb = presetBounds(mode);
+    if (!pb) return {};
+    return { from: toYmd(pb.from), to: toYmd(pb.to) };
 }
 
 function useFilterRows<T extends { date: string }>(rows: T[], mode: DateFilterMode, customFrom: string, customTo: string): T[] {

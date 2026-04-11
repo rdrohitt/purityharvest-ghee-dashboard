@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../api';
 import { Spinner } from '../../../components/Spinner';
-import { type Order, type OrderItem, type PaymentStatus, type FulfillmentStatus, type DeliveryStatus } from '../../../utils/orders';
+import {
+    type Order,
+    type OrderItem,
+    type PaymentStatus,
+    type FulfillmentStatus,
+    type DeliveryStatus,
+    normalizeDeliveryStatus,
+    deliveryStatusLabel,
+} from '../../../utils/orders';
 
 function formatCurrency(n: number): string { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); }
 
@@ -31,7 +39,13 @@ export default function Amazon() {
             })
             .then((data) => {
                 if (cancelled) return;
-                setOrders(data);
+                const arr = Array.isArray(data) ? (data as Order[]) : [];
+                setOrders(
+                    arr.map((o) => ({
+                        ...o,
+                        deliveryStatus: normalizeDeliveryStatus(o.deliveryStatus),
+                    })),
+                );
             })
             .catch((err) => {
                 console.error('Failed to load Amazon orders', err);
@@ -128,9 +142,9 @@ export default function Amazon() {
         const quantity = filtered.reduce((s, o) => s + o.items.reduce((sum, item) => sum + item.quantity, 0), 0);
         const shipping = filtered.reduce((s, o) => s + (o.shippingAmount || 0), 0);
         const adsSpend = Math.round(totalSales * 0.22);
-        const delivered = filtered.filter(o => o.deliveryStatus === 'Delivered').length;
-        const rto = filtered.filter(o => o.deliveryStatus === 'RTO').length;
-        const inTransit = filtered.filter(o => o.deliveryStatus === 'In Transit').length;
+        const delivered = filtered.filter((o) => o.deliveryStatus === 'delivered').length;
+        const rto = filtered.filter((o) => o.deliveryStatus === 'rto').length;
+        const inTransit = filtered.filter((o) => o.deliveryStatus === 'in_transit').length;
         return { totalSales, quantity, shipping, adsSpend, delivered, rto, inTransit, totalOrders: filtered.length };
     }, [filtered]);
 
@@ -193,9 +207,9 @@ export default function Amazon() {
                 <div className="admin-sales-metrics-grid">
                     <MetricItem label="Total Sales" value={formatCurrency(metrics.totalSales)} isLast={false} />
                     <MetricItem label="Quantity" value={metrics.quantity.toLocaleString()} isLast={false} />
-                    <MetricItemWithAmount label="Delivered" count={metrics.delivered} amount={filtered.filter(o=>o.deliveryStatus==='Delivered').reduce((s,o)=>s+o.amount,0)} isLast={false} />
-                    <MetricItemWithAmount label="RTO" count={metrics.rto} amount={filtered.filter(o=>o.deliveryStatus==='RTO').reduce((s,o)=>s+o.amount,0)} isLast={false} />
-                    <MetricItemWithAmount label="In Transit" count={metrics.inTransit} amount={filtered.filter(o=>o.deliveryStatus==='In Transit').reduce((s,o)=>s+o.amount,0)} isLast={false} />
+                    <MetricItemWithAmount label="Delivered" count={metrics.delivered} amount={filtered.filter((o) => o.deliveryStatus === 'delivered').reduce((s, o) => s + o.amount, 0)} isLast={false} />
+                    <MetricItemWithAmount label="RTO" count={metrics.rto} amount={filtered.filter((o) => o.deliveryStatus === 'rto').reduce((s, o) => s + o.amount, 0)} isLast={false} />
+                    <MetricItemWithAmount label="In Transit" count={metrics.inTransit} amount={filtered.filter((o) => o.deliveryStatus === 'in_transit').reduce((s, o) => s + o.amount, 0)} isLast={false} />
                     <MetricItem label="Shipping" value={formatCurrency(metrics.shipping)} isLast={false} />
                     <MetricItem label="Amazon Ads" value={formatCurrency(metrics.adsSpend)} isLast={true} />
                 </div>
@@ -384,12 +398,15 @@ function StatusTag({ kind, type }: { kind: string; type: 'payment' | 'delivery' 
         else if (kind === 'Failed') cls = 'tag danger';
         else cls = 'tag info';
     } else {
-        if (kind === 'Delivered') cls = 'tag success';
-        else if (kind === 'In Transit') cls = 'tag info';
-        else if (kind === 'Pending Pickup') cls = 'tag warning';
-        else if (kind === 'RTO') cls = 'tag danger';
+        const d = normalizeDeliveryStatus(kind);
+        if (d === 'delivered') cls = 'tag success';
+        else if (d === 'in_transit') cls = 'tag info';
+        else if (d === 'pending_pickup') cls = 'tag warning';
+        else if (d === 'rto') cls = 'tag danger';
     }
-    return <span className={cls}>{kind}</span>;
+    return (
+        <span className={cls}>{type === 'delivery' ? deliveryStatusLabel(kind) : kind}</span>
+    );
 }
 
 function toInputDate(d: Date) {

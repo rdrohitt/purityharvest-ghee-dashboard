@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Spinner } from '../../../components/Spinner';
 import { loadDelhiMarts, addDelhiMart, updateDelhiMart, deleteDelhiMart, type Mart, type RefillEntry, type SalesEntry } from '../../../utils/marts';
 import { loadProducts, type Product } from '../../../utils/products';
-import { loadOrders, type Order, type OrderItem } from '../../../utils/orders';
+import { loadOrders, type Order, type OrderItem, type DeliveryStatus } from '../../../utils/orders';
 import { generateInvoicePDF } from '../../../utils/invoice';
 
 function formatCurrency(n: number): string { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); }
@@ -2134,7 +2134,7 @@ function AddTransactionModal({ type, mart, onClose, onSave }: { type: 'sales' | 
     const [orderId, setOrderId] = useState('');
     const [amount, setAmount] = useState('');
     const [paymentStatus, setPaymentStatus] = useState<'COD' | 'PAID'>('COD');
-    const [deliveryStatus, setDeliveryStatus] = useState<'In Transit' | 'Delivered' | 'RTO' | 'Pending Pickup'>('Pending Pickup');
+    const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>('pending_pickup');
     const [refillQuantities, setRefillQuantities] = useState<Record<string, string>>({});
     const [salesQuantities, setSalesQuantities] = useState<Record<string, string>>({});
     const [totalAmount, setTotalAmount] = useState('');

@@ -70,9 +70,10 @@ export function CustomerProfileModal({
         return [...data.orders]
             .map((o) => {
                 const paymentStatus: PaymentStatus = o.paymentMode === 'PAID' ? 'PAID' : 'COD';
-                const deliveryStatus: DeliveryStatus = o.returnStatus
-                    ? 'RTO'
-                    : mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus);
+                const deliveryStatus: DeliveryStatus = mapDeliveryStatusFromTracking(
+                    o.shippingDetails?.trackingStatus,
+                    o.returnStatus,
+                );
                 return {
                     id: o._id,
                     date: o.date,
@@ -108,9 +109,9 @@ export function CustomerProfileModal({
 
     const totalOrders = customerOrders.length;
     const totalAmount = customerOrders.reduce((sum, o) => sum + o.amount, 0);
-    const deliveredCount = customerOrders.filter((o) => o.deliveryStatus === 'Delivered').length;
-    const rtoCount = customerOrders.filter((o) => o.deliveryStatus === 'RTO').length;
-    const inTransitCount = customerOrders.filter((o) => o.deliveryStatus === 'In Transit').length;
+    const deliveredCount = customerOrders.filter((o) => o.deliveryStatus === 'delivered').length;
+    const rtoCount = customerOrders.filter((o) => o.deliveryStatus === 'rto').length;
+    const inTransitCount = customerOrders.filter((o) => o.deliveryStatus === 'in_transit').length;
 
     const [activeTab, setActiveTab] = useState<'orders' | 'followups' | 'notes'>('orders');
     const [notes, setNotes] = useState<string>('');

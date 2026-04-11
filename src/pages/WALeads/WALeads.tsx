@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../api';
 import { Spinner } from '../../components/Spinner';
+import { deliveryStatusLabel, normalizeDeliveryStatus } from '../../utils/orders';
 
 type LeadStatus = 'New' | 'Contacted' | 'Converted' | 'Not Interested' | 'No Answer' | 'Potential Customer' | 'Very Interested' | 'CBA';
 type Platform = 'Maatripure' | 'STW' | 'Abandoned' | 'Whatsapp';
@@ -630,10 +631,11 @@ function StatusTag({ kind, type }: { kind: string; type: 'payment' | 'delivery' 
         else if (kind === 'Failed') cls = 'tag danger';
         else cls = 'tag info';
     } else if (type === 'delivery') {
-        if (kind === 'Delivered') cls = 'tag success';
-        else if (kind === 'In Transit') cls = 'tag info';
-        else if (kind === 'Pending Pickup') cls = 'tag warning';
-        else if (kind === 'RTO') cls = 'tag danger';
+        const d = normalizeDeliveryStatus(kind);
+        if (d === 'delivered') cls = 'tag success';
+        else if (d === 'in_transit') cls = 'tag info';
+        else if (d === 'pending_pickup') cls = 'tag warning';
+        else if (d === 'rto') cls = 'tag danger';
     } else if (type === 'lead') {
         if (kind === 'Converted') cls = 'tag success';
         else if (kind === 'New') cls = 'tag info';
@@ -642,7 +644,9 @@ function StatusTag({ kind, type }: { kind: string; type: 'payment' | 'delivery' 
         else if (kind === 'No Answer') cls = 'tag info';
         else cls = 'tag info';
     }
-    return <span className={cls}>{kind}</span>;
+    return (
+        <span className={cls}>{type === 'delivery' ? deliveryStatusLabel(kind) : kind}</span>
+    );
 }
 
 function toInputDate(d: Date) {

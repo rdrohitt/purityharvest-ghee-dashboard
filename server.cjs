@@ -5,6 +5,9 @@ const https = require('https');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+/** Delhivery tracking + CMU API token (override with DELHIVERY_API_TOKEN in production). */
+const DELHIVERY_API_TOKEN =
+  process.env.DELHIVERY_API_TOKEN || 'cd8c22b7d58baf249855b7c02e66c71a07779a02';
 
 app.use(express.json());
 
@@ -329,10 +332,33 @@ async function writeAdScripts(scripts) {
   await fs.writeFile(AD_SCRIPTS_PATH, json, 'utf8');
 }
 
-app.get('/api/products', async (_req, res) => {
+app.get('/api/products', async (req, res) => {
   try {
     const products = await readProducts();
-    res.json(products);
+    const pageRaw = parseInt(String(req.query.page), 10);
+    const limitRaw = parseInt(String(req.query.limit), 10);
+    const hasPaginationQuery = Number.isFinite(pageRaw) || Number.isFinite(limitRaw);
+
+    if (!hasPaginationQuery) {
+      res.json(products);
+      return;
+    }
+
+    const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(500, limitRaw)) : 20;
+    const total = products.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+    const rows = products.slice(start, start + limit);
+
+    res.json({
+      count: rows.length,
+      total,
+      page,
+      limit,
+      totalPages,
+      rows,
+    });
   } catch (err) {
     console.error('Error reading products.json', err);
     res.status(500).json({ message: 'Failed to read products' });
@@ -414,10 +440,50 @@ app.put('/api/products/:id', async (req, res) => {
   }
 });
 
-app.get('/api/orders', async (_req, res) => {
+app.get('/api/orders', async (req, res) => {
   try {
     const orders = await readOrders();
-    res.json(orders);
+    const from = typeof req.query.from === 'string' ? req.query.from : '';
+    const to = typeof req.query.to === 'string' ? req.query.to : '';
+    const pageRaw = parseInt(String(req.query.page), 10);
+    const limitRaw = parseInt(String(req.query.limit), 10);
+
+    const hasDateFilter = Boolean(from || to);
+    const hasPagination = Number.isFinite(pageRaw) || Number.isFinite(limitRaw);
+
+    let filtered = orders;
+    if (hasDateFilter) {
+      const fromTs = from ? Date.parse(`${from}T00:00:00.000Z`) : Number.NEGATIVE_INFINITY;
+      const toTs = to ? Date.parse(`${to}T23:59:59.999Z`) : Number.POSITIVE_INFINITY;
+      filtered = orders.filter((o) => {
+        const rawDate = o?.date || o?.createdAt;
+        if (!rawDate) return false;
+        const ts = Date.parse(String(rawDate));
+        if (!Number.isFinite(ts)) return false;
+        return ts >= fromTs && ts <= toTs;
+      });
+    }
+
+    if (!hasPagination) {
+      res.json(filtered);
+      return;
+    }
+
+    const page = Number.isFinite(pageRaw) ? Math.max(1, pageRaw) : 1;
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(1000, limitRaw)) : 20;
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+    const rows = filtered.slice(start, start + limit);
+
+    res.json({
+      count: rows.length,
+      total,
+      page,
+      limit,
+      totalPages,
+      rows,
+    });
   } catch (err) {
     console.error('Error reading orders.json', err);
     res.status(500).json({ message: 'Failed to read orders' });
@@ -1701,7 +1767,7 @@ app.get('/api/delhivery-track', async (req, res) => {
 
   const options = {
     headers: {
-      Authorization: 'Token cd8c22b7d58baf249855b7c02e66c71a07779a02',
+      Authorization: `Token ${DELHIVERY_API_TOKEN}`,
       'Content-type': 'application/json',
     },
   };
@@ -1728,6 +1794,86 @@ app.get('/api/delhivery-track', async (req, res) => {
       console.error('Error calling Delhivery tracking API', err);
       res.status(500).json({ message: 'Failed to contact Delhivery tracking API' });
     });
+});
+
+app.post('/api/delhivery-create-waybill', async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object') {
+    return res.status(400).json({ message: 'Expected JSON body' });
+  }
+
+  const shipments = body.shipments;
+  const pickup = body.pickup_location;
+  if (!Array.isArray(shipments) || shipments.length === 0) {
+    return res.status(400).json({ message: 'shipments array is required' });
+  }
+  if (!pickup || typeof pickup !== 'object' || typeof pickup.name !== 'string' || !pickup.name.trim()) {
+    return res.status(400).json({ message: 'pickup_location.name is required' });
+  }
+
+  const sellerGst = process.env.DELHIVERY_SELLER_GST;
+  if (sellerGst) {
+    for (const s of shipments) {
+      if (s && typeof s === 'object' && !s.seller_gst_tin) {
+        s.seller_gst_tin = sellerGst;
+      }
+    }
+  }
+
+  const payload = { shipments, pickup_location: pickup };
+  const postData = JSON.stringify(payload);
+
+  const options = {
+    hostname: 'track.delhivery.com',
+    path: '/api/cmu/create.json',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'Content-Length': Buffer.byteLength(postData),
+      Authorization: `Token ${DELHIVERY_API_TOKEN}`,
+    },
+  };
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const r = https.request(options, (apiRes) => {
+        let data = '';
+        apiRes.on('data', (chunk) => {
+          data += chunk;
+        });
+        apiRes.on('end', () => {
+          let json = null;
+          try {
+            json = data ? JSON.parse(data) : null;
+          } catch {
+            json = null;
+          }
+          resolve({
+            statusCode: apiRes.statusCode,
+            json,
+            raw: data,
+          });
+        });
+      });
+      r.on('error', reject);
+      r.write(postData);
+      r.end();
+    });
+
+    const code = result.statusCode || 502;
+    if (result.json != null) {
+      res.status(code >= 200 && code < 600 ? code : 502).json(result.json);
+    } else {
+      res.status(code >= 200 && code < 600 ? code : 502).json({
+        message: 'Non-JSON response from Delhivery',
+        raw: typeof result.raw === 'string' ? result.raw.slice(0, 2000) : '',
+      });
+    }
+  } catch (err) {
+    console.error('Delhivery create waybill', err);
+    res.status(502).json({ message: 'Failed to contact Delhivery API' });
+  }
 });
 
 app.listen(PORT, () => {

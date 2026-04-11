@@ -2,6 +2,7 @@ import { apiFetch } from '../api';
 import type { ProductApiItem } from '../types/products';
 import type { ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../types/shopify';
 import type { Order, PaymentStatus, FulfillmentStatus, DeliveryStatus, OrderType } from './orders';
+import { normalizeDeliveryStatus } from './orders';
 
 /** Match Add Order / Shopify product picker label to a catalog product (same rules as Shopify order save UI). */
 function findProductByVariantLabel(
@@ -154,6 +155,7 @@ function extractOrdersArray(json: unknown): unknown[] {
     if (!json || typeof json !== 'object') return [];
     const obj = json as Record<string, unknown>;
     // Top-level keys
+    if (Array.isArray(obj.rows)) return obj.rows;
     if (Array.isArray(obj.data)) return obj.data;
     if (Array.isArray(obj.orders)) return obj.orders;
     if (Array.isArray(obj.result)) return obj.result;
@@ -163,6 +165,7 @@ function extractOrdersArray(json: unknown): unknown[] {
     const data = obj.data;
     if (data && typeof data === 'object' && !Array.isArray(data)) {
         const d = data as Record<string, unknown>;
+        if (Array.isArray(d.rows)) return d.rows;
         if (Array.isArray(d.orders)) return d.orders;
         if (Array.isArray(d.data)) return d.data;
         if (Array.isArray(d.list)) return d.list;
@@ -224,7 +227,10 @@ export function orderDetailToOrder(o: ShopifyOrderApi): Order {
         amount: o.totalAmount,
         paymentStatus,
         fulfillmentStatus: mapFulfillmentStatus(o.fulfillmentStatus),
-        deliveryStatus: mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus),
+        deliveryStatus: mapDeliveryStatusFromTracking(
+            o.shippingDetails?.trackingStatus,
+            o.returnStatus,
+        ),
         state: o.state,
         pincode: o.pincode,
         codCharges: o.codCharges,
@@ -245,13 +251,44 @@ export function orderDetailToOrder(o: ShopifyOrderApi): Order {
     };
 }
 
+export type LoadOrdersOptions = {
+    from?: string;
+    to?: string;
+    page?: number;
+    limit?: number;
+    type?: string;
+    platform?: string;
+    paymentMode?: string;
+    trackingStatus?: string;
+};
+
+export type OrdersDashboardResponse = {
+    rows: ShopifyOrderApi[];
+    count: number;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+};
+
 /**
- * Load orders from GET /api/orders (or GET /orders). Optional from/to in YYYY-MM-DD for date filter.
+ * Load paginated orders from GET /api/orders (or GET /orders).
+ * Supports optional from/to (YYYY-MM-DD), page, and limit.
  */
-export async function loadOrdersFromApi(options?: { from?: string; to?: string }): Promise<ShopifyOrderApi[]> {
+export async function loadOrdersDashboardFromApi(options?: LoadOrdersOptions): Promise<OrdersDashboardResponse> {
     const params = new URLSearchParams();
     if (options?.from) params.set('from', options.from);
     if (options?.to) params.set('to', options.to);
+    if (typeof options?.page === 'number' && Number.isFinite(options.page)) {
+        params.set('page', String(Math.max(1, Math.trunc(options.page))));
+    }
+    if (typeof options?.limit === 'number' && Number.isFinite(options.limit)) {
+        params.set('limit', String(Math.max(1, Math.min(1000, Math.trunc(options.limit)))));
+    }
+    if (options?.type) params.set('type', options.type);
+    if (options?.platform) params.set('platform', options.platform);
+    if (options?.paymentMode) params.set('paymentMode', options.paymentMode);
+    if (options?.trackingStatus) params.set('trackingStatus', options.trackingStatus);
     const query = params.toString();
     const path = query ? `/api/orders?${query}` : '/api/orders';
     let response = await apiFetch(path);
@@ -263,8 +300,46 @@ export async function loadOrdersFromApi(options?: { from?: string; to?: string }
         throw new Error('Failed to load orders');
     }
     const json = (await response.json()) as unknown;
+    if (json && typeof json === 'object' && !Array.isArray(json)) {
+        const obj = json as Record<string, unknown>;
+        const arr = extractOrdersArray(json);
+        const rows = arr.map(normalizeOrder).filter((o): o is ShopifyOrderApi => o !== null);
+        const fallbackLimit = Number(params.get('limit')) || rows.length || 1;
+        const total = typeof obj.total === 'number' ? obj.total : rows.length;
+        const page = typeof obj.page === 'number' ? obj.page : Number(params.get('page')) || 1;
+        const limit = typeof obj.limit === 'number' ? obj.limit : fallbackLimit;
+        const totalPages =
+            typeof obj.totalPages === 'number'
+                ? obj.totalPages
+                : Math.max(1, Math.ceil(total / Math.max(1, limit)));
+        const count = typeof obj.count === 'number' ? obj.count : rows.length;
+        return {
+            rows,
+            count,
+            total,
+            page,
+            limit,
+            totalPages,
+        };
+    }
     const arr = extractOrdersArray(json);
-    return arr.map(normalizeOrder).filter((o): o is ShopifyOrderApi => o !== null);
+    const rows = arr.map(normalizeOrder).filter((o): o is ShopifyOrderApi => o !== null);
+    return {
+        rows,
+        count: rows.length,
+        total: rows.length,
+        page: Number(params.get('page')) || 1,
+        limit: Number(params.get('limit')) || rows.length || 1,
+        totalPages: 1,
+    };
+}
+
+/**
+ * Load orders list from GET /api/orders (or GET /orders). Optional from/to in YYYY-MM-DD for date filter.
+ */
+export async function loadOrdersFromApi(options?: LoadOrdersOptions): Promise<ShopifyOrderApi[]> {
+    const dash = await loadOrdersDashboardFromApi(options);
+    return dash.rows;
 }
 
 export function mapFulfillmentStatus(s: string): FulfillmentStatus {
@@ -274,13 +349,11 @@ export function mapFulfillmentStatus(s: string): FulfillmentStatus {
     return 'Unfulfilled';
 }
 
-export function mapDeliveryStatusFromTracking(trackingStatus: string | undefined): DeliveryStatus {
-    const lower = (trackingStatus || '').toLowerCase();
-    if (lower === 'delivered') return 'Delivered';
-    if (lower === 'in transit' || lower === 'in_transit') return 'In Transit';
-    if (lower === 'rto') return 'RTO';
-    if (lower === 'pending pickup' || lower === 'pending_pickup') return 'Pending Pickup';
-    return 'Pending Pickup';
+export function mapDeliveryStatusFromTracking(
+    trackingStatus: string | undefined,
+    returnStatus?: boolean,
+): DeliveryStatus {
+    return normalizeDeliveryStatus(trackingStatus, returnStatus);
 }
 
 export function mapOrderType(t: string): OrderType {
@@ -291,13 +364,8 @@ export function mapOrderType(t: string): OrderType {
     return 'New';
 }
 
-function toBackendDeliveryStatus(status: DeliveryStatus): string {
-    const lower = status.toLowerCase();
-    if (lower === 'delivered') return 'delivered';
-    if (lower === 'in transit') return 'in_transit';
-    if (lower === 'rto') return 'rto';
-    if (lower === 'pending pickup') return 'pending_pickup';
-    return lower;
+function toBackendDeliveryStatus(status: DeliveryStatus | string): string {
+    return normalizeDeliveryStatus(String(status));
 }
 
 function toBackendFulfillmentStatus(status: FulfillmentStatus): string {
@@ -505,7 +573,10 @@ export function shopifyOrderToOrder(o: ShopifyOrderApi): Order {
         amount: o.totalAmount,
         paymentStatus,
         fulfillmentStatus: mapFulfillmentStatus(o.fulfillmentStatus),
-        deliveryStatus: mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus),
+        deliveryStatus: mapDeliveryStatusFromTracking(
+            o.shippingDetails?.trackingStatus,
+            o.returnStatus,
+        ),
         state: o.state,
         pincode: o.pincode,
         codCharges: o.codCharges,

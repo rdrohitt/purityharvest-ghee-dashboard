@@ -1,13 +1,24 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { apiFetch } from '../../../api';
-import { updateOrder, deleteOrder, type Order, type OrderItem, type PaymentStatus, type FulfillmentStatus, type DeliveryStatus, type Platform, type OrderType } from '../../../utils/orders';
 import {
-    loadOrdersFromApi,
+    updateOrder,
+    deleteOrder,
+    type Order,
+    type OrderItem,
+    type PaymentStatus,
+    type DeliveryStatus,
+    type Platform,
+    type OrderType,
+    DELIVERY_STATUSES,
+    deliveryStatusLabel,
+    normalizeDeliveryStatus,
+} from '../../../utils/orders';
+import {
+    loadOrdersDashboardFromApi,
     shopifyOrderToOrder,
     fetchOrderById,
     orderDetailToOrder,
     mapDeliveryStatusFromTracking,
-    mapFulfillmentStatus,
     mapOrderType,
     getOrderCustomerName,
     getOrderCustomerPhone,
@@ -15,10 +26,11 @@ import {
     getShopifyProductUnitPrice,
     buildDefaultTrackingUrlFromCourier,
 } from '../../../utils/shopify-orders';
-import type { ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../../../types/shopify';
+import type { CustomerSearchResult, ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../../../types/shopify';
 import { loadProducts, type ProductApiItem } from '../../../utils/products';
 import type { MarketingSpendApiItem } from '../../../types/marketing-spend';
 import { loadAllMarketingSpend } from '../../../utils/marketing-spend';
+import { searchCustomersByPhone } from '../../../utils/customers';
 import { useAppDispatch, useAppSelector, setProducts, setProductsLoading } from '../../../store';
 import AddOrderModal, { type ProductVariantOption, formatVariantLabel } from './AddOrderModal';
 import { CustomerProfileModal } from './CustomerProfileModal';
@@ -29,6 +41,39 @@ import { Spinner } from '../../../components/Spinner';
 import { ShopifyOrdersTable } from './ShopifyOrdersTable';
 import { ToastContainer, type Toast } from './ToastContainer';
 import './Shopify.scss';
+
+const MIN_PHONE_SEARCH_DIGITS = 10;
+
+function digitsOnly(s: string): string {
+    return s.replace(/\D/g, '');
+}
+
+function toBackendTrackingStatus(status: DeliveryStatus | ''): string | undefined {
+    if (!status) return undefined;
+    return status;
+}
+
+/** Match order to customers returned from GET /api/customers/search (current page only). */
+function orderMatchesCustomerPhoneSearch(o: ShopifyOrderApi, matches: CustomerSearchResult[]): boolean {
+    const idSet = new Set(matches.map((m) => m._id));
+    const c = o.customer;
+    const custId =
+        c && typeof c === 'object' && '_id' in c
+            ? String((c as ShopifyOrderCustomer)._id ?? '')
+            : typeof c === 'string'
+              ? c
+              : '';
+    if (custId && idSet.has(custId)) return true;
+
+    const orderPhone = digitsOnly(getOrderCustomerPhone(o));
+    if (!orderPhone) return false;
+
+    return matches.some((m) => {
+        const mp = digitsOnly(m.phoneNumber);
+        if (!mp) return false;
+        return mp === orderPhone || mp.endsWith(orderPhone) || orderPhone.endsWith(mp);
+    });
+}
 
 type UiRange = 'all' | 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
 type CategoryTab = 'all' | 'milk' | 'ghee' | 'oils';
@@ -108,6 +153,8 @@ type ShopifyProps = {
 export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps) {
     const [range, setRange] = useState<UiRange>('currentMonth');
     const [customerFilter, setCustomerFilter] = useState('');
+    const [phoneSearchCustomers, setPhoneSearchCustomers] = useState<CustomerSearchResult[]>([]);
+    const [phoneSearchLoading, setPhoneSearchLoading] = useState(false);
     const [customStart, setCustomStart] = useState<string>(toInputDate(new Date()));
     const [customEnd, setCustomEnd] = useState<string>(toInputDate(new Date()));
     const [appliedCustomStart, setAppliedCustomStart] = useState<string>(toInputDate(new Date()));
@@ -123,8 +170,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const [customerProfileLoading, setCustomerProfileLoading] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
     const [orders, setOrders] = useState<ShopifyOrderApi[]>([]);
+    const [modalApiProducts, setModalApiProducts] = useState<ProductApiItem[]>([]);
+    const [modalApiProductsLoading, setModalApiProductsLoading] = useState(false);
     const dispatch = useAppDispatch();
     const products = useAppSelector((state) => state.products.products);
+    const productsList = useMemo(() => (Array.isArray(products) ? products : []), [products]);
     const productsLoading = useAppSelector((state) => state.products.loading);
     // Marketing spend must come directly from the API (not Redux),
     // otherwise EBITA + misc/shipping values can be stale when navigating modules.
@@ -134,6 +184,15 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const [categoryTab, setCategoryTab] = useState<CategoryTab>('ghee');
     const [shippedTab, setShippedTab] = useState<ShippedTab>('shipped');
     const [syncingShopify, setSyncingShopify] = useState(false);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
+    const [ordersMeta, setOrdersMeta] = useState<{
+        total: number;
+        totalPages: number;
+        count: number;
+        page: number;
+        limit: number;
+    } | null>(null);
     
     // Toast notifications
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -165,7 +224,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         }
     };
     const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatus | ''>('');
-    const [fulfillmentStatusFilter, setFulfillmentStatusFilter] = useState<FulfillmentStatus | ''>('');
     const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<DeliveryStatus | ''>('');
     const [platformFilter, setPlatformFilter] = useState<Platform | ''>('');
     const [typeFilter, setTypeFilter] = useState<OrderType | ''>('');
@@ -174,7 +232,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
     useEffect(() => {
         let cancelled = false;
-        if (products && products.length > 0) {
+        if (productsList.length > 0 || productsLoading) {
             return;
         }
         dispatch(setProductsLoading(true));
@@ -192,7 +250,54 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return () => {
             cancelled = true;
         };
-    }, [dispatch, products]);
+    }, [dispatch, productsList.length, productsLoading]);
+
+    useEffect(() => {
+        if (!(showAddOrder || editingOrder)) return;
+        let cancelled = false;
+        setModalApiProductsLoading(true);
+        loadProducts()
+            .then((data) => {
+                if (!cancelled) {
+                    setModalApiProducts(data);
+                }
+            })
+            .catch((err) => {
+                console.error('Failed to load modal products', err);
+                if (!cancelled) {
+                    setModalApiProducts([]);
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setModalApiProductsLoading(false);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [showAddOrder, editingOrder]);
+
+    useEffect(() => {
+        if (!(showAddOrder || editingOrder)) return;
+        if (productsList.length > 0 || productsLoading) return;
+        let cancelled = false;
+        dispatch(setProductsLoading(true));
+        loadProducts()
+            .then((data) => {
+                if (!cancelled) {
+                    dispatch(setProducts(data));
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    dispatch(setProductsLoading(false));
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [dispatch, showAddOrder, editingOrder, productsList.length, productsLoading]);
 
     useEffect(() => {
         let cancelled = false;
@@ -225,14 +330,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return `${year}-${month}-${day}`;
     };
 
-    /** Add one day to YYYY-MM-DD so backend's exclusive "to" includes the last day. */
-    const addOneDay = (ymd: string): string => {
-        const d = new Date(ymd + 'T12:00:00');
-        d.setDate(d.getDate() + 1);
-        return getLocalDateString(d);
-    };
-
-    // Compute from/to for API based on selected range (YYYY-MM-DD); to is sent as next day so backend includes last day
+    // Compute from/to for API based on selected range (YYYY-MM-DD)
     const dateRangeForApi = useMemo((): { from: string; to: string } => {
         const now = new Date();
         const todayStr = getLocalDateString(now);
@@ -270,11 +368,39 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return { from: '2024-01-01', to: todayStr };
     }, [range, appliedCustomStart, appliedCustomEnd]);
 
-    /** GET /api/orders: from/to match selected date filters (`to` is exclusive next day so last day is included). */
+    /** GET /api/orders with date range + pagination + selected dropdown filters. */
     const ordersListQuery = useMemo(
-        () => ({ from: dateRangeForApi.from, to: addOneDay(dateRangeForApi.to) }),
-        [dateRangeForApi.from, dateRangeForApi.to],
+        () => ({
+            from: dateRangeForApi.from,
+            to: dateRangeForApi.to,
+            page,
+            limit: pageSize,
+            type: typeFilter ? String(typeFilter).toLowerCase() : undefined,
+            platform: platformFilter ? String(platformFilter).toLowerCase() : undefined,
+            paymentMode: paymentStatusFilter || undefined,
+            trackingStatus: toBackendTrackingStatus(deliveryStatusFilter),
+        }),
+        [dateRangeForApi.from, dateRangeForApi.to, page, pageSize, typeFilter, platformFilter, paymentStatusFilter, deliveryStatusFilter],
     );
+
+    useEffect(() => {
+        setPage(1);
+    }, [dateRangeForApi.from, dateRangeForApi.to, typeFilter, platformFilter, paymentStatusFilter, deliveryStatusFilter]);
+
+    const loadOrdersPage = async (query = ordersListQuery) => {
+        const dash = await loadOrdersDashboardFromApi(query);
+        setOrdersMeta({
+            total: dash.total,
+            totalPages: dash.totalPages,
+            count: dash.count,
+            page: dash.page,
+            limit: dash.limit,
+        });
+        if (dash.page !== page) {
+            setPage(dash.page);
+        }
+        setOrders(dash.rows);
+    };
 
     const syncShopifyOrders = async () => {
         try {
@@ -286,8 +412,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 showToast('Failed to Sync', 'error');
                 return;
             }
-            const ordersData = await loadOrdersFromApi(ordersListQuery);
-            setOrders(ordersData);
+            await loadOrdersPage(ordersListQuery);
         } catch (err) {
             console.error('Failed to sync Shopify orders', err);
             showToast('Failed to Sync', 'error');
@@ -300,18 +425,63 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
-        loadOrdersFromApi(ordersListQuery)
-            .then((ordersData) => {
-                if (!cancelled) setOrders(ordersData);
+        loadOrdersDashboardFromApi(ordersListQuery)
+            .then((dash) => {
+                if (!cancelled) {
+                    setOrdersMeta({
+                        total: dash.total,
+                        totalPages: dash.totalPages,
+                        count: dash.count,
+                        page: dash.page,
+                        limit: dash.limit,
+                    });
+                    if (dash.page !== page) {
+                        setPage(dash.page);
+                    }
+                    setOrders(dash.rows);
+                }
             })
             .catch(() => {
-                if (!cancelled) setOrders([]);
+                if (!cancelled) {
+                    setOrders([]);
+                    setOrdersMeta(null);
+                }
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
             });
         return () => { cancelled = true; };
-    }, [ordersListQuery]);
+    }, [ordersListQuery, page]);
+
+    const phoneDigits = useMemo(() => digitsOnly(customerFilter), [customerFilter]);
+    const isPhoneSearch = phoneDigits.length === MIN_PHONE_SEARCH_DIGITS;
+
+    useEffect(() => {
+        if (!isPhoneSearch) {
+            setPhoneSearchCustomers([]);
+            setPhoneSearchLoading(false);
+            return;
+        }
+        let cancelled = false;
+        const t = window.setTimeout(() => {
+            (async () => {
+                try {
+                    setPhoneSearchLoading(true);
+                    const rows = await searchCustomersByPhone(phoneDigits);
+                    if (!cancelled) setPhoneSearchCustomers(rows);
+                } catch (err) {
+                    console.error('Failed to search customers by phone', err);
+                    if (!cancelled) setPhoneSearchCustomers([]);
+                } finally {
+                    if (!cancelled) setPhoneSearchLoading(false);
+                }
+            })();
+        }, 300);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(t);
+        };
+    }, [phoneDigits, isPhoneSearch]);
 
     // When Edit is clicked, fetch full order from GET /api/orders/:id then open modal
     useEffect(() => {
@@ -339,8 +509,13 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         };
     }, [editingOrderId]);
 
+    const modalProductSource = useMemo(
+        () => (modalApiProducts.length > 0 ? modalApiProducts : productsList),
+        [modalApiProducts, productsList],
+    );
+
     const productOptions = useMemo((): ProductVariantOption[] => {
-        return products.flatMap((p) => {
+        return modalProductSource.flatMap((p) => {
             const variants = Array.isArray(p.variants) ? p.variants : [];
             if (variants.length === 0) {
                 return [
@@ -360,11 +535,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 price: v.price,
             }));
         });
-    }, [products]);
+    }, [modalProductSource]);
 
     const productCategoryMap = useMemo(() => {
         const map = new Map<string, string>();
-        products.forEach((p) => {
+        productsList.forEach((p) => {
             let categoryName = '';
             const cat = p.category as any;
             if (cat && typeof cat === 'object' && 'name' in cat) {
@@ -377,7 +552,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             }
         });
         return map;
-    }, [products]);
+    }, [productsList]);
 
     const generatedPlusUser = useMemo(() => {
         return [...orders].sort((a, b) => {
@@ -392,16 +567,18 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
     const filtered = useMemo(() => {
         return byRange.filter((o: ShopifyOrderApi) => {
-            const searchTerm = customerFilter.toLowerCase();
-            const name = getOrderCustomerName(o);
-            const phone = getOrderCustomerPhone(o);
-            const matchesCustomer =
-                name.toLowerCase().includes(searchTerm) ||
-                (phone && phone.includes(searchTerm));
+            const matchesCustomer = (() => {
+                if (!isPhoneSearch) return true;
+                if (phoneSearchLoading) return false;
+                if (phoneSearchCustomers.length === 0) return false;
+                return orderMatchesCustomerPhoneSearch(o, phoneSearchCustomers);
+            })();
             const paymentStatus = o.paymentMode === 'PAID' ? 'PAID' : 'COD';
             const matchesPayment = !paymentStatusFilter || paymentStatus === paymentStatusFilter;
-            const matchesFulfillment = !fulfillmentStatusFilter || mapFulfillmentStatus(o.fulfillmentStatus) === fulfillmentStatusFilter;
-            const deliveryStatus = o.returnStatus ? 'RTO' : mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus);
+            const deliveryStatus = mapDeliveryStatusFromTracking(
+                o.shippingDetails?.trackingStatus,
+                o.returnStatus,
+            );
             const matchesDelivery = !deliveryStatusFilter || deliveryStatus === deliveryStatusFilter;
             const matchesPlatform = !platformFilter || (o.platform && o.platform.toLowerCase() === platformFilter.toLowerCase());
             const matchesType = !typeFilter || mapOrderType(o.type) === typeFilter;
@@ -438,7 +615,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             return (
                 matchesCustomer &&
                 matchesPayment &&
-                matchesFulfillment &&
                 matchesDelivery &&
                 matchesPlatform &&
                 matchesType &&
@@ -449,9 +625,10 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         });
     }, [
         byRange,
-        customerFilter,
+        isPhoneSearch,
+        phoneSearchLoading,
+        phoneSearchCustomers,
         paymentStatusFilter,
-        fulfillmentStatusFilter,
         deliveryStatusFilter,
         platformFilter,
         typeFilter,
@@ -466,9 +643,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         const quantity = filtered.reduce((s, o) => s + (o.products || []).reduce((sum, p) => sum + p.quantity, 0), 0);
         const codCharges = filtered.reduce((s, o) => s + (o.codCharges || 0), 0);
         const deliveryStatusFor = (o: ShopifyOrderApi) =>
-            o.returnStatus ? 'RTO' : mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus);
-        const deliveredOrders = filtered.filter(o => deliveryStatusFor(o) === 'Delivered');
-        const inTransitOrders = filtered.filter(o => deliveryStatusFor(o) === 'In Transit');
+            mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus, o.returnStatus);
+        const deliveredOrders = filtered.filter((o) => deliveryStatusFor(o) === 'delivered');
+        const inTransitOrders = filtered.filter((o) => deliveryStatusFor(o) === 'in_transit');
         const delivered = deliveredOrders.length;
         const deliveredAmount = deliveredOrders.reduce((s, o) => s + o.totalAmount, 0);
         const deliveredShippingCharges = deliveredOrders.reduce((s, o) => s + (o.shippingCharges || 0), 0);
@@ -529,7 +706,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
         // Manufacturing cost based on delivered lines and product actual cost from /api/products.
         const productMap = new Map<string, ProductApiItem>();
-        products.forEach((p) => {
+        productsList.forEach((p) => {
             if (p?._id) productMap.set(p._id, p);
         });
 
@@ -630,9 +807,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 const sizeKey = resolveShopifyVariantSizeKey(variantName);
                 if (sizeKey) {
                     quantityBySize[sizeKey] += p.quantity;
-                    if (delStatus === 'Delivered') deliveredQuantityBySize[sizeKey] += p.quantity;
-                    if (delStatus === 'RTO') rtoQuantityBySize[sizeKey] += p.quantity;
-                    if (delStatus === 'In Transit') inTransitQuantityBySize[sizeKey] += p.quantity;
+                    if (delStatus === 'delivered') deliveredQuantityBySize[sizeKey] += p.quantity;
+                    if (delStatus === 'rto') rtoQuantityBySize[sizeKey] += p.quantity;
+                    if (delStatus === 'in_transit') inTransitQuantityBySize[sizeKey] += p.quantity;
                 }
             });
         });
@@ -653,7 +830,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             });
         });
 
-        const rtoOrders = filtered.filter((o: ShopifyOrderApi) => deliveryStatusFor(o) === 'RTO');
+        const rtoOrders = filtered.filter((o: ShopifyOrderApi) => deliveryStatusFor(o) === 'rto');
         const rto = rtoOrders.length;
         const rtoAmount = rtoOrders.reduce((s, o) => s + o.totalAmount, 0);
         
@@ -690,7 +867,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             amazonShippingSpend,
             shippingSpend,
         };
-    }, [filtered, products, marketingSpendRecords, dateRangeForApi.from, dateRangeForApi.to]);
+    }, [filtered, productsList, marketingSpendRecords, dateRangeForApi.from, dateRangeForApi.to]);
 
     const marketingSpendForSummary = useMemo(() => {
         return marketingSpendRecords.map((rec) => ({
@@ -772,9 +949,17 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return groups;
     }, [filtered]);
 
+    const showFullPageSpinner = loading || marketingSpendLoading || (isPhoneSearch && phoneSearchLoading);
+
     return (
         <section className="shopify-page">
-            {(loading || marketingSpendLoading) ? <Spinner overlay fixed message="Loading Orders" /> : null}
+            {showFullPageSpinner ? (
+                <Spinner
+                    overlay
+                    fixed
+                    message={isPhoneSearch && phoneSearchLoading && !loading && !marketingSpendLoading ? 'Searching by phone…' : 'Loading Orders'}
+                />
+            ) : null}
             <div className="card shopify-header-card">
                 <div className="shopify-header-title">{title}</div>
                 <div className="shopify-header-main">
@@ -831,9 +1016,17 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             </span>
                             <input
                                 className="input shopify-search-input"
-                                placeholder="Search customer or phone"
+                                type="search"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                maxLength={MIN_PHONE_SEARCH_DIGITS}
+                                placeholder={`Enter ${MIN_PHONE_SEARCH_DIGITS} phone digits to search (e.g. 9876543210)`}
+                                aria-label={`Phone search; enter ${MIN_PHONE_SEARCH_DIGITS} digits`}
                                 value={customerFilter}
-                                onChange={(e) => setCustomerFilter(e.target.value)}
+                                onChange={(e) => {
+                                    const digits = e.target.value.replace(/\D/g, '').slice(0, MIN_PHONE_SEARCH_DIGITS);
+                                    setCustomerFilter(digits);
+                                }}
                             />
                         </div>
                         <div className="shopify-header-actions">
@@ -878,17 +1071,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         />
                         <StatusFilter
                             layout="ribbon"
-                            label="Fulfill"
-                            value={fulfillmentStatusFilter}
-                            onChange={setFulfillmentStatusFilter}
-                            options={['Unfulfilled', 'Fulfilled', 'Partial'] as FulfillmentStatus[]}
-                        />
-                        <StatusFilter
-                            layout="ribbon"
-                            label="Delivery"
+                            label="Shipping"
                             value={deliveryStatusFilter}
                             onChange={setDeliveryStatusFilter}
-                            options={['In Transit', 'Delivered', 'RTO', 'Pending Pickup'] as DeliveryStatus[]}
+                            options={DELIVERY_STATUSES}
+                            formatOptionLabel={(v) => deliveryStatusLabel(v)}
                         />
                         <StatusFilter
                             layout="ribbon"
@@ -929,11 +1116,10 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                         getOrderCustomerPhone(order),
                                         totalQuantityLiters,
                                         order.totalAmount,
-                                        order.returnStatus
-                                            ? 'RTO'
-                                            : order.shippingDetails?.trackingStatus ||
-                                              mapDeliveryStatusFromTracking(order.shippingDetails?.trackingStatus) ||
-                                              '',
+                                        deliveryStatusLabel(
+                                            order.shippingDetails?.trackingStatus,
+                                            order.returnStatus,
+                                        ),
                                         order.state || ''
                                     ];
                                 });
@@ -971,13 +1157,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             </svg>
                             Export CSV
                         </button>
-                        {(paymentStatusFilter || fulfillmentStatusFilter || deliveryStatusFilter || platformFilter || typeFilter) ? (
+                        {(paymentStatusFilter || deliveryStatusFilter || platformFilter || typeFilter) ? (
                             <button
                                 type="button"
                                 className="shopify-clear-filters-btn"
                                 onClick={() => { 
                                     setPaymentStatusFilter(''); 
-                                    setFulfillmentStatusFilter(''); 
                                     setDeliveryStatusFilter(''); 
                                     setPlatformFilter(''); 
                                     setTypeFilter(''); 
@@ -1081,7 +1266,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             <ShopifyOrdersTable
                 groupedByDate={groupedByDate}
                 marketingSpend={marketingSpendForSummary}
-                loading={loading || marketingSpendLoading}
+                loading={false}
                 orderCount={filtered.length}
                 onCustomerClick={(customerId, phone) => {
                     setCustomerProfileLoading(true);
@@ -1092,6 +1277,75 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 onEdit={(order) => setEditingOrderId(order.id)}
                 onDelete={setOrderToDelete}
             />
+            <footer className="shopify-pagination" aria-label="Orders pagination">
+                <div className="shopify-pagination__range">
+                    {loading ? (
+                        <span className="shopify-pagination__muted">Loading…</span>
+                    ) : ordersMeta ? (
+                        <>
+                            Showing{' '}
+                            <strong>
+                                {ordersMeta.total === 0 ? 0 : (ordersMeta.page - 1) * ordersMeta.limit + 1}–
+                                {Math.min(ordersMeta.page * ordersMeta.limit, ordersMeta.total)}
+                            </strong>{' '}
+                            of <strong>{ordersMeta.total.toLocaleString()}</strong>
+                        </>
+                    ) : (
+                        <span className="shopify-pagination__muted">Total unavailable</span>
+                    )}
+                </div>
+                <label className="shopify-pagination__size">
+                    <span className="shopify-pagination__size-lab">Rows per page</span>
+                    <select
+                        className="shopify-pagination__select"
+                        value={pageSize}
+                        disabled={loading}
+                        aria-label="Rows per page"
+                        onChange={(e) => {
+                            setPageSize(Number(e.target.value));
+                            setPage(1);
+                        }}
+                    >
+                        {[20, 50, 100, 250, 500, 1000].map((n) => (
+                            <option key={n} value={n}>
+                                {n}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+                <div className="shopify-pagination__nav">
+                    <button type="button" className="shopify-page-btn" disabled={loading || page <= 1} onClick={() => setPage(1)}>
+                        First
+                    </button>
+                    <button
+                        type="button"
+                        className="shopify-page-btn"
+                        disabled={loading || page <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                        Prev
+                    </button>
+                    <span className="shopify-pagination__page-of">
+                        Page <strong>{page}</strong> of <strong>{Math.max(1, ordersMeta?.totalPages ?? 1)}</strong>
+                    </span>
+                    <button
+                        type="button"
+                        className="shopify-page-btn"
+                        disabled={loading || page >= Math.max(1, ordersMeta?.totalPages ?? 1)}
+                        onClick={() => setPage((p) => p + 1)}
+                    >
+                        Next
+                    </button>
+                    <button
+                        type="button"
+                        className="shopify-page-btn"
+                        disabled={loading || page >= Math.max(1, ordersMeta?.totalPages ?? 1)}
+                        onClick={() => setPage(Math.max(1, ordersMeta?.totalPages ?? 1))}
+                    >
+                        Last
+                    </button>
+                </div>
+            </footer>
 
             {loadingOrderDetail && <Spinner overlay fixed message="Loading order…" />}
             {customerProfileLoading && <Spinner overlay fixed message="Loading customer…" />}
@@ -1109,9 +1363,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         setEditingOrder(null);
                         // Ensure list refresh uses the same from/to as the date filter (bare GET /orders otherwise).
                         if (wasEditing) {
-                            void loadOrdersFromApi(ordersListQuery)
-                                .then((fresh) => setOrders(fresh))
-                                .catch(() => {});
+                            void loadOrdersPage(ordersListQuery).catch(() => {});
                         }
                     }} 
                     onCreate={async (o) => {
@@ -1131,8 +1383,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                             const size = rest.join('-').trim();
 
                                             let product: ProductApiItem | undefined =
-                                                products.find((p) => p.name === name) ||
-                                                products.find((p) => label.startsWith(p.name));
+                                                modalProductSource.find((p) => p.name === name) ||
+                                                modalProductSource.find((p) => label.startsWith(p.name));
 
                                             if (!product) return undefined;
 
@@ -1146,13 +1398,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
                                             return hasVariant ? product._id : product._id;
                                         },
-                                        products,
+                                        modalProductSource,
                                     );
                                 } else {
                                     await updateOrder(o);
                                 }
-                                const fresh = await loadOrdersFromApi(ordersListQuery);
-                                setOrders(fresh);
+                                await loadOrdersPage(ordersListQuery);
                                 setEditingOrder(null);
                                 showToast('Order updated successfully!', 'success');
                             } else {
@@ -1164,14 +1415,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     return 'unfulfilled';
                                 })();
 
-                                const shippingStatusBackend = (() => {
-                                    const lower = o.deliveryStatus.toLowerCase();
-                                    if (lower === 'delivered') return 'delivered';
-                                    if (lower === 'in transit') return 'in_transit';
-                                    if (lower === 'rto') return 'rto';
-                                    if (lower === 'pending pickup') return 'pending_pickup';
-                                    return lower;
-                                })();
+                                const shippingStatusBackend = normalizeDeliveryStatus(o.deliveryStatus);
 
                                 const typeBackend = (o.type ?? 'New').toLowerCase();
 
@@ -1233,8 +1477,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     },
                                     body: JSON.stringify(payload),
                                 });
-                                const fresh = await loadOrdersFromApi(ordersListQuery);
-                                setOrders(fresh);
+                                await loadOrdersPage(ordersListQuery);
                                 setShowAddOrder(false);
                                 showToast('Order added successfully!', 'success');
                             }
@@ -1267,8 +1510,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     onConfirm={async () => {
                         try {
                             await deleteOrder(orderToDelete.id);
-                            const fresh = await loadOrdersFromApi(ordersListQuery);
-                            setOrders(fresh);
+                            await loadOrdersPage(ordersListQuery);
                             showToast('Order deleted successfully!', 'delete');
                             setOrderToDelete(null);
                         } catch (err) {

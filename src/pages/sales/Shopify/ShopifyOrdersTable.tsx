@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ShopifyOrderApi, ShopifyOrderCustomer } from '../../../types/shopify';
 import type { Order } from '../../../utils/orders';
 import type { Platform } from '../../../utils/orders';
@@ -27,6 +28,30 @@ export type GroupedOrdersByDate = {
     codCount: number;
     paidCount: number;
 };
+
+function ShopifyOrdersEmptyIcon() {
+    const svgProps = {
+        width: 44,
+        height: 44,
+        viewBox: '0 0 24 24',
+        fill: 'none' as const,
+        stroke: 'currentColor',
+        strokeWidth: 1.5,
+        strokeLinecap: 'round' as const,
+        strokeLinejoin: 'round' as const,
+        'aria-hidden': true as const,
+    };
+    return (
+        <svg {...svgProps}>
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            <polyline points="7.5 4.21 12 6.81 16.5 4.21" />
+            <polyline points="7.5 19.79 7.5 14.6 3 12" />
+            <polyline points="21 12 16.5 14.6 16.5 19.79" />
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+            <line x1="12" y1="22.08" x2="12" y2="12" />
+        </svg>
+    );
+}
 
 function buildOrderWhatsAppMessage(o: ShopifyOrderApi): string {
     const name = getOrderCustomerName(o) || 'Customer';
@@ -81,6 +106,32 @@ function buildOrderWhatsAppMessage(o: ShopifyOrderApi): string {
     lines.push('Your order will be with you very soon — thank you for trusting Purity Harvest....');
 
     return lines.join('\n');
+}
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(trimmed);
+            return true;
+        }
+    } catch {
+        /* fall through */
+    }
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = trimmed;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch {
+        return false;
+    }
 }
 
 function formatInvoiceDate(iso?: string): string {
@@ -350,6 +401,7 @@ export function ShopifyOrdersTable({
     groupedByDate,
     marketingSpend,
     loading,
+    loadingMessage = 'Loading Orders',
     orderCount,
     onCustomerClick,
     onEdit,
@@ -358,18 +410,40 @@ export function ShopifyOrdersTable({
     groupedByDate: GroupedOrdersByDate[];
     marketingSpend: SpendRecord[];
     loading: boolean;
+    /** Shown under the spinner when `loading` (e.g. phone search vs initial load). */
+    loadingMessage?: string;
     orderCount: number;
     onCustomerClick: (customerId: string, phone: string) => void;
     onEdit: (order: Order) => void;
     onDelete: (order: Order) => void;
 }) {
+    const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
+    const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+        };
+    }, []);
+
+    const flashCopied = useCallback((orderId: string) => {
+        if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+        setCopiedOrderId(orderId);
+        copiedTimerRef.current = setTimeout(() => {
+            setCopiedOrderId(null);
+            copiedTimerRef.current = null;
+        }, 2000);
+    }, []);
+
     return (
         <div className="card shopify-orders-card">
             <div className="shopify-orders-count-bar">
                 {loading ? '—' : `${orderCount.toLocaleString()} order${orderCount === 1 ? '' : 's'}`}
             </div>
             {loading ? (
-                null
+                <div className="shopify-orders-loading">
+                    <Spinner overlay message={loadingMessage} />
+                </div>
             ) : (
                 <div className="table-scroll-wrapper">
                     <table className="orders-table shopify-orders-table">
@@ -394,19 +468,26 @@ export function ShopifyOrdersTable({
                         <tbody>
                             {groupedByDate.length === 0 ? (
                                 <tr>
-                                    <td colSpan={11} className="shopify-orders-empty-cell">
-                                        No orders found. Click "Add Order" to create your first order.
+                                    <td colSpan={11} className="shopify-orders-empty-cell shopify-orders-empty-cell--panel">
+                                        <div className="shopify-orders-empty-panel">
+                                            <div className="shopify-orders-empty-panel__icon-wrap">
+                                                <ShopifyOrdersEmptyIcon />
+                                            </div>
+                                            <h3 className="shopify-orders-empty-panel__title">No Record Found</h3>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
                                 groupedByDate.map((group) =>
-                                    group.items.map((o, idx) => (
-                                        <tr
+                                    group.items.map((o, idx) => {
+                                        const customerPhone = getOrderCustomerPhone(o);
+                                        return (
+                                            <tr
                                             key={o._id}
                                             className={`shopify-orders-row${
                                                 idx === 0 ? ' shopify-orders-row--group-start' : ''
                                             }`}
-                                        >
+                                            >
                                             {idx === 0 ? (
                                                 <td rowSpan={group.items.length} className="shopify-orders-date-cell">
                                                     <div className="shopify-orders-date-wrapper">
@@ -460,7 +541,7 @@ export function ShopifyOrdersTable({
                                                                     );
                                                                 }
 
-                                                                onCustomerClick(customerId, getOrderCustomerPhone(o));
+                                                                onCustomerClick(customerId, customerPhone);
                                                             }}
                                                         >
                                                             {getOrderCustomerName(o)}
@@ -491,12 +572,37 @@ export function ShopifyOrdersTable({
                                                             </svg>
                                                         </button>
                                                     </div>
-                                                    <a
-                                                        className="link shopify-customer-phone"
-                                                        href={`tel:${getOrderCustomerPhone(o)}`}
-                                                    >
-                                                        {getOrderCustomerPhone(o)}
-                                                    </a>
+                                                    {customerPhone ? (
+                                                        copiedOrderId === o._id ? (
+                                                            <span
+                                                                className="shopify-customer-phone-copied"
+                                                                role="status"
+                                                                aria-live="polite"
+                                                            >
+                                                                Copied
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                className="shopify-customer-phone shopify-customer-phone--copy"
+                                                                title="Click to copy number"
+                                                                aria-label={`Copy phone number ${customerPhone}`}
+                                                                onClick={async (e) => {
+                                                                    e.stopPropagation();
+                                                                    const ok = await copyTextToClipboard(
+                                                                        customerPhone,
+                                                                    );
+                                                                    if (ok) flashCopied(o._id);
+                                                                }}
+                                                            >
+                                                                {customerPhone}
+                                                            </button>
+                                                        )
+                                                    ) : (
+                                                        <span className="shopify-customer-phone shopify-customer-phone--empty">
+                                                            —
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </Td>
                                             <Td>
@@ -546,13 +652,10 @@ export function ShopifyOrdersTable({
                                             <Td>
                                                 <div className="shopify-shipping-status-cell">
                                                     <StatusTag
-                                                        kind={
-                                                            o.returnStatus
-                                                                ? 'RTO'
-                                                                : mapDeliveryStatusFromTracking(
-                                                                      o.shippingDetails?.trackingStatus
-                                                                  )
-                                                        }
+                                                        kind={mapDeliveryStatusFromTracking(
+                                                            o.shippingDetails?.trackingStatus,
+                                                            o.returnStatus,
+                                                        )}
                                                         type="delivery"
                                                     />
                                                     {(() => {
@@ -603,7 +706,7 @@ export function ShopifyOrdersTable({
                                             <Td>
                                                 <div className="shopify-row-actions">
                                                     <a
-                                                        href={`https://wa.me/${getOrderCustomerPhone(o)}?text=${encodeURIComponent(
+                                                        href={`https://wa.me/${customerPhone}?text=${encodeURIComponent(
                                                             buildOrderWhatsAppMessage(o),
                                                         )}`}
                                                         target="_blank"
@@ -633,7 +736,8 @@ export function ShopifyOrdersTable({
                                                 </div>
                                             </Td>
                                         </tr>
-                                    ))
+                                        );
+                                    }),
                                 )
                             )}
                         </tbody>

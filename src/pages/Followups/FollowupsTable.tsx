@@ -1,6 +1,5 @@
 import React from 'react';
 import type { Followup } from '../../utils/followups';
-import type { Order } from '../../utils/orders';
 import { FollowupTableRow } from './FollowupTableRow';
 import { Th } from './FollowupsTableCells';
 
@@ -8,7 +7,6 @@ type Props = {
     loading: boolean;
     filtered: Followup[];
     baseFollowups: Followup[];
-    ordersByCustomer: Map<string, Order[]>;
     onCustomerClick: (f: Followup) => void;
     onOpenHistory: (f: Followup) => void;
     onUpdate: (id: string, field: keyof Followup, value: string | null) => void;
@@ -18,7 +16,6 @@ export function FollowupsTable({
     loading,
     filtered,
     baseFollowups,
-    ordersByCustomer,
     onCustomerClick,
     onOpenHistory,
     onUpdate,
@@ -55,7 +52,6 @@ export function FollowupsTable({
                                   <FollowupTableRow
                                       key={f.id}
                                       followup={f}
-                                      ordersByCustomer={ordersByCustomer}
                                       onCustomerClick={onCustomerClick}
                                       onOpenHistory={onOpenHistory}
                                       onUpdate={onUpdate}

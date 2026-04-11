@@ -2,7 +2,36 @@ import { apiFetch } from '../api';
 
 export type PaymentStatus = 'COD' | 'PAID';
 export type FulfillmentStatus = 'Unfulfilled' | 'Fulfilled' | 'Partial';
-export type DeliveryStatus = 'In Transit' | 'Delivered' | 'RTO' | 'Pending Pickup';
+
+/** Shipping / tracking status as stored in API (`shippingDetails.trackingStatus`). */
+export type DeliveryStatus = 'in_transit' | 'delivered' | 'rto' | 'pending_pickup';
+
+export const DELIVERY_STATUSES: DeliveryStatus[] = ['pending_pickup', 'in_transit', 'delivered', 'rto'];
+
+const DELIVERY_LABELS: Record<DeliveryStatus, string> = {
+    in_transit: 'In Transit',
+    delivered: 'Delivered',
+    rto: 'RTO',
+    pending_pickup: 'Pending Pickup',
+};
+
+/** Human-readable label for UI (dropdowns, tags, tables). */
+export function deliveryStatusLabel(status: string | undefined, returnStatus?: boolean): string {
+    const n = normalizeDeliveryStatus(status, returnStatus);
+    return DELIVERY_LABELS[n] ?? (status || '—');
+}
+
+/** Normalize API or legacy display strings to canonical `DeliveryStatus`. */
+export function normalizeDeliveryStatus(input: string | undefined, returnStatus?: boolean): DeliveryStatus {
+    if (returnStatus === true) return 'rto';
+    const raw = String(input ?? '').trim();
+    const s = raw.toLowerCase().replace(/\s+/g, ' ');
+    if (s === 'in_transit' || s === 'in-transit' || s === 'in transit') return 'in_transit';
+    if (s === 'delivered') return 'delivered';
+    if (s === 'rto') return 'rto';
+    if (s === 'pending_pickup' || s === 'pending pickup') return 'pending_pickup';
+    return 'pending_pickup';
+}
 export type Platform = 'Shopify' | 'Abandoned' | 'Whatsapp' | 'Amazon' | 'Flipkart' | 'Calling';
 export type OrderType = 'New' | 'Repeat' | 'Reference';
 
@@ -59,6 +88,10 @@ export async function loadOrders(): Promise<Order[]> {
         // Normalise possible backend shapes
         addedBy: (o.addedBy ?? o.added_by) ?? undefined,
         is_shipped: Boolean((o as { is_shipped?: boolean }).is_shipped),
+        deliveryStatus: normalizeDeliveryStatus(
+            (o as { deliveryStatus?: string }).deliveryStatus,
+            Boolean((o as { returnStatus?: boolean }).returnStatus),
+        ) as DeliveryStatus,
     })) as Order[];
 }
 

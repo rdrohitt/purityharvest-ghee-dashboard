@@ -1,3 +1,9 @@
+/** Populated creator/updater ref on user list rows from API. */
+export interface UserAuditRef {
+  _id: string;
+  name?: string;
+}
+
 /**
  * User record for the Users & Roles list (normalized from API).
  */
@@ -9,6 +15,40 @@ export interface UserRecord {
   password: string;
   role: string;
   permissions: string[];
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: UserAuditRef | null;
+  updatedBy?: UserAuditRef | null;
+  __v?: number;
+}
+
+/**
+ * Single row from GET /api/users when the API returns a paginated dashboard shape.
+ */
+export interface UsersListRowApi {
+  _id: string;
+  name: string;
+  username: string;
+  phoneNumber?: string;
+  role: string;
+  permissions: string[];
+  createdBy?: UserAuditRef;
+  updatedBy?: UserAuditRef;
+  createdAt?: string;
+  updatedAt?: string;
+  __v?: number;
+}
+
+/**
+ * Paginated list response from GET /api/users?page=&limit=.
+ */
+export interface UsersListDashboardResponse {
+  count: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  rows: UsersListRowApi[];
 }
 
 /**

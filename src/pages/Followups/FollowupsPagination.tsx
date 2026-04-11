@@ -20,6 +20,10 @@ type Props = {
     pageSize: number;
     setPage: React.Dispatch<React.SetStateAction<number>>;
     setPageSize: React.Dispatch<React.SetStateAction<number>>;
+    /** Defaults to followups page-size options. */
+    pageSizeOptions?: readonly number[];
+    /** `aria-label` on the pagination footer. */
+    ariaLabel?: string;
 };
 
 export function FollowupsPagination({
@@ -33,9 +37,11 @@ export function FollowupsPagination({
     pageSize,
     setPage,
     setPageSize,
+    pageSizeOptions = FOLLOWUPS_PAGE_SIZE_OPTIONS,
+    ariaLabel = 'Followups pagination',
 }: Props) {
     return (
-        <footer className="fu-pagination" aria-label="Followups pagination">
+        <footer className="fu-pagination" aria-label={ariaLabel}>
             <div className="fu-pagination__range">
                 {loading ? (
                     <span className="fu-pagination__muted">Loading…</span>
@@ -69,7 +75,7 @@ export function FollowupsPagination({
                         setPage(1);
                     }}
                 >
-                    {FOLLOWUPS_PAGE_SIZE_OPTIONS.map((n) => (
+                    {pageSizeOptions.map((n) => (
                         <option key={n} value={n}>
                             {n}
                         </option>

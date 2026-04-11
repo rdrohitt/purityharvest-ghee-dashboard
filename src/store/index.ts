@@ -5,6 +5,7 @@ import productReducer from './productSlice';
 import modulesReducer from './moduleSlice';
 import usersTableReducer from './usersTableSlice';
 import marketingSpendReducer from './marketingSpendSlice';
+import type { UserState } from './userSlice';
 
 export const store = configureStore({
 	reducer: {
@@ -16,7 +17,14 @@ export const store = configureStore({
 	},
 });
 
-export type RootState = ReturnType<typeof store.getState>;
+/** Explicit shape so `state.user` is not inferred as `unknown` under strict tooling. */
+export type RootState = {
+	user: UserState;
+	products: ReturnType<typeof productReducer>;
+	modules: ReturnType<typeof modulesReducer>;
+	usersTable: ReturnType<typeof usersTableReducer>;
+	marketingSpend: ReturnType<typeof marketingSpendReducer>;
+};
 export type AppDispatch = typeof store.dispatch;
 
 export const useAppDispatch: () => AppDispatch = useDispatch;
