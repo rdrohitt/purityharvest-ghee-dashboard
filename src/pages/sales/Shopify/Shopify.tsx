@@ -22,6 +22,9 @@ import {
     mapOrderType,
     getOrderCustomerName,
     getOrderCustomerPhone,
+    getOrderAddress,
+    getOrderState,
+    getOrderPincode,
     updateShopifyOrderFromForm,
     getShopifyProductUnitPrice,
     buildDefaultTrackingUrlFromCourier,
@@ -1035,45 +1038,94 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             className="shopify-export-btn"
                             onClick={() => {
                                 // Export to CSV
-                                const headers = ['S.no', 'Name', 'Mobile', 'Quantity (L)', 'Amount', 'Shipping Status', 'State'];
+                                const headers = [
+                                    'S.No',
+                                    'Customer Name',
+                                    'Phone No',
+                                    'Address',
+                                    'Shipping Status',
+                                    'Quantity (L)',
+                                    'Amount',
+                                    'State',
+                                    'Pincode',
+                                ];
+
+                                function lineLitersFromOrder(order: ShopifyOrderApi): number {
+                                    return (order.products || []).reduce(
+                                        (sum: number, p: { variantName: string; quantity: number }) => {
+                                            const sizeMatch = (p.variantName || '').match(
+                                                /-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|L)/i,
+                                            );
+                                            if (!sizeMatch) return sum;
+                                            const sizeValue = parseFloat(sizeMatch[1]);
+                                            const sizeUnit = sizeMatch[2].toLowerCase();
+                                            let litersPerUnit = 0;
+                                            if (sizeUnit === 'ml') litersPerUnit = sizeValue / 1000;
+                                            else if (sizeUnit === 'l' || sizeUnit === 'ltr')
+                                                litersPerUnit = sizeValue;
+                                            return sum + litersPerUnit * p.quantity;
+                                        },
+                                        0,
+                                    );
+                                }
+
+                                function csvEscapeCell(cell: unknown): string {
+                                    const cellStr = String(cell);
+                                    if (
+                                        cellStr.includes(',') ||
+                                        cellStr.includes('"') ||
+                                        cellStr.includes('\n')
+                                    ) {
+                                        return `"${cellStr.replace(/"/g, '""')}"`;
+                                    }
+                                    return cellStr;
+                                }
+
+                                function rowToCsvLine(row: unknown[]): string {
+                                    return row.map(csvEscapeCell).join(',');
+                                }
+
                                 // Include all orders (COD, PAID, RTO, In Transit, etc.)
                                 const exportableOrders = filtered;
+                                let sumQuantityL = 0;
+                                let sumAmount = 0;
                                 const rows = exportableOrders.map((order: ShopifyOrderApi, index: number) => {
-                                    const totalQuantityLiters = (order.products || []).reduce((sum: number, p: { variantName: string; quantity: number }) => {
-                                        const sizeMatch = (p.variantName || '').match(/-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|L)/i);
-                                        if (!sizeMatch) return sum;
-                                        const sizeValue = parseFloat(sizeMatch[1]);
-                                        const sizeUnit = sizeMatch[2].toLowerCase();
-                                        let litersPerUnit = 0;
-                                        if (sizeUnit === 'ml') litersPerUnit = sizeValue / 1000;
-                                        else if (sizeUnit === 'l' || sizeUnit === 'ltr') litersPerUnit = sizeValue;
-                                        return sum + litersPerUnit * p.quantity;
-                                    }, 0);
+                                    const qtyL = lineLitersFromOrder(order);
+                                    const amt = Number(order.totalAmount) || 0;
+                                    sumQuantityL += qtyL;
+                                    sumAmount += amt;
                                     return [
                                         index + 1,
                                         getOrderCustomerName(order),
                                         getOrderCustomerPhone(order),
-                                        totalQuantityLiters,
-                                        order.totalAmount,
+                                        getOrderAddress(order),
                                         deliveryStatusLabel(
                                             order.shippingDetails?.trackingStatus,
                                             order.returnStatus,
                                         ),
-                                        order.state || ''
+                                        qtyL === 0 ? 0 : Number(qtyL.toFixed(4)),
+                                        amt,
+                                        getOrderState(order),
+                                        getOrderPincode(order),
                                     ];
                                 });
-                                
-                                // Create CSV content
+
+                                const totalRow = [
+                                    'Total',
+                                    '',
+                                    '',
+                                    '',
+                                    '',
+                                    Number(sumQuantityL.toFixed(4)),
+                                    Number(sumAmount.toFixed(2)),
+                                    '',
+                                    '',
+                                ];
+
                                 const csvContent = [
-                                    headers.join(','),
-                                    ...rows.map(row => row.map(cell => {
-                                        // Escape commas and quotes in CSV
-                                        const cellStr = String(cell);
-                                        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-                                            return `"${cellStr.replace(/"/g, '""')}"`;
-                                        }
-                                        return cellStr;
-                                    }).join(','))
+                                    rowToCsvLine(headers),
+                                    ...rows.map(rowToCsvLine),
+                                    rowToCsvLine(totalRow),
                                 ].join('\n');
                                 
                                 // Create blob and download

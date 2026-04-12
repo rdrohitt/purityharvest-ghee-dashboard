@@ -49,6 +49,20 @@ export function getShopifyProductLineAmount(p: ShopifyOrderProduct): number {
     return hasPr ? pr : 0;
 }
 
+/** API / DB may use pincode, pinCode, postalCode, etc. */
+const ORDER_PINCODE_KEYS = ['pincode', 'pinCode', 'postalCode', 'postcode', 'zip', 'ZIP'] as const;
+
+function pincodeFromLooseRecord(r: Record<string, unknown> | null | undefined): string {
+    if (!r) return '';
+    for (const k of ORDER_PINCODE_KEYS) {
+        const v = r[k];
+        if (v == null) continue;
+        const s = String(v).trim();
+        if (s !== '' && s !== 'undefined' && s !== 'null') return s;
+    }
+    return '';
+}
+
 /** Get customer name from order (from customer object or top-level customerName). */
 export function getOrderCustomerName(o: ShopifyOrderApi): string {
     const c = o.customer;
@@ -70,6 +84,25 @@ export function getOrderAddress(o: ShopifyOrderApi): string {
     return String(o.address ?? '');
 }
 
+/** State from populated customer or top-level field. */
+export function getOrderState(o: ShopifyOrderApi): string {
+    const c = o.customer;
+    if (c && typeof c === 'object' && 'state' in c) return String((c as ShopifyOrderCustomer).state ?? '');
+    return String(o.state ?? '');
+}
+
+/** Pincode from populated customer or order (supports pincode / pinCode / postalCode / zip aliases). */
+export function getOrderPincode(o: ShopifyOrderApi): string {
+    const c = o.customer;
+    if (c && typeof c === 'object') {
+        const fromCust = pincodeFromLooseRecord(c as unknown as Record<string, unknown>);
+        if (fromCust) return fromCust;
+    }
+    const fromOrder = pincodeFromLooseRecord(o as unknown as Record<string, unknown>);
+    if (fromOrder) return fromOrder;
+    return '';
+}
+
 /**
  * Normalize a raw order from API to ShopifyOrderApi shape (handles id/_id, date/createdAt, etc.).
  */
@@ -86,7 +119,7 @@ function normalizeOrder(raw: unknown): ShopifyOrderApi | null {
     const address = String(o.address ?? cust?.address ?? '');
     const state = String(o.state ?? cust?.state ?? '');
     const updatedBy = o.updatedBy as ShopifyOrderApi['updatedBy'] | undefined;
-    const pincode = String(o.pincode ?? cust?.pincode ?? '');
+    const pincode = pincodeFromLooseRecord(cust) || pincodeFromLooseRecord(o) || '';
     const shippingDetailsRaw =
         o.shippingDetails && typeof o.shippingDetails === 'object'
             ? (o.shippingDetails as Record<string, unknown>)
