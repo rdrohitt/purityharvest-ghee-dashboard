@@ -57,6 +57,23 @@ export interface ShopifyOrderCustomer {
     createdAt?: string;
     updatedAt?: string;
     __v?: number;
+    /** Present when customer record was last updated by a user (id or populated ref). */
+    updatedBy?: string | ShopifyOrderUserRef;
+}
+
+/** Category embedded on populated `productId` in GET /api/orders rows. */
+export interface ShopifyOrderProductCategory {
+    _id: string;
+    name: string;
+}
+
+/**
+ * Populated product on an order line (GET /orders often includes `category`).
+ */
+export interface ShopifyOrderProductPopulated {
+    _id: string;
+    name: string;
+    category?: ShopifyOrderProductCategory;
 }
 
 /**
@@ -64,18 +81,15 @@ export interface ShopifyOrderCustomer {
  */
 export interface ShopifyOrderProduct {
     /**
-     * In some responses this is a populated object, in others it's just the id string.
+     * In some responses this is a populated object (with optional `category`), in others it's just the id string.
      */
-    productId:
-        | {
-              _id: string;
-              name: string;
-          }
-        | string;
+    productId: ShopifyOrderProductPopulated | string;
     variantId?: string;
     variantName: string;
     variantSku?: string | null;
     variantPrice: number;
+    /** Unit/list price context from API (optional). */
+    actualPrice?: number;
     quantity: number;
     price: number;
 }

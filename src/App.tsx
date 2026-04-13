@@ -81,6 +81,7 @@ export default function App() {
 
 	const isMarketingSpendRoute = location.pathname.startsWith('/admin/marketing-spend');
 	const isShopifyRoute = location.pathname.startsWith('/admin/shopify');
+	const isWALeadsRoute = location.pathname.startsWith('/admin/wa-leads');
 	const isUsersRoute =
 		location.pathname.startsWith('/admin/users-and-roles') ||
 		location.pathname.startsWith('/admin/users');
@@ -88,8 +89,12 @@ export default function App() {
 	const isProductsRoute = location.pathname.startsWith('/admin/products');
 	const showGlobalSpinner =
 		hydratingUser ||
-		(!(isMarketingSpendRoute || isShopifyRoute || isUsersRoute || isModulesRoute || isProductsRoute) &&
-			activeApiRequests > 0);
+		(!(isMarketingSpendRoute ||
+			isShopifyRoute ||
+			isWALeadsRoute ||
+			isUsersRoute ||
+			isModulesRoute ||
+			isProductsRoute) && activeApiRequests > 0);
 	const spinnerMessage = hydratingUser ? 'Loading dashboard…' : 'Loading…';
 
 	return (

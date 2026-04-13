@@ -1147,13 +1147,13 @@ function AddOrderModal({
             codCharges: codCharges ? Number(codCharges) : undefined,
             partialAmount: partialAmount !== '' ? Number(partialAmount) || 0 : 0,
             discountAmount: discount ? Number(discount) : undefined,
-            awbNumber: awb || undefined,
+            awbNumber: awb.trim(),
             shippingTrackingUrl: resolvedTrackingUrl || undefined,
             shippingTrackingCompany: shippingTrackingCompanyInput || undefined,
             notes: notes || undefined,
             state,
             platform: platform as Platform,
-            type: type ? (type as OrderType) : undefined,
+            type: (type || initialOrder?.type || 'New') as OrderType,
             is_shipped: isShipped,
         };
         try {

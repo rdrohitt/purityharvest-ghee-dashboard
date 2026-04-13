@@ -49,6 +49,8 @@ export type Followup = {
     customerName: string;
     customerPhone: string;
     lastOrder: string; // ISO date
+    /** Last order channel from dashboard `platform` (e.g. shopify, whatsapp). */
+    lastOrderPlatform?: string;
     totalOrders: number;
     lastOrderDetail: string;
     feedback: string;
@@ -122,6 +124,9 @@ export function dashboardRowToFollowup(row: FollowupsDashboardRow): Followup {
         customerName: row.customer.name,
         customerPhone,
         lastOrder: row.lastOrderDate,
+        ...(row.platform != null && String(row.platform).trim() !== ''
+            ? { lastOrderPlatform: String(row.platform).trim() }
+            : {}),
         totalOrders: row.totalOrders,
         lastOrderDetail: row.lastOrderSummary,
         feedback: row.feedback ?? '',

@@ -23,6 +23,7 @@ export interface FollowupsDashboardRow {
     /** When true, last order was an RTO; when false, delivered successfully. */
     lastOrderReturnStatus?: boolean | null;
     totalOrders: number;
+    platform?: string;
     lastOrderSummary: string;
     lastOrderAmount: number;
     lastOrderQuantity: number;

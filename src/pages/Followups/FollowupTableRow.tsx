@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Followup } from '../../utils/followups';
+import { PlatformTag } from '../sales/Shopify/ShopifyShared';
 import { FEEDBACK_OPTIONS } from './followupsConstants';
 import { formatDate, getCustomerType, getFeedbackEmoji, getFeedbackSelectClass } from './followupsFormat';
 import { DateInput } from './DateInput';
@@ -103,7 +104,14 @@ export function FollowupTableRow({ followup: f, onCustomerClick, onOpenHistory, 
             </Td>
             <Td className="fu-td--middle">
                 <div className="fu-last-order-cell">
-                    <span className="fu-last-order-cell__date">{formatDate(f.lastOrder)}</span>
+                    <div className="fu-last-order-cell__main">
+                        <span className="fu-last-order-cell__date">{formatDate(f.lastOrder)}</span>
+                        {f.lastOrderPlatform ? (
+                            <span className="fu-last-order-cell__platform">
+                                <PlatformTag platform={f.lastOrderPlatform} />
+                            </span>
+                        ) : null}
+                    </div>
                     <button
                         type="button"
                         className={`fu-hist-icon-btn${f.callingHistory.length ? ' fu-hist-icon-btn--has' : ''}`}

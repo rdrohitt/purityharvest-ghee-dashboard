@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../api';
 import { Spinner } from '../../components/Spinner';
-import { deliveryStatusLabel, normalizeDeliveryStatus } from '../../utils/orders';
+import type { LeadApiRow, LeadsListResponse } from '../../types/leads';
+import { parseLeadsListResponse } from '../../types/leads';
+import { DatePicker as ShopifyDatePicker } from '../sales/Shopify/DatePicker';
+import { FilterButton, Th, Td, toInputDate } from '../sales/Shopify/ShopifyShared';
+import '../sales/Shopify/Shopify.scss';
+import './WALeads.scss';
 
 type LeadStatus = 'New' | 'Contacted' | 'Converted' | 'Not Interested' | 'No Answer' | 'Potential Customer' | 'Very Interested' | 'CBA';
 type Platform = 'Maatripure' | 'STW' | 'Abandoned' | 'Whatsapp';
@@ -24,14 +29,130 @@ type WALead = {
     platform?: Platform;
 };
 
+const LEAD_STATUSES: LeadStatus[] = [
+    'New',
+    'Contacted',
+    'Converted',
+    'Not Interested',
+    'No Answer',
+    'Potential Customer',
+    'Very Interested',
+    'CBA',
+];
+
+const MIN_PHONE_SEARCH_DIGITS = 10;
+
+const ENGAGE_IMPORT_PAGE_NUMBERS = Array.from({ length: 20 }, (_, i) => i + 1);
+
+function digitsOnly(s: string): string {
+    return s.replace(/\D/g, '');
+}
+
+function formatLeadDateTime(iso: string | null | undefined): string {
+    if (iso == null || iso === '') return '—';
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return '—';
+    return new Date(t).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function truncateMessage(text: string, maxLen: number): string {
+    const t = text.replace(/\s+/g, ' ').trim();
+    if (t.length <= maxLen) return t;
+    return `${t.slice(0, maxLen)}…`;
+}
+
+const WA_LEADS_NODATE_GROUP_KEY = '__nodate__';
+
+function localDateKeyFromLeadRow(row: LeadApiRow): string {
+    const raw = row.time?.trim() ? row.time : row.createdAt;
+    if (!raw) return WA_LEADS_NODATE_GROUP_KEY;
+    const t = Date.parse(raw);
+    if (!Number.isFinite(t)) return WA_LEADS_NODATE_GROUP_KEY;
+    const d = new Date(t);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function formatWaLeadsDateGroupTitle(dateKey: string): string {
+    if (dateKey === WA_LEADS_NODATE_GROUP_KEY) return 'No lead date';
+    const parts = dateKey.split('-').map((x) => parseInt(x, 10));
+    const [y, mo, da] = parts;
+    if (!y || !mo || !da) return dateKey;
+    const d = new Date(y, mo - 1, da);
+    return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function leadStatusModifier(status: LeadStatus): string {
+    const map: Record<LeadStatus, string> = {
+        New: 'new',
+        Contacted: 'contacted',
+        Converted: 'converted',
+        'Not Interested': 'not-interested',
+        'No Answer': 'no-answer',
+        'Potential Customer': 'potential',
+        'Very Interested': 'very-interested',
+        CBA: 'cba',
+    };
+    return map[status];
+}
+
+type UiRange = 'all' | 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
+
+function transformWALeadItem(item: Record<string, unknown>): WALead {
+    const statusOk = (s: unknown): s is LeadStatus =>
+        typeof s === 'string' && (LEAD_STATUSES as string[]).includes(s);
+
+    if (item.customerName && item.mobile) {
+        return {
+            id: String(item.id ?? ''),
+            customerName: String(item.customerName ?? ''),
+            mobile: String(item.mobile ?? ''),
+            callingDate: String(item.callingDate ?? ''),
+            callingDetail: String(item.callingDetail ?? ''),
+            callBackDate: item.callBackDate != null ? String(item.callBackDate) : undefined,
+            notes: String(item.notes ?? ''),
+            status: statusOk(item.status) ? item.status : 'New',
+            platform: item.platform as Platform | undefined,
+        };
+    }
+    return {
+        id: String(item.id ?? ''),
+        customerName: String(item.customer ?? ''),
+        mobile: String(item.customerPhone ?? ''),
+        callingDate: String(item.date ?? item.callingDate ?? ''),
+        callingDetail: String(item.callingDetail ?? ''),
+        callBackDate: item.callBackDate != null ? String(item.callBackDate) : undefined,
+        notes: String(item.notes ?? ''),
+        status: statusOk(item.status) ? item.status : 'New',
+        platform: item.platform as Platform | undefined,
+    };
+}
+
 export default function WALeads() {
-    const [customerFilter, setCustomerFilter] = useState('');
+    const [range, setRange] = useState<UiRange>('currentMonth');
+    const [phoneSearchInput, setPhoneSearchInput] = useState('');
+    const [customStart, setCustomStart] = useState<string>(toInputDate(new Date()));
+    const [customEnd, setCustomEnd] = useState<string>(toInputDate(new Date()));
+    const [appliedCustomStart, setAppliedCustomStart] = useState<string>(toInputDate(new Date()));
+    const [appliedCustomEnd, setAppliedCustomEnd] = useState<string>(toInputDate(new Date()));
+    const [showCustom, setShowCustom] = useState(false);
+    const customBtnRef = useRef<HTMLButtonElement | null>(null);
+    const popoverRef = useRef<HTMLDivElement | null>(null);
+
     const [showAddLead, setShowAddLead] = useState(false);
     const [editingLead, setEditingLead] = useState<WALead | null>(null);
-    const [leads, setLeads] = useState<WALead[]>([]);
+    const [leadsRows, setLeadsRows] = useState<LeadApiRow[]>([]);
+    const [leadsMeta, setLeadsMeta] = useState<LeadsListResponse | null>(null);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [loading, setLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState<LeadStatus | ''>('');
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const [showEngageImportModal, setShowEngageImportModal] = useState(false);
+    const [engageToken, setEngageToken] = useState('');
+    const [engageImportLoadingPage, setEngageImportLoadingPage] = useState<number | null>(null);
+    const [engageFetchAllLoading, setEngageFetchAllLoading] = useState(false);
 
     function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
         const id = `toast-${Date.now()}-${Math.random()}`;
@@ -41,361 +162,769 @@ export default function WALeads() {
         }, 3000);
     }
 
+    const getLocalDateString = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const dateRangeForApi = useMemo((): { from: string; to: string } => {
+        const now = new Date();
+        const todayStr = getLocalDateString(now);
+        if (range === 'all') {
+            return { from: '2024-01-01', to: todayStr };
+        }
+        if (range === 'custom') {
+            return { from: appliedCustomStart, to: appliedCustomEnd };
+        }
+        if (range === 'today') {
+            return { from: todayStr, to: todayStr };
+        }
+        if (range === 'yesterday') {
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = getLocalDateString(yesterday);
+            return { from: yesterdayStr, to: yesterdayStr };
+        }
+        if (range === 'last7') {
+            const start = new Date(now);
+            start.setDate(start.getDate() - 6);
+            return { from: getLocalDateString(start), to: todayStr };
+        }
+        if (range === 'currentMonth') {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            return { from: getLocalDateString(start), to: todayStr };
+        }
+        if (range === 'lastMonth') {
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const start = new Date(year, month - 1, 1);
+            const end = new Date(year, month, 0);
+            return { from: getLocalDateString(start), to: getLocalDateString(end) };
+        }
+        return { from: '2024-01-01', to: todayStr };
+    }, [range, appliedCustomStart, appliedCustomEnd]);
+
+    const loadLeads = useCallback(async () => {
+        setLoading(true);
+        try {
+            const params = new URLSearchParams();
+            if (range !== 'all') {
+                params.set('from', dateRangeForApi.from);
+                params.set('to', dateRangeForApi.to);
+            }
+            params.set('page', String(page));
+            params.set('limit', String(pageSize));
+            const res = await apiFetch(`/api/leads?${params.toString()}`);
+            if (!res.ok) throw new Error('Failed to load Leads');
+            const data: unknown = await res.json();
+            let parsed = parseLeadsListResponse(data);
+            if (!parsed && Array.isArray(data)) {
+                const wal = data.map((item) => transformWALeadItem(item as Record<string, unknown>));
+                const rows: LeadApiRow[] = wal.map((w) => ({
+                    _id: w.id,
+                    name: w.customerName,
+                    phoneNumber: digitsOnly(w.mobile).slice(-10) || digitsOnly(w.mobile),
+                    countryCode: '+91',
+                    message: [w.notes, w.callingDetail].filter(Boolean).join('\n') || '',
+                    time: w.callingDate?.trim() ? w.callingDate : null,
+                    createdBy: { _id: '', name: '—' },
+                    updatedBy: { _id: '', name: '—' },
+                    createdAt: w.callingDate || new Date().toISOString(),
+                    updatedAt: w.callingDate || new Date().toISOString(),
+                    __v: 0,
+                }));
+                parsed = {
+                    count: rows.length,
+                    total: rows.length,
+                    page: 1,
+                    limit: Math.max(rows.length, 1),
+                    totalPages: 1,
+                    rows,
+                };
+            }
+            if (parsed) {
+                setLeadsRows(parsed.rows);
+                setLeadsMeta(parsed);
+            } else {
+                setLeadsRows([]);
+                setLeadsMeta(null);
+            }
+        } catch (err) {
+            console.error('Failed to load Leads', err);
+            setLeadsRows([]);
+            setLeadsMeta(null);
+        } finally {
+            setLoading(false);
+        }
+    }, [range, dateRangeForApi.from, dateRangeForApi.to, page, pageSize]);
+
     useEffect(() => {
-        let cancelled = false;
-        apiFetch('/api/wa-leads-orders')
-            .then((res) => {
-                if (!res.ok) throw new Error('Failed to load Leads');
-                return res.json();
-            })
-            .then((data) => {
-                if (cancelled) return;
-                // Transform old order data to new lead format if needed
-                const transformedLeads: WALead[] = Array.isArray(data) ? data.map((item: any) => {
-                    // If it's already in the new format, ensure all required fields are present
-                    if (item.customerName && item.mobile) {
-                        return {
-                            id: item.id || '',
-                            customerName: item.customerName || '',
-                            mobile: item.mobile || '',
-                            callingDate: item.callingDate || '',
-                            callingDetail: item.callingDetail || '',
-                            callBackDate: item.callBackDate || undefined,
-                            notes: item.notes || '',
-                            status: (item.status && ['New', 'Contacted', 'Converted', 'Not Interested', 'No Answer', 'Potential Customer', 'Very Interested', 'CBA'].includes(item.status)) 
-                                ? item.status as LeadStatus 
-                                : 'New' as LeadStatus,
-                        };
-                    }
-                    // Otherwise, transform from old order format
-                    return {
-                        id: item.id || '',
-                        customerName: item.customer || '',
-                        mobile: item.customerPhone || '',
-                        callingDate: item.date || item.callingDate || '',
-                        callingDetail: item.callingDetail || '',
-                        callBackDate: item.callBackDate || undefined,
-                        notes: item.notes || '',
-                        status: (item.status && ['New', 'Contacted', 'Converted', 'Not Interested', 'No Answer', 'Potential Customer', 'Very Interested', 'CBA'].includes(item.status)) 
-                            ? item.status as LeadStatus 
-                            : 'New' as LeadStatus,
-                    };
-                }) : [];
-                setLeads(transformedLeads);
-            })
-            .catch((err) => {
-                console.error('Failed to load Leads', err);
-                if (!cancelled) setLeads([]);
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false);
-            });
+        void loadLeads();
+    }, [loadLeads]);
 
+    useEffect(() => {
+        function onDocClick(e: MouseEvent) {
+            if (!showCustom) return;
+            const target = e.target as Node;
+            if (popoverRef.current?.contains(target)) return;
+            if (customBtnRef.current?.contains(target)) return;
+            setShowCustom(false);
+        }
+        document.addEventListener('click', onDocClick);
+        return () => document.removeEventListener('click', onDocClick);
+    }, [showCustom]);
+
+    useEffect(() => {
+        if (!showEngageImportModal) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
         return () => {
-            cancelled = true;
+            document.body.style.overflow = prev;
         };
-    }, []);
+    }, [showEngageImportModal]);
 
-    const sortedLeads = useMemo(() => {
-        return [...leads].sort((a, b) => {
-            if (!a.callingDate && !b.callingDate) return 0;
-            if (!a.callingDate) return 1;
-            if (!b.callingDate) return -1;
-            return a.callingDate < b.callingDate ? 1 : -1;
+    useLayoutEffect(() => {
+        if (!showCustom) return;
+        const pop = popoverRef.current;
+        const btn = customBtnRef.current;
+        if (pop && btn) {
+            pop.style.left = `${btn.offsetLeft}px`;
+        }
+    }, [showCustom, range]);
+
+    const runEngageImport = useCallback(
+        async (page: number) => {
+            const token = engageToken.trim();
+            if (!token) {
+                showToast('Enter your Engage token', 'error');
+                return;
+            }
+            setEngageImportLoadingPage(page);
+            try {
+                const res = await apiFetch(`/api/leads/import-engage?page=${encodeURIComponent(page)}`, {
+                    method: 'POST',
+                    headers: { 'x-engage-token': token },
+                });
+                const data: unknown = await res.json().catch(() => null);
+                if (!res.ok) {
+                    const msg =
+                        data && typeof data === 'object' && data !== null && 'message' in data
+                            ? String((data as { message?: unknown }).message)
+                            : `Request failed (${res.status})`;
+                    throw new Error(msg);
+                }
+                showToast(`Engage import page ${page} completed`, 'success');
+                await loadLeads();
+            } catch (err) {
+                console.error('Engage import failed', err);
+                showToast(err instanceof Error ? err.message : 'Engage import failed', 'error');
+            } finally {
+                setEngageImportLoadingPage(null);
+            }
+        },
+        [engageToken, loadLeads],
+    );
+
+    const engageImportBusy = engageImportLoadingPage !== null || engageFetchAllLoading;
+
+    const runEngageFetchAll = useCallback(async () => {
+        const token = engageToken.trim();
+        if (!token) {
+            showToast('Enter your Engage token', 'error');
+            return;
+        }
+        setEngageFetchAllLoading(true);
+        try {
+            const res = await apiFetch('/api/leads/import-engage?mode=full', {
+                method: 'POST',
+                headers: { 'x-engage-token': token },
+            });
+            const data: unknown = await res.json().catch(() => null);
+            if (!res.ok) {
+                const msg =
+                    data && typeof data === 'object' && data !== null && 'message' in data
+                        ? String((data as { message?: unknown }).message)
+                        : `Request failed (${res.status})`;
+                throw new Error(msg);
+            }
+            showToast('Engage fetch all completed', 'success');
+            await loadLeads();
+        } catch (err) {
+            console.error('Engage fetch all failed', err);
+            showToast(err instanceof Error ? err.message : 'Engage fetch all failed', 'error');
+        } finally {
+            setEngageFetchAllLoading(false);
+        }
+    }, [engageToken, loadLeads]);
+
+    const phoneDigits = useMemo(() => digitsOnly(phoneSearchInput), [phoneSearchInput]);
+    const isPhoneSearch = phoneDigits.length === MIN_PHONE_SEARCH_DIGITS;
+
+    const existingLeadsForModal = useMemo((): WALead[] => {
+        return leadsRows.map((r) => {
+            const mob = digitsOnly(r.phoneNumber).slice(-10) || r.phoneNumber;
+            return {
+                id: r._id,
+                customerName: r.name,
+                mobile: mob.length === 10 ? mob : digitsOnly(r.phoneNumber) || r.phoneNumber,
+                callingDate: '',
+                callingDetail: '',
+                notes: '',
+                status: 'New',
+            };
         });
-    }, [leads]);
+    }, [leadsRows]);
+
+    const sortedLeadRows = useMemo(() => {
+        return [...leadsRows].sort((a, b) => {
+            const ta = Date.parse(a.createdAt);
+            const tb = Date.parse(b.createdAt);
+            if (!Number.isFinite(ta) && !Number.isFinite(tb)) return 0;
+            if (!Number.isFinite(ta)) return 1;
+            if (!Number.isFinite(tb)) return -1;
+            return tb - ta;
+        });
+    }, [leadsRows]);
 
     const filtered = useMemo(() => {
-        const filteredLeads = sortedLeads.filter(lead => {
-            const matchesCustomer = lead.customerName.toLowerCase().includes(customerFilter.toLowerCase());
-            const matchesStatus = !statusFilter || lead.status === statusFilter;
-            return matchesCustomer && matchesStatus;
+        return sortedLeadRows.filter((row) => {
+            const mobileDigits = digitsOnly(row.phoneNumber).slice(-10);
+            const matchesPhone =
+                !isPhoneSearch || (mobileDigits.length >= MIN_PHONE_SEARCH_DIGITS && mobileDigits.endsWith(phoneDigits));
+            return matchesPhone;
         });
-        return filteredLeads;
-    }, [sortedLeads, customerFilter, statusFilter]);
+    }, [sortedLeadRows, phoneDigits, isPhoneSearch]);
 
-    const metrics = useMemo(() => {
-        const totalLeads = filtered.length;
-        const newLeads = filtered.filter(l => l.status === 'New').length;
-        const convertedLeads = filtered.filter(l => l.status === 'Converted').length;
-        const interestedLeads = filtered.filter(l => l.status === 'Very Interested' || l.status === 'Potential Customer').length;
-        const cbaLeads = filtered.filter(l => l.status === 'CBA').length;
-        
-        return {
-            totalLeads,
-            newLeads,
-            convertedLeads,
-            interestedLeads,
-            cbaLeads,
-        };
+    const leadsGroupedByDate = useMemo((): { dateKey: string; rows: LeadApiRow[] }[] => {
+        const map = new Map<string, LeadApiRow[]>();
+        for (const row of filtered) {
+            const k = localDateKeyFromLeadRow(row);
+            const list = map.get(k);
+            if (list) list.push(row);
+            else map.set(k, [row]);
+        }
+        const keys = [...map.keys()].sort((a, b) => {
+            if (a === WA_LEADS_NODATE_GROUP_KEY) return 1;
+            if (b === WA_LEADS_NODATE_GROUP_KEY) return -1;
+            return b.localeCompare(a);
+        });
+        for (const k of keys) {
+            const list = map.get(k)!;
+            list.sort((a, b) => {
+                const ta = Date.parse(a.createdAt);
+                const tb = Date.parse(b.createdAt);
+                return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
+            });
+        }
+        return keys.map((dateKey) => ({ dateKey, rows: map.get(dateKey)! }));
     }, [filtered]);
 
+    const metrics = useMemo(() => {
+        const totalInRange = leadsMeta?.total ?? 0;
+        const rowsOnPage = leadsMeta?.count ?? leadsRows.length;
+        const totalLeads = isPhoneSearch ? filtered.length : totalInRange;
+        return {
+            totalLeads,
+            rowsOnPage,
+            page: leadsMeta?.page ?? page,
+            totalPages: leadsMeta?.totalPages ?? 1,
+            perPage: leadsMeta?.limit ?? pageSize,
+            phoneMatchesOnPage: isPhoneSearch ? filtered.length : rowsOnPage,
+        };
+    }, [filtered.length, isPhoneSearch, leadsMeta, leadsRows.length, page, pageSize]);
+
     return (
-        <section style={{ display: 'grid', gap: 12, width: '100%', maxWidth: '100%', overflow: 'hidden', position: 'relative' }}>
+        <section className="shopify-page wa-leads">
+            {loading ? <Spinner overlay fixed message="Loading leads…" /> : null}
             <ToastContainer toasts={toasts} />
-            <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
-                <div style={{ fontWeight: 800 }}>Leads</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-                    <div style={{ 
-                        display: 'flex', 
-                        gap: 10, 
-                        alignItems: 'center', 
-                        flexWrap: 'wrap', 
-                        justifyContent: 'space-between',
-                        background: '#f8f9fa',
-                        padding: '12px 16px',
-                        borderRadius: 8,
-                        width: '100%'
-                    }}>
-                        <div className="status-filters-row" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <StatusFilter
-                                label="Status"
-                                value={statusFilter}
-                                onChange={setStatusFilter}
-                                options={['New', 'Contacted', 'Converted', 'Not Interested', 'No Answer', 'Potential Customer', 'Very Interested', 'CBA'] as LeadStatus[]}
-                            />
-                            {statusFilter ? (
-                            <button 
-                                className="filter-btn" 
-                                    onClick={() => { setStatusFilter(''); }}
-                                style={{ fontSize: 12, padding: '6px 12px' }}
+            <div className="card shopify-header-card">
+                <div className="shopify-header-title">Leads</div>
+                <div className="shopify-header-main">
+                    <div className="shopify-header-filters">
+                        <div className="filter-group shopify-header-filter-group">
+                            <FilterButton active={range === 'all'} onClick={() => { setPage(1); setRange('all'); setShowCustom(false); }}>
+                                All
+                            </FilterButton>
+                            <FilterButton active={range === 'today'} onClick={() => { setPage(1); setRange('today'); setShowCustom(false); }}>
+                                Today
+                            </FilterButton>
+                            <FilterButton active={range === 'yesterday'} onClick={() => { setPage(1); setRange('yesterday'); setShowCustom(false); }}>
+                                Yesterday
+                            </FilterButton>
+                            <FilterButton active={range === 'last7'} onClick={() => { setPage(1); setRange('last7'); setShowCustom(false); }}>
+                                Last 7 days
+                            </FilterButton>
+                            <FilterButton active={range === 'currentMonth'} onClick={() => { setPage(1); setRange('currentMonth'); setShowCustom(false); }}>
+                                Current Month
+                            </FilterButton>
+                            <FilterButton active={range === 'lastMonth'} onClick={() => { setPage(1); setRange('lastMonth'); setShowCustom(false); }}>
+                                Last Month
+                            </FilterButton>
+                            <FilterButton
+                                refEl={customBtnRef}
+                                active={range === 'custom' || showCustom}
+                                onClick={() => {
+                                    if (!showCustom) {
+                                        setCustomStart(appliedCustomStart);
+                                        setCustomEnd(appliedCustomEnd);
+                                    }
+                                    setShowCustom((v) => !v);
+                                }}
                             >
-                                    Clear
-                            </button>
-                        ) : null}
+                                Custom
+                            </FilterButton>
                         </div>
-                        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div className="shopify-header-spacer" />
+                        <div className="shopify-search-wrapper">
+                            <span className="shopify-search-icon" aria-hidden>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <path d="m21 21-4.35-4.35" />
+                                </svg>
+                            </span>
                             <input
-                                className="input admin-fluid-search"
-                                placeholder="Search customer"
-                                value={customerFilter}
-                                onChange={(e) => setCustomerFilter(e.target.value)}
+                                className="input shopify-search-input"
+                                type="search"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                maxLength={MIN_PHONE_SEARCH_DIGITS}
+                                placeholder={`Enter ${MIN_PHONE_SEARCH_DIGITS} phone digits to search`}
+                                aria-label={`Phone search; enter ${MIN_PHONE_SEARCH_DIGITS} digits`}
+                                value={phoneSearchInput}
+                                onChange={(e) => {
+                                    const digits = e.target.value.replace(/\D/g, '').slice(0, MIN_PHONE_SEARCH_DIGITS);
+                                    setPhoneSearchInput(digits);
+                                }}
                             />
-                            <button className="button" style={{ width: 'auto', padding: '0 16px' }} onClick={() => {
-                                setEditingLead(null);
-                                setShowAddLead(true);
-                            }}>Add Lead</button>
+                        </div>
+                        <div className="shopify-header-actions">
+                            <button
+                                type="button"
+                                className="button shopify-add-order-btn"
+                                onClick={() => {
+                                    setEditingLead(null);
+                                    setShowAddLead(true);
+                                }}
+                            >
+                                <span>+</span> Add Lead
+                            </button>
+                            <button
+                                className="button shopify-refresh-btn"
+                                type="button"
+                                title="Import leads from Engage"
+                                onClick={() => setShowEngageImportModal(true)}
+                            >
+                                <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                >
+                                    <polyline points="23 4 23 10 17 10" />
+                                    <polyline points="1 20 1 14 7 14" />
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+                                    <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
+                    {showCustom ? (
+                        <div ref={popoverRef} className="date-range-popover shopify-date-range-popover">
+                            <div className="shopify-date-range-inner">
+                                <div className="shopify-date-range-field">
+                                    <label className="label shopify-date-range-label">Start</label>
+                                    <div className="shopify-date-range-picker">
+                                        <ShopifyDatePicker value={customStart} onChange={setCustomStart} placeholder="Select start date" />
+                                    </div>
+                                </div>
+                                <span className="shopify-date-range-separator">—</span>
+                                <div className="shopify-date-range-field">
+                                    <label className="label shopify-date-range-label">End</label>
+                                    <div className="shopify-date-range-picker">
+                                        <ShopifyDatePicker value={customEnd} onChange={setCustomEnd} placeholder="Select end date" />
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="button shopify-date-range-apply"
+                                    onClick={() => {
+                                        setPage(1);
+                                        setAppliedCustomStart(customStart);
+                                        setAppliedCustomEnd(customEnd);
+                                        setRange('custom');
+                                        setShowCustom(false);
+                                    }}
+                                >
+                                    Apply
+                                </button>
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
-                <div className="admin-metrics-row">
+            </div>
+            <div className="card wa-leads__metrics-card">
+                <div className="admin-metrics-row wa-leads-metrics">
                     <ModernMetricItem 
                         icon="👥" 
-                        label="Total Leads" 
+                        label={isPhoneSearch ? 'Matches (this page)' : 'Total in range'} 
                         value={metrics.totalLeads.toLocaleString()} 
-                        iconColor="var(--primary-strong)"
                         isLast={false}
                         isEven={false}
                     />
                     <ModernMetricItem 
-                        icon="🆕" 
-                        label="New" 
-                        value={metrics.newLeads.toLocaleString()} 
-                        iconColor="#3b82f6"
+                        icon="📄" 
+                        label="Rows (this page)" 
+                        value={metrics.rowsOnPage.toLocaleString()} 
                         isLast={false}
                         isEven={true}
                     />
                     <ModernMetricItem 
-                        icon="⭐" 
-                        label="Interested" 
-                        value={metrics.interestedLeads.toLocaleString()} 
-                        iconColor="#f59e0b"
+                        icon="🔢" 
+                        label="Page" 
+                        value={`${metrics.page} / ${metrics.totalPages}`} 
                         isLast={false}
                         isEven={false}
                     />
                     <ModernMetricItem 
-                        icon="💬" 
-                        label="CBA" 
-                        value={metrics.cbaLeads.toLocaleString()} 
-                        iconColor="#8b5cf6"
+                        icon="⚙️" 
+                        label="Rows per page" 
+                        value={metrics.perPage.toLocaleString()} 
                         isLast={false}
                         isEven={true}
                     />
                     <ModernMetricItem 
-                        icon="✅" 
-                        label="Converted" 
-                        value={metrics.convertedLeads.toLocaleString()} 
-                        iconColor="var(--primary)"
+                        icon="📱" 
+                        label={isPhoneSearch ? 'Phone filter' : 'List'} 
+                        value={isPhoneSearch ? metrics.phoneMatchesOnPage.toLocaleString() : '—'} 
                         isLast={true}
                         isEven={false}
                     />
                 </div>
             </div>
 
-            <div className="card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
-                {loading ? (
-                    <div style={{ position: 'relative', minHeight: 280 }}>
-                        <Spinner overlay message="Loading leads…" />
-                    </div>
-                ) : (
-                <div className="table-scroll-wrapper">
-                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000, tableLayout: 'auto' }}>
+            <div className="card wa-leads__table-card">
+                <div className={`table-scroll-wrapper wa-leads__table-scroll${loading ? ' wa-leads__table-scroll--loading' : ''}`}>
+                    <table className="orders-table shopify-orders-table wa-leads__table">
                         <colgroup>
-                            <col style={{ width: '180px', minWidth: '180px' }} />
-                            <col style={{ width: '140px', minWidth: '140px' }} />
-                            <col style={{ width: '140px', minWidth: '140px' }} />
-                            <col style={{ width: '200px', minWidth: '200px' }} />
-                            <col style={{ width: '140px', minWidth: '140px' }} />
-                            <col style={{ width: '250px', minWidth: '250px' }} />
-                            <col style={{ width: '150px', minWidth: '150px' }} />
-                            <col style={{ width: '120px', minWidth: '120px' }} />
-                            <col style={{ width: '120px', minWidth: '120px' }} />
+                            <col />
+                            <col />
+                            <col />
+                            <col />
+                            <col />
+                            <col />
+                            <col />
+                            <col />
                         </colgroup>
                         <thead>
-                            <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-                                <Th>Customer Name</Th>
-                                <Th>Mobile</Th>
-                                <Th>Calling Date</Th>
-                                <Th>Calling Detail</Th>
-                                <Th>Call Back Date</Th>
-                                <Th>Notes</Th>
-                                <Th>Status</Th>
-                                <Th>Platform</Th>
-                                <Th>Actions</Th>
+                            <tr>
+                                <Th align="center">Phone</Th>
+                                <Th>Name</Th>
+                                <Th>Message</Th>
+                                <Th>Lead time</Th>
+                                <Th>Created</Th>
+                                <Th>Created by</Th>
+                                <Th>Updated</Th>
+                                <Th align="right">Actions</Th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.length === 0 ? (
+                            {!loading && filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
-                                        No leads found. Click "Add Lead" to create your first lead.
+                                    <td colSpan={8} className="shopify-td wa-leads__empty-cell">
+                                        No leads in this range{isPhoneSearch ? ' matching this phone on the current page' : ''}. Adjust filters or import from Engage.
                                     </td>
                                 </tr>
+                            ) : loading ? (
+                                <tr aria-hidden>
+                                    <td colSpan={8} className="shopify-td wa-leads__skeleton-cell" />
+                                </tr>
                             ) : (
-                                filtered.map((lead, rowIndex) => {
-                                    const isEven = rowIndex % 2 === 1;
-                                    return (
-                                        <tr key={lead.id} style={{ 
-                                            borderBottom: '1px solid var(--border)',
-                                            background: isEven ? '#f8f9fa' : 'transparent'
-                                        }}>
-                                            <Td>
-                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <span style={{ fontWeight: 600 }}>{lead.customerName}</span>
-                                            </div>
-                                            </Td>
-                                            <Td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                    <span style={{ fontSize: 13, color: 'var(--text)' }}>{lead.mobile}</span>
-                                                    <a 
-                                                        href={`tel:${lead.mobile}`}
-                                                        aria-label={`Call ${lead.mobile}`}
-                                                        role="button"
-                                                        tabIndex={0}
-                                                        style={{ 
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            textDecoration: 'none',
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.2s ease',
-                                                            border: 'none',
-                                                            outline: 'none',
-                                                            background: 'transparent',
-                                                            padding: '6px',
-                                                            borderRadius: '6px',
-                                                            color: 'var(--primary)',
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            e.currentTarget.style.background = '#f0fdf4';
-                                                            e.currentTarget.style.color = '#059669';
-                                                            e.currentTarget.style.transform = 'scale(1.1)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            e.currentTarget.style.background = 'transparent';
-                                                            e.currentTarget.style.color = 'var(--primary)';
-                                                            e.currentTarget.style.transform = 'scale(1)';
-                                                        }}
-                                                        onFocus={(e) => {
-                                                            e.currentTarget.style.outline = '2px solid var(--primary)';
-                                                            e.currentTarget.style.outlineOffset = '2px';
-                                                            e.currentTarget.style.borderRadius = '6px';
-                                                            e.currentTarget.style.background = '#f0fdf4';
-                                                        }}
-                                                        onBlur={(e) => {
-                                                            e.currentTarget.style.outline = 'none';
-                                                            e.currentTarget.style.background = 'transparent';
-                                                        }}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                                e.preventDefault();
-                                                                window.location.href = `tel:${lead.mobile}`;
-                                                            }
-                                                        }}
-                                                        title={`Call ${lead.mobile}`}
-                                                    >
-                                                        <svg 
-                                                            aria-hidden="true"
-                                                            width="18" 
-                                                            height="18" 
-                                                            viewBox="0 0 24 24" 
-                                                            fill="none" 
-                                                            stroke="currentColor" 
-                                                            strokeWidth="2" 
-                                                            strokeLinecap="round" 
-                                                            strokeLinejoin="round"
-                                                            style={{ display: 'block' }}
-                                                        >
-                                                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                                        </svg>
-                                                    </a>
-                                                </div>
-                                            </Td>
-                                            <Td>{lead.callingDate ? new Date(lead.callingDate).toLocaleDateString() : '—'}</Td>
-                                            <Td>{lead.callingDetail || '—'}</Td>
-                                            <Td>{lead.callBackDate ? new Date(lead.callBackDate).toLocaleDateString() : '—'}</Td>
-                                            <Td style={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={lead.notes}>{lead.notes || '—'}</Td>
-                                            <Td><StatusTag kind={lead.status} type="lead" /></Td>
-                                            <Td>{lead.platform || '—'}</Td>
-                                            <Td>
-                                                <div style={{ display: 'flex', gap: 8 }}>
-                                                    <button
-                                                        type="button"
-                                                        className="icon-btn"
-                                                        onClick={() => {
-                                                            setEditingLead(lead);
-                                                            setShowAddLead(true);
-                                                        }}
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className="icon-btn icon-btn--danger"
-                                                        onClick={async () => {
-                                                            if (confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
-                                                                try {
-                                                                    const response = await apiFetch(`/api/wa-leads-orders/${lead.id}`, {
-                                                                        method: 'DELETE',
-                                                                    });
-                                                                    if (!response.ok) throw new Error('Failed to delete lead');
-                                                                    setLeads((prev) => prev.filter(l => l.id !== lead.id));
-                                                                    showToast('Lead deleted successfully!', 'delete');
-                                                                } catch (err) {
-                                                                    console.error('Failed to delete lead', err);
-                                                                    showToast('Failed to delete lead. Please check that the server is running and try again.', 'error');
-                                                                }
-                                                            }
-                                                        }}
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </Td>
-                                        </tr>
-                                    );
-                                })
+                                (() => {
+                                    let dataRowIndex = 0;
+                                    return leadsGroupedByDate.flatMap(({ dateKey, rows: groupRows }) => {
+                                        const headerTr = (
+                                            <tr key={`wa-date-${dateKey}`} className="wa-leads__date-group-row">
+                                                <td colSpan={8} className="shopify-td wa-leads__date-group-header">
+                                                    <div className="wa-leads__date-group-inner">
+                                                        <span className="wa-leads__date-group-title">
+                                                            {formatWaLeadsDateGroupTitle(dateKey)}
+                                                        </span>
+                                                        <span className="wa-leads__date-group-meta">
+                                                            {groupRows.length} lead{groupRows.length === 1 ? '' : 's'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                        const dataTrs = groupRows.map((row) => {
+                                            const isEven = dataRowIndex % 2 === 1;
+                                            dataRowIndex += 1;
+                                            const e164ish = `${row.countryCode}${row.phoneNumber}`.replace(/\s/g, '');
+                                            const displayPhone = `${row.countryCode} ${row.phoneNumber}`.trim();
+                                            const rowPhoneDigits = digitsOnly(row.phoneNumber);
+                                            const canCall = rowPhoneDigits.length > 0;
+                                            const msgPreview = truncateMessage(row.message, 80);
+                                            const callIcon = (
+                                                <svg
+                                                    className="wa-leads-call-btn__icon"
+                                                    width="24"
+                                                    height="24"
+                                                    viewBox="0 0 24 24"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    aria-hidden
+                                                >
+                                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                                                </svg>
+                                            );
+                                            return (
+                                                <tr
+                                                    key={row._id}
+                                                    className={`wa-leads__row${isEven ? ' wa-leads__row--even' : ''}`}
+                                                >
+                                                    <Td className="wa-leads__td-call">
+                                                        {canCall ? (
+                                                            <a
+                                                                className="wa-leads-call-btn"
+                                                                href={`tel:${e164ish}`}
+                                                                title={`Call ${row.name || displayPhone}`}
+                                                                aria-label={`Call ${row.name || 'lead'} at ${displayPhone}`}
+                                                            >
+                                                                {callIcon}
+                                                            </a>
+                                                        ) : (
+                                                            <span
+                                                                className="wa-leads-call-btn wa-leads-call-btn--disabled"
+                                                                title="No phone number"
+                                                                aria-label="No phone number to call"
+                                                            >
+                                                                {callIcon}
+                                                            </span>
+                                                        )}
+                                                    </Td>
+                                                    <Td>
+                                                        <div className="wa-leads-customer-cell">
+                                                            <span className="wa-leads-customer-name">{row.name || '—'}</span>
+                                                            {canCall ? (
+                                                                <a className="wa-leads-customer-tel" href={`tel:${e164ish}`}>
+                                                                    {displayPhone}
+                                                                </a>
+                                                            ) : (
+                                                                <span className="wa-leads-customer-tel wa-leads-customer-tel--na">
+                                                                    —
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </Td>
+                                                    <Td className="wa-leads__msg-cell">
+                                                        <span title={row.message || undefined}>{msgPreview || '—'}</span>
+                                                    </Td>
+                                                    <Td>{formatLeadDateTime(row.time)}</Td>
+                                                    <Td>{formatLeadDateTime(row.createdAt)}</Td>
+                                                    <Td>{row.createdBy?.name || '—'}</Td>
+                                                    <Td>{formatLeadDateTime(row.updatedAt)}</Td>
+                                                    <Td className="wa-leads__actions-cell">
+                                                        <div className="wa-leads__actions-inner">
+                                                            <button
+                                                                type="button"
+                                                                className="icon-btn"
+                                                                title="Copy phone with country code"
+                                                                onClick={() => {
+                                                                    const toCopy = `${row.countryCode}${row.phoneNumber}`.replace(
+                                                                        /\s/g,
+                                                                        '',
+                                                                    );
+                                                                    void navigator.clipboard?.writeText(toCopy).then(
+                                                                        () => showToast('Phone copied', 'success'),
+                                                                        () => showToast('Could not copy', 'error'),
+                                                                    );
+                                                                }}
+                                                            >
+                                                                Copy
+                                                            </button>
+                                                        </div>
+                                                    </Td>
+                                                </tr>
+                                            );
+                                        });
+                                        return [headerTr, ...dataTrs];
+                                    });
+                                })()
                             )}
                         </tbody>
                     </table>
                 </div>
-                )}
             </div>
+
+            <footer className="shopify-pagination" aria-label="Leads pagination">
+                <div className="shopify-pagination__range">
+                    {loading && !isPhoneSearch ? (
+                        <span className="shopify-pagination__muted">Loading…</span>
+                    ) : isPhoneSearch ? (
+                        <>
+                            Phone filter: showing{' '}
+                            <strong>
+                                {filtered.length === 0 ? 0 : 1}–{filtered.length}
+                            </strong>{' '}
+                            of <strong>{(leadsMeta?.count ?? leadsRows.length).toLocaleString()}</strong> on this page
+                        </>
+                    ) : leadsMeta ? (
+                        <>
+                            Showing{' '}
+                            <strong>
+                                {leadsMeta.total === 0
+                                    ? 0
+                                    : (leadsMeta.page - 1) * leadsMeta.limit + 1}
+                                –
+                                {Math.min(leadsMeta.page * leadsMeta.limit, leadsMeta.total)}
+                            </strong>{' '}
+                            of <strong>{leadsMeta.total.toLocaleString()}</strong>
+                        </>
+                    ) : (
+                        <span className="shopify-pagination__muted">Total unavailable</span>
+                    )}
+                </div>
+                <label className="shopify-pagination__size">
+                    <span className="shopify-pagination__size-lab">Rows per page</span>
+                    <select
+                        className="shopify-pagination__select"
+                        value={pageSize}
+                        disabled={loading || isPhoneSearch}
+                        aria-label="Rows per page"
+                        onChange={(e) => {
+                            setPageSize(Number(e.target.value));
+                            setPage(1);
+                        }}
+                    >
+                        {[20, 50, 100, 250, 500].map((n) => (
+                            <option key={n} value={n}>
+                                {n}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+                <div className="shopify-pagination__nav">
+                    <button
+                        type="button"
+                        className="shopify-page-btn"
+                        disabled={loading || isPhoneSearch || page <= 1}
+                        onClick={() => setPage(1)}
+                    >
+                        First
+                    </button>
+                    <button
+                        type="button"
+                        className="shopify-page-btn"
+                        disabled={loading || isPhoneSearch || page <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                        Prev
+                    </button>
+                    <span className="shopify-pagination__page-of">
+                        Page <strong>{isPhoneSearch ? 1 : page}</strong> of{' '}
+                        <strong>{isPhoneSearch ? 1 : Math.max(1, leadsMeta?.totalPages ?? 1)}</strong>
+                    </span>
+                    <button
+                        type="button"
+                        className="shopify-page-btn"
+                        disabled={loading || isPhoneSearch || page >= Math.max(1, leadsMeta?.totalPages ?? 1)}
+                        onClick={() => setPage((p) => p + 1)}
+                    >
+                        Next
+                    </button>
+                    <button
+                        type="button"
+                        className="shopify-page-btn"
+                        disabled={loading || isPhoneSearch || page >= Math.max(1, leadsMeta?.totalPages ?? 1)}
+                        onClick={() => setPage(Math.max(1, leadsMeta?.totalPages ?? 1))}
+                    >
+                        Last
+                    </button>
+                </div>
+            </footer>
+
+            {showEngageImportModal ? (
+                <div
+                    className="wa-leads-engage-backdrop"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="wa-leads-engage-title"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowEngageImportModal(false);
+                    }}
+                >
+                    <div className="card wa-leads-engage-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="wa-leads-engage__header">
+                            <h2 id="wa-leads-engage-title" className="wa-leads-engage__title">
+                                Import from Engage
+                            </h2>
+                            <button
+                                type="button"
+                                className="icon-btn"
+                                aria-label="Close"
+                                onClick={() => setShowEngageImportModal(false)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <p className="wa-leads-engage__help">
+                            Paste your Engage token. Page buttons send{' '}
+                            <code className="wa-leads-engage__code">POST /api/leads/import-engage?page=…</code>;{' '}
+                            <strong>Fetch All</strong> sends{' '}
+                            <code className="wa-leads-engage__code">POST /api/leads/import-engage?mode=full</code> with header{' '}
+                            <code className="wa-leads-engage__code">x-engage-token</code>.
+                        </p>
+                        <label className="label wa-leads-engage__label" htmlFor="wa-leads-engage-token">
+                            Engage token
+                        </label>
+                        <input
+                            id="wa-leads-engage-token"
+                            className="input wa-leads-engage__token-input"
+                            type="password"
+                            autoComplete="off"
+                            placeholder="x-engage-token value"
+                            value={engageToken}
+                            onChange={(e) => setEngageToken(e.target.value)}
+                        />
+                        <div className="wa-leads-engage__grid">
+                            {ENGAGE_IMPORT_PAGE_NUMBERS.map((n) => (
+                                <button
+                                    key={n}
+                                    type="button"
+                                    className={`button wa-leads-engage__page-btn${engageImportLoadingPage === n ? ' wa-leads-engage__page-btn--active' : ''}`}
+                                    disabled={engageImportBusy}
+                                    onClick={() => void runEngageImport(n)}
+                                >
+                                    {engageImportLoadingPage === n ? '…' : n}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            className="button wa-leads-engage__fetch-all"
+                            disabled={engageImportBusy}
+                            onClick={() => void runEngageFetchAll()}
+                        >
+                            {engageFetchAllLoading ? 'Fetching…' : 'Fetch All'}
+                        </button>
+                    </div>
+                </div>
+            ) : null}
 
             {showAddLead ? (
                 <AddLeadModal 
                     lead={editingLead}
-                    existingLeads={leads}
+                    existingLeads={existingLeadsForModal}
                     onClose={() => {
                         setShowAddLead(false);
                         setEditingLead(null);
@@ -403,30 +932,25 @@ export default function WALeads() {
                     onSave={async (lead) => {
                         try {
                             if (editingLead) {
-                                // Update existing lead
                                 const response = await apiFetch(`/api/wa-leads-orders/${editingLead.id}`, {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(lead),
                                 });
                                 if (!response.ok) throw new Error('Failed to update lead');
-                                const updated = await response.json();
-                                setLeads((prev) => prev.map(l => l.id === editingLead.id ? updated : l));
                                 showToast('Lead updated successfully!', 'success');
                             } else {
-                                // Create new lead
-                            const response = await apiFetch('/api/wa-leads-orders', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                const response = await apiFetch('/api/wa-leads-orders', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(lead),
-                            });
+                                });
                                 if (!response.ok) throw new Error('Failed to save lead');
-                            const saved = await response.json();
-                                setLeads((prev) => [saved, ...prev]);
                                 showToast('Lead added successfully!', 'success');
                             }
                             setShowAddLead(false);
                             setEditingLead(null);
+                            await loadLeads();
                         } catch (err) {
                             console.error('Failed to save lead', err);
                             showToast(`Failed to ${editingLead ? 'update' : 'create'} lead. Please check that the server is running and try again.`, 'error');
@@ -438,269 +962,16 @@ export default function WALeads() {
     );
 }
 
-function Th({ children }: { children: string }) {
-    return <th style={{ textAlign: 'left', padding: '10px 12px', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{children}</th>;
-}
-function Td({ children, style, title }: { children: React.ReactNode; style?: React.CSSProperties; title?: string }) {
-    return <td style={{ padding: '12px', ...style }} title={title}>{children}</td>;
-}
-
-function StatusFilter<T extends LeadStatus>({ label, value, onChange, options }: { label: string; value: T | ''; onChange: (val: T | '') => void; options: T[] }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const buttonRef = useRef<HTMLDivElement>(null);
-    const popupRef = useRef<HTMLDivElement>(null);
-
-    const statusConfig: Record<LeadStatus, { icon: string; color: string; bgColor: string }> = {
-        'New': { icon: '🆕', color: '#075985', bgColor: '#e0f2fe' },
-        'Contacted': { icon: '📞', color: '#854d0e', bgColor: '#fef9c3' },
-        'Converted': { icon: '✅', color: 'var(--primary-strong)', bgColor: '#dbeafe' },
-        'Not Interested': { icon: '❌', color: '#991b1b', bgColor: '#fee2e2' },
-        'No Answer': { icon: '🔇', color: '#075985', bgColor: '#e0f2fe' },
-        'Potential Customer': { icon: '⭐', color: '#854d0e', bgColor: '#fef9c3' },
-        'Very Interested': { icon: '🔥', color: '#854d0e', bgColor: '#fef9c3' },
-        'CBA': { icon: '💬', color: '#854d0e', bgColor: '#fef9c3' },
-    };
-
-    const currentStatus = value ? statusConfig[value] : null;
-
-    useEffect(() => {
-        function handleClickOutside(e: MouseEvent) {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
-        }
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
-        }
-    }, [isOpen]);
-
-    useEffect(() => {
-        if (isOpen && buttonRef.current && popupRef.current) {
-            const buttonRect = buttonRef.current.getBoundingClientRect();
-            const popup = popupRef.current;
-            const popupHeight = 260;
-            const popupWidth = 220;
-            
-            let top = buttonRect.bottom + window.scrollY + 4;
-            let left = buttonRect.left + window.scrollX;
-            
-            if (buttonRect.bottom + popupHeight > window.innerHeight) {
-                top = buttonRect.top + window.scrollY - popupHeight - 4;
-            }
-            
-            if (buttonRect.left + popupWidth > window.innerWidth) {
-                left = window.innerWidth - popupWidth - 10;
-            }
-            
-            popup.style.top = `${top}px`;
-            popup.style.left = `${left}px`;
-        }
-    }, [isOpen]);
-
+function ModernMetricItem({ icon, label, value, isLast, isEven }: { icon: string; label: string; value: string; isLast: boolean; isEven: boolean }) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label className="label" style={{ fontSize: 11, margin: 0, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</label>
-            <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-                <div
-                    ref={buttonRef}
-                    onClick={() => setIsOpen(!isOpen)}
-                className="input"
-                    style={{
-                        height: 42,
-                        minWidth: 200,
-                        cursor: 'pointer',
-                        display: 'flex', 
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        userSelect: 'none',
-                        padding: '0 14px',
-                        fontSize: 14,
-                    }}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {currentStatus ? (
-                            <>
-                                <span style={{ fontSize: 16 }}>{currentStatus.icon}</span>
-                                <span style={{ color: 'var(--text)', fontWeight: 500, fontSize: 14 }}>{value}</span>
-                            </>
-                        ) : (
-                            <span style={{ color: 'var(--muted)', fontSize: 14 }}>All</span>
-                        )}
-                    </div>
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>▼</span>
-                </div>
-                {isOpen && (
-                    <div
-                        ref={popupRef}
-                        style={{
-                            position: 'fixed',
-                            background: '#ffffff',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: 8,
-                            padding: 6,
-                            boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
-                            zIndex: 10000,
-                            minWidth: 220,
-                            maxWidth: 220,
-                            maxHeight: 260,
-                            overflowY: 'auto',
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div
-                            onClick={() => {
-                                onChange('' as T | '');
-                                setIsOpen(false);
-                            }}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                padding: '8px 10px',
-                                borderRadius: 6,
-                                cursor: 'pointer',
-                                background: !value ? '#f3f4f6' : 'transparent',
-                                border: !value ? '1.5px solid #6b7280' : '1.5px solid transparent',
-                                transition: 'all 0.2s',
-                                marginBottom: 2,
-                            }}
-                            onMouseEnter={(e) => {
-                                if (!value) return;
-                                e.currentTarget.style.background = '#f9fafb';
-                            }}
-                            onMouseLeave={(e) => {
-                                if (!value) return;
-                                e.currentTarget.style.background = 'transparent';
-                            }}
-                        >
-                            <span style={{ fontSize: 14, width: 20, textAlign: 'center' }}>—</span>
-                            <span style={{ color: 'var(--text)', fontWeight: 500, fontSize: 13 }}>All</span>
-                        </div>
-                        {options.map((status) => {
-                            const config = statusConfig[status];
-                            const isSelected = value === status;
-                            return (
-                                <div
-                                    key={status}
-                                    onClick={() => {
-                                        onChange(status);
-                                        setIsOpen(false);
-                                    }}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 8,
-                                        padding: '8px 10px',
-                                        borderRadius: 6,
-                                        cursor: 'pointer',
-                                        background: isSelected ? config.bgColor : 'transparent',
-                                        border: isSelected ? `1.5px solid ${config.color}` : '1.5px solid transparent',
-                                        transition: 'all 0.2s',
-                                        marginBottom: 2,
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (!isSelected) {
-                                            e.currentTarget.style.background = '#f9fafb';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (!isSelected) {
-                                            e.currentTarget.style.background = 'transparent';
-                                        }
-                                    }}
-                                >
-                                    <span style={{ fontSize: 14, width: 20, textAlign: 'center' }}>{config.icon}</span>
-                                    <span style={{ color: 'var(--text)', fontWeight: 500, fontSize: 13 }}>{status}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-function StatusTag({ kind, type }: { kind: string; type: 'payment' | 'delivery' | 'lead' }) {
-    let cls = 'tag info';
-    if (type === 'payment') {
-        if (kind === 'Paid') cls = 'tag success';
-        else if (kind === 'Pending') cls = 'tag warning';
-        else if (kind === 'Failed') cls = 'tag danger';
-        else cls = 'tag info';
-    } else if (type === 'delivery') {
-        const d = normalizeDeliveryStatus(kind);
-        if (d === 'delivered') cls = 'tag success';
-        else if (d === 'in_transit') cls = 'tag info';
-        else if (d === 'pending_pickup') cls = 'tag warning';
-        else if (d === 'rto') cls = 'tag danger';
-    } else if (type === 'lead') {
-        if (kind === 'Converted') cls = 'tag success';
-        else if (kind === 'New') cls = 'tag info';
-        else if (kind === 'Contacted' || kind === 'Potential Customer' || kind === 'Very Interested' || kind === 'CBA') cls = 'tag warning';
-        else if (kind === 'Not Interested') cls = 'tag danger';
-        else if (kind === 'No Answer') cls = 'tag info';
-        else cls = 'tag info';
-    }
-    return (
-        <span className={cls}>{type === 'delivery' ? deliveryStatusLabel(kind) : kind}</span>
-    );
-}
-
-function toInputDate(d: Date) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-}
-
-function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { icon: string; label: string; value: string; iconColor: string; isLast: boolean; isEven: boolean }) {
-    return (
-        <div style={{ 
-            background: isEven ? '#f8f9fa' : 'transparent',
-            flex: 1,
-            padding: '12px 10px',
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: 6,
-            borderRight: isLast ? 'none' : '1px solid var(--border)',
-            transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--bg)';
-        }}
-        onMouseLeave={(e) => {
-            e.currentTarget.style.background = isEven ? '#f8f9fa' : 'transparent';
-        }}
+        <div
+            className={['wa-leads-metric', isEven ? 'wa-leads-metric--even' : '', isLast ? 'wa-leads-metric--last' : ''].filter(Boolean).join(' ')}
         >
-            <div style={{ 
-                display: 'flex',
-            alignItems: 'center',
-                gap: 6,
-                marginBottom: 2
-        }}>
-                <span style={{ fontSize: 16, opacity: 0.8 }}>{icon}</span>
-            <div style={{ 
-                fontSize: 10, 
-                color: 'var(--muted)', 
-                fontWeight: 600, 
-                textTransform: 'uppercase', 
-                    letterSpacing: '0.4px',
-            }}>
-                {label}
-                </div>
+            <div className="wa-leads-metric__hdr">
+                <span className="wa-leads-metric__icon">{icon}</span>
+                <div className="wa-leads-metric__label">{label}</div>
             </div>
-            <div style={{ 
-                fontSize: 16, 
-                fontWeight: 700, 
-                color: 'var(--text)',
-                lineHeight: 1.2,
-                letterSpacing: '-0.2px'
-            }}>
-                {value}
-            </div>
+            <div className="wa-leads-metric__value">{value}</div>
         </div>
     );
 }
@@ -783,183 +1054,79 @@ function DatePicker({ value, onChange, required, placeholder }: { value: string;
     }
 
     return (
-        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+        <div ref={containerRef} className="wa-leads-dp">
             <div
                 ref={inputRef}
                 onClick={() => setIsOpen(!isOpen)}
-                className="input"
-                style={{
-                    width: '100%',
-                    marginTop: 6,
-                    cursor: 'pointer',
-            display: 'flex', 
-            alignItems: 'center',
-                    justifyContent: 'space-between',
-                    userSelect: 'none'
-                }}
+                className="input wa-leads-dp__trigger"
             >
-                <span style={{ color: displayValue ? 'var(--text)' : 'var(--muted)' }}>
+                <span className={displayValue ? 'wa-leads-dp__value' : 'wa-leads-dp__value wa-leads-dp__value--placeholder'}>
                     {displayValue || placeholder || 'Select date'}
                 </span>
-                <span style={{ fontSize: 18, color: 'var(--muted)' }}>📅</span>
+                <span className="wa-leads-dp__cal-emoji" aria-hidden>
+                    📅
+                </span>
             </div>
             <input
                 type="date"
+                className="wa-leads-dp__hidden"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 required={required}
-                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
                 tabIndex={-1}
             />
             {isOpen && (
-                <div
-                    ref={popupRef}
-                    style={{
-                        position: 'fixed',
-                        background: '#ffffff',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: 12,
-                        padding: 20,
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
-                        zIndex: 10000,
-                        minWidth: 300,
-                        maxWidth: 300,
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                        <button
-                            type="button"
-                            onClick={handlePrevMonth}
-                            style={{ 
-                                padding: '6px 10px', 
-                                fontSize: 18,
-                                border: 'none',
-                                background: '#f3f4f6',
-                                borderRadius: 6,
-                                cursor: 'pointer',
-                                color: '#374151',
-                fontWeight: 600, 
-                                transition: 'all 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#e5e7eb';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = '#f3f4f6';
-                            }}
-                            aria-label="Previous month"
-                        >
+                <div ref={popupRef} className="wa-leads-cal" onClick={(e) => e.stopPropagation()}>
+                    <div className="wa-leads-cal__nav">
+                        <button type="button" onClick={handlePrevMonth} className="wa-leads-cal__nav-btn" aria-label="Previous month">
                             ‹
                         </button>
-                        <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>
+                        <div className="wa-leads-cal__month-title">
                             {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </div>
-                        <button
-                            type="button"
-                            onClick={handleNextMonth}
-                            style={{ 
-                                padding: '6px 10px', 
-                                fontSize: 18,
-                                border: 'none',
-                                background: '#f3f4f6',
-                                borderRadius: 6,
-                                cursor: 'pointer',
-                                color: '#374151',
-                    fontWeight: 600, 
-                                transition: 'all 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = '#e5e7eb';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = '#f3f4f6';
-                            }}
-                            aria-label="Next month"
-                        >
+                        </div>
+                        <button type="button" onClick={handleNextMonth} className="wa-leads-cal__nav-btn" aria-label="Next month">
                             ›
                         </button>
-                </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 16 }}>
+                    </div>
+                    <div className="wa-leads-cal__weekdays">
                         {weekDays.map((day) => (
-                            <div key={day} style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: '#6b7280', padding: '8px 0' }}>
+                            <div key={day} className="wa-leads-cal__weekday">
                                 {day}
-            </div>
+                            </div>
                         ))}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
-                        {Array(firstDayOfMonth).fill(null).map((_, i) => (
-                            <div key={`empty-${i}`} />
-                        ))}
+                    <div className="wa-leads-cal__days">
+                        {Array(firstDayOfMonth)
+                            .fill(null)
+                            .map((_, i) => (
+                                <div key={`empty-${i}`} />
+                            ))}
                         {days.map((day) => {
                             const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-                            const isSelected = selectedDate && 
+                            const isSelected =
+                                selectedDate &&
                                 date.getDate() === selectedDate.getDate() &&
                                 date.getMonth() === selectedDate.getMonth() &&
                                 date.getFullYear() === selectedDate.getFullYear();
                             const isToday = date.toDateString() === new Date().toDateString();
+                            const dayClass = [
+                                'wa-leads-cal__day',
+                                isSelected ? 'wa-leads-cal__day--selected' : '',
+                                !isSelected && isToday ? 'wa-leads-cal__day--today' : '',
+                            ]
+                                .filter(Boolean)
+                                .join(' ');
                             return (
-                                <button
-                                    key={day}
-                                    type="button"
-                                    onClick={() => handleDateSelect(day)}
-                                    style={{
-                                        padding: '10px 4px',
-                                        border: 'none',
-                                        background: isSelected ? '#2563eb' : isToday ? '#dbeafe' : 'transparent',
-                                        color: isSelected ? '#ffffff' : isToday ? '#1d4ed8' : '#111827',
-                                        borderRadius: 8,
-                                        cursor: 'pointer',
-                                        fontSize: 14,
-                                        fontWeight: isSelected ? 700 : isToday ? 600 : 400,
-                                        transition: 'all 0.2s',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (!isSelected && !isToday) {
-                                            e.currentTarget.style.background = '#f3f4f6';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (!isSelected && !isToday) {
-                                            e.currentTarget.style.background = 'transparent';
-                                        } else if (isToday && !isSelected) {
-                                            e.currentTarget.style.background = '#dbeafe';
-                                        }
-                                    }}
-                                >
+                                <button key={day} type="button" onClick={() => handleDateSelect(day)} className={dayClass}>
                                     {day}
                                 </button>
                             );
                         })}
-                </div>
-                    <button
-                        type="button"
-                        onClick={handleToday}
-                        style={{
-                            marginTop: 16,
-                            width: '100%',
-                            padding: '10px',
-                            border: '1px solid #e5e7eb',
-                            background: '#f9fafb',
-                            borderRadius: 8,
-                            cursor: 'pointer',
-                            fontSize: 14,
-                    fontWeight: 600, 
-                            color: '#111827',
-                            transition: 'all 0.2s',
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#f3f4f6';
-                            e.currentTarget.style.borderColor = '#d1d5db';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#f9fafb';
-                            e.currentTarget.style.borderColor = '#e5e7eb';
-                        }}
-                    >
+                    </div>
+                    <button type="button" onClick={handleToday} className="wa-leads-cal__today-btn">
                         Today
                     </button>
-            </div>
+                </div>
             )}
         </div>
     );
@@ -971,15 +1138,15 @@ function StatusDropdown({ value, onChange, required }: { value: LeadStatus; onCh
     const buttonRef = useRef<HTMLDivElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
 
-    const statusConfig: Record<LeadStatus, { icon: string; color: string; bgColor: string }> = {
-        'New': { icon: '🆕', color: '#075985', bgColor: '#e0f2fe' },
-        'Contacted': { icon: '📞', color: '#854d0e', bgColor: '#fef9c3' },
-        'Converted': { icon: '✅', color: 'var(--primary-strong)', bgColor: '#dbeafe' },
-        'Not Interested': { icon: '❌', color: '#991b1b', bgColor: '#fee2e2' },
-        'No Answer': { icon: '🔇', color: '#075985', bgColor: '#e0f2fe' },
-        'Potential Customer': { icon: '⭐', color: '#854d0e', bgColor: '#fef9c3' },
-        'Very Interested': { icon: '🔥', color: '#854d0e', bgColor: '#fef9c3' },
-        'CBA': { icon: '💬', color: '#854d0e', bgColor: '#fef9c3' },
+    const statusConfig: Record<LeadStatus, { icon: string }> = {
+        New: { icon: '🆕' },
+        Contacted: { icon: '📞' },
+        Converted: { icon: '✅' },
+        'Not Interested': { icon: '❌' },
+        'No Answer': { icon: '🔇' },
+        'Potential Customer': { icon: '⭐' },
+        'Very Interested': { icon: '🔥' },
+        CBA: { icon: '💬' },
     };
 
     const currentStatus = statusConfig[value];
@@ -1022,105 +1189,63 @@ function StatusDropdown({ value, onChange, required }: { value: LeadStatus; onCh
     const statusOptions: LeadStatus[] = ['New', 'Contacted', 'Converted', 'Not Interested', 'No Answer', 'Potential Customer', 'Very Interested', 'CBA'];
 
     return (
-        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
-            <div
-                ref={buttonRef}
-                onClick={() => setIsOpen(!isOpen)}
-                className="input"
-                style={{
-                    width: '100%',
-                    marginTop: 6,
-                    cursor: 'pointer',
-            display: 'flex', 
-            alignItems: 'center',
-                    justifyContent: 'space-between',
-                    userSelect: 'none',
-            padding: '0 12px',
-                }}
-            >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 16 }}>{currentStatus.icon}</span>
-                    <span style={{ color: 'var(--text)', fontWeight: 500, fontSize: 14 }}>{value}</span>
+        <div ref={containerRef} className="wa-leads-sd">
+            <div ref={buttonRef} onClick={() => setIsOpen(!isOpen)} className="input wa-leads-sd__trigger">
+                <div className="wa-leads-sd__trigger-inner">
+                    <span className="wa-leads-sd__trigger-icon">{currentStatus.icon}</span>
+                    <span className="wa-leads-sd__trigger-label">{value}</span>
                 </div>
-                <span style={{ fontSize: 10, color: 'var(--muted)' }}>▼</span>
+                <span className="wa-leads-sd__chevron" aria-hidden>
+                    ▼
+                </span>
             </div>
             <select
+                className="wa-leads-dp__hidden"
                 value={value}
                 onChange={(e) => onChange(e.target.value as LeadStatus)}
                 required={required}
-                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
                 tabIndex={-1}
             >
                 {statusOptions.map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                    <option key={s} value={s}>
+                        {s}
+                    </option>
                 ))}
             </select>
             {isOpen && (
-                <div
-                    ref={popupRef}
-                    style={{
-                        position: 'fixed',
-                        background: '#ffffff',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: 8,
-                        padding: 6,
-                        boxShadow: '0 10px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
-                        zIndex: 10000,
-                        minWidth: 220,
-                        maxWidth: 220,
-                        maxHeight: 260,
-                        overflowY: 'auto',
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                >
+                <div ref={popupRef} className="wa-leads-sd__popup" onClick={(e) => e.stopPropagation()}>
                     {statusOptions.map((status) => {
                         const config = statusConfig[status];
                         const isSelected = value === status;
+                        const mod = leadStatusModifier(status);
+                        const optClass = ['wa-leads-sd__opt', `wa-leads-sd__opt--${mod}`, isSelected ? 'wa-leads-sd__opt--selected' : '']
+                            .filter(Boolean)
+                            .join(' ');
                         return (
                             <div
                                 key={status}
+                                role="button"
+                                tabIndex={0}
+                                className={optClass}
                                 onClick={() => {
                                     onChange(status);
                                     setIsOpen(false);
                                 }}
-                                style={{
-                display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    padding: '8px 10px',
-                                    borderRadius: 6,
-                                    cursor: 'pointer',
-                                    background: isSelected ? config.bgColor : 'transparent',
-                                    border: isSelected ? `1.5px solid ${config.color}` : '1.5px solid transparent',
-                                    transition: 'all 0.2s',
-                                    marginBottom: 2,
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isSelected) {
-                                        e.currentTarget.style.background = '#f9fafb';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isSelected) {
-                                        e.currentTarget.style.background = 'transparent';
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        onChange(status);
+                                        setIsOpen(false);
                                     }
                                 }}
                             >
-                                <span style={{ fontSize: 16 }}>{config.icon}</span>
-                                <span style={{ 
-                                    color: isSelected ? config.color : '#111827', 
-                                    fontWeight: isSelected ? 600 : 500,
-                                    fontSize: 13,
-                                }}>
-                                    {status}
-                                </span>
-                                {isSelected && (
-                                    <span style={{ marginLeft: 'auto', fontSize: 14, color: config.color }}>✓</span>
-                                )}
-                </div>
+                                <span className="wa-leads-sd__opt-icon">{config.icon}</span>
+                                <span className="wa-leads-sd__opt-label">{status}</span>
+                                {isSelected ? <span className="wa-leads-sd__opt-check">✓</span> : null}
+                            </div>
                         );
                     })}
-            </div>
+                </div>
             )}
         </div>
     );
@@ -1204,38 +1329,26 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
     }, []);
 
     return (
-        <div
-            role="dialog"
-            aria-modal="true"
-            onClick={onClose}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.45)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', zIndex: 60 }}
-        >
-            <div
-                className="card"
-                onClick={(e)=>e.stopPropagation()}
-                style={{ width: '100%', maxWidth: 1100, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}
-            >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: '1px solid var(--border)' }}>
-                    <h3 style={{ margin: 0 }}>{lead ? 'Edit Lead' : 'Add Lead'}</h3>
-                    <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+        <div role="dialog" aria-modal="true" onClick={onClose} className="wa-leads-modal-backdrop">
+            <div className="card wa-leads-modal-card" onClick={(e) => e.stopPropagation()}>
+                <div className="wa-leads-modal__header">
+                    <h3 className="wa-leads-modal__title">{lead ? 'Edit Lead' : 'Add Lead'}</h3>
+                    <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+                        ✕
+                    </button>
                 </div>
-                <form onSubmit={submit} style={{ display: 'grid', gap: 20, padding: 20, maxHeight: '70vh', overflow: 'auto' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                <form onSubmit={submit} className="wa-leads-modal__form">
+                    <div className="wa-leads-modal__grid-2">
                         <div>
                             <label className="label">Customer Name</label>
-                            <input className="input" style={{ width: '100%', marginTop: 6 }} value={customerName} onChange={(e)=>setCustomerName(e.target.value)} required />
+                            <input className="input wa-leads-modal__input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
                         </div>
                         <div>
                             <label className="label">Mobile</label>
-                            <input 
-                                className="input" 
-                                style={{ 
-                                    width: '100%', 
-                                    marginTop: 6,
-                                    borderColor: mobileError ? '#dc2626' : undefined
-                                }} 
-                                type="tel" 
-                                value={mobile} 
+                            <input
+                                className={['input', 'wa-leads-modal__input', mobileError ? 'wa-leads-modal__input--error' : ''].filter(Boolean).join(' ')}
+                                type="tel"
+                                value={mobile}
                                 onChange={(e) => {
                                     const value = e.target.value.replace(/\D/g, ''); // Remove non-numeric characters
                                     if (value.length <= 10) {
@@ -1260,20 +1373,14 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
                                 required 
                                 placeholder="Enter 10 digit mobile number"
                             />
-                            {mobile && mobile.length !== 10 && !mobileError && (
-                                <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
-                                    Mobile number must be exactly 10 digits
-                                </div>
-                            )}
-                            {mobileError && (
-                                <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
-                                    {mobileError}
-                                </div>
-                            )}
+                            {mobile && mobile.length !== 10 && !mobileError ? (
+                                <div className="wa-leads-modal__field-error">Mobile number must be exactly 10 digits</div>
+                            ) : null}
+                            {mobileError ? <div className="wa-leads-modal__field-error">{mobileError}</div> : null}
                         </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
+                    <div className="wa-leads-modal__grid-4">
                     <div>
                             <label className="label">Calling Date</label>
                             <DatePicker value={callingDate} onChange={setCallingDate} placeholder="Select calling date" />
@@ -1289,8 +1396,7 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
                         <div>
                             <label className="label">Platform</label>
                             <select
-                                className="input"
-                                style={{ width: '100%', marginTop: 6 }}
+                                className="input wa-leads-modal__select"
                                 value={platform}
                                 onChange={(e) => setPlatform(e.target.value as Platform | '')}
                             >
@@ -1305,17 +1411,19 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
 
                         <div>
                         <label className="label">Calling Detail</label>
-                        <textarea className="input" style={{ width: '100%', marginTop: 6, minHeight: 80, resize: 'vertical', paddingTop: 12 }} value={callingDetail} onChange={(e)=>setCallingDetail(e.target.value)} />
+                        <textarea className="input wa-leads-modal__textarea" value={callingDetail} onChange={(e) => setCallingDetail(e.target.value)} />
                     </div>
 
                         <div>
                         <label className="label">Notes</label>
-                        <textarea className="input" style={{ width: '100%', marginTop: 6, minHeight: 80, resize: 'vertical', paddingTop: 12 }} value={notes} onChange={(e)=>setNotes(e.target.value)} />
+                        <textarea className="input wa-leads-modal__textarea" value={notes} onChange={(e) => setNotes(e.target.value)} />
                     </div>
 
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                        <button type="button" className="icon-btn" onClick={onClose}>Cancel</button>
-                        <button type="submit" className="button" style={{ width: 'auto', padding: '0 16px' }}>
+                    <div className="wa-leads-modal__footer">
+                        <button type="button" className="icon-btn" onClick={onClose}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="button wa-leads-modal__submit">
                             {lead ? 'Save Changes' : 'Create'}
                         </button>
                     </div>
@@ -1327,30 +1435,11 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
 
 function ToastContainer({ toasts }: { toasts: Toast[] }) {
     return (
-        <div
-            style={{
-                position: 'fixed',
-                top: 20,
-                right: 20,
-                zIndex: 1000,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                pointerEvents: 'none',
-            }}
-        >
+        <div className="wa-leads-toast-host">
             {toasts.map((toast) => (
-                <div
-                    key={toast.id}
-                    className="toast"
-                    style={{
-                        pointerEvents: 'auto',
-                        animation: 'slideInRight 0.3s ease-out',
-                    }}
-                    data-type={toast.type}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span style={{ fontSize: 18 }}>
+                <div key={toast.id} className="toast wa-leads-toast" data-type={toast.type}>
+                    <div className="wa-leads-toast__row">
+                        <span className="wa-leads-toast__icon" aria-hidden>
                             {toast.type === 'success' ? '✓' : toast.type === 'delete' ? '🗑' : '✕'}
                         </span>
                         <span>{toast.message}</span>

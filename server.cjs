@@ -130,6 +130,55 @@ async function writeWALeadsOrders(orders) {
   await fs.writeFile(WA_LEADS_ORDERS_PATH, json, 'utf8');
 }
 
+/** Optional from/to (YYYY-MM-DD) on req.query — same semantics for GET /api/leads and GET /api/wa-leads-orders */
+function filterWALeadsOrdersByDateQuery(orders, req) {
+  const from = typeof req.query.from === 'string' ? req.query.from : '';
+  const to = typeof req.query.to === 'string' ? req.query.to : '';
+  const hasDateFilter = Boolean(from || to);
+  if (!hasDateFilter) return orders;
+  const fromTs = from ? Date.parse(`${from}T00:00:00.000Z`) : Number.NEGATIVE_INFINITY;
+  const toTs = to ? Date.parse(`${to}T23:59:59.999Z`) : Number.POSITIVE_INFINITY;
+  return orders.filter((o) => {
+    const rawDate = o?.callingDate || o?.date || o?.createdAt;
+    if (!rawDate) return false;
+    const ts = Date.parse(String(rawDate));
+    if (!Number.isFinite(ts)) return false;
+    return ts >= fromTs && ts <= toTs;
+  });
+}
+
+/** Map legacy wa-leads-orders.json row to the GET /api/leads list row shape (matches production API). */
+function mapWaLeadOrderToApiRow(o) {
+  const mobileRaw = String(o?.mobile ?? o?.customerPhone ?? '').replace(/\D/g, '');
+  const phone10 = mobileRaw.length >= 10 ? mobileRaw.slice(-10) : mobileRaw;
+  const callingRaw = o?.callingDate ?? o?.date ?? null;
+  let timeIso = null;
+  if (callingRaw) {
+    const t = Date.parse(String(callingRaw));
+    if (Number.isFinite(t)) timeIso = new Date(t).toISOString();
+  }
+  const createdAtRaw = o?.createdAt ?? callingRaw ?? new Date().toISOString();
+  const createdTs = Date.parse(String(createdAtRaw));
+  const createdAt = Number.isFinite(createdTs) ? new Date(createdTs).toISOString() : new Date().toISOString();
+  const updatedAtRaw = o?.updatedAt ?? createdAtRaw;
+  const updatedTs = Date.parse(String(updatedAtRaw));
+  const updatedAt = Number.isFinite(updatedTs) ? new Date(updatedTs).toISOString() : createdAt;
+
+  return {
+    _id: String(o?.id ?? o?._id ?? ''),
+    name: String(o?.customerName ?? o?.customer ?? 'Unknown'),
+    phoneNumber: phone10,
+    countryCode: '+91',
+    message: String(o?.notes ?? o?.callingDetail ?? ''),
+    time: timeIso,
+    createdBy: { _id: '', name: '—' },
+    updatedBy: { _id: '', name: '—' },
+    createdAt,
+    updatedAt,
+    __v: 0,
+  };
+}
+
 async function readAbandonedCartOrders() {
   try {
     const data = await fs.readFile(ABANDONED_CART_ORDERS_PATH, 'utf8');
@@ -549,6 +598,53 @@ app.put('/api/customers/:id', async (req, res) => {
   }
 });
 
+/** Placeholder overview for local dev; production returns full analytics payload. */
+app.get('/api/analytics/overview', async (req, res) => {
+  try {
+    const from = typeof req.query.from === 'string' ? req.query.from : '';
+    const to = typeof req.query.to === 'string' ? req.query.to : '';
+    const emptyPay = { count: 0, percentage: 0 };
+    res.json({
+      filters: {
+        range: null,
+        from,
+        to,
+        appliedDateRange: { $gte: '', $lte: '' },
+      },
+      salesEbita: {
+        totalSales: 0,
+        ebita: 0,
+        expectedEbita: 0,
+        costs: {
+          manufacturingDelivered: 0,
+          manufacturingExpected: 0,
+          marketingSpendTotal: 0,
+          marketingSpendByPlatform: {},
+        },
+      },
+      volume: {
+        totalLitres: 0,
+        litresByType: { girCow: 0, desiCow: 0, buffalo: 0 },
+        quantityBySize: {},
+      },
+      shippingPipeline: {
+        delivered: { count: 0, amount: 0 },
+        rto: { count: 0, amount: 0 },
+        inTransit: { count: 0, amount: 0 },
+      },
+      paymentSplit: {
+        totalOrders: 0,
+        prepaid: emptyPay,
+        cod: emptyPay,
+        unknown: emptyPay,
+      },
+    });
+  } catch (err) {
+    console.error('Error analytics overview', err);
+    res.status(500).json({ message: 'Failed to load analytics overview' });
+  }
+});
+
 app.get('/api/orders', async (req, res) => {
   try {
     const orders = await readOrders();
@@ -571,6 +667,13 @@ app.get('/api/orders', async (req, res) => {
         if (!Number.isFinite(ts)) return false;
         return ts >= fromTs && ts <= toTs;
       });
+    }
+
+    const shippedRaw =
+      typeof req.query.shipped === 'string' ? String(req.query.shipped).toLowerCase() : '';
+    if (shippedRaw === 'true' || shippedRaw === 'false') {
+      const wantShipped = shippedRaw === 'true';
+      filtered = filtered.filter((o) => Boolean(o?.is_shipped) === wantShipped);
     }
 
     if (!hasPagination) {
@@ -596,6 +699,62 @@ app.get('/api/orders', async (req, res) => {
   } catch (err) {
     console.error('Error reading orders.json', err);
     res.status(500).json({ message: 'Failed to read orders' });
+  }
+});
+
+function orderPhoneDigitsForSearch(order) {
+  const cust = order?.customer;
+  let raw = '';
+  if (cust && typeof cust === 'object' && cust.phoneNumber != null) {
+    raw = String(cust.phoneNumber);
+  } else if (order?.phoneNumber != null) {
+    raw = String(order.phoneNumber);
+  }
+  return raw.replace(/\D/g, '');
+}
+
+function orderMatchesSearchPhone(order, phoneDigits10) {
+  const orderDigits = orderPhoneDigitsForSearch(order);
+  if (!orderDigits || !phoneDigits10) return false;
+  if (orderDigits === phoneDigits10) return true;
+  if (orderDigits.endsWith(phoneDigits10)) return true;
+  if (phoneDigits10.endsWith(orderDigits)) return true;
+  return false;
+}
+
+/** Phone search for Shopify list: filter orders.json by 10-digit phone + optional date range (same semantics as GET /api/orders). */
+app.get('/api/orders/search-by-phone', async (req, res) => {
+  try {
+    const rawPhone = typeof req.query.phoneNumber === 'string' ? req.query.phoneNumber : '';
+    const phoneDigits = rawPhone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) {
+      return res.status(400).json({ message: 'phoneNumber must be exactly 10 digits' });
+    }
+
+    const from = typeof req.query.from === 'string' ? req.query.from : '';
+    const to = typeof req.query.to === 'string' ? req.query.to : '';
+
+    const orders = await readOrders();
+    let filtered = orders;
+
+    const hasDateFilter = Boolean(from || to);
+    if (hasDateFilter) {
+      const fromTs = from ? Date.parse(`${from}T00:00:00.000Z`) : Number.NEGATIVE_INFINITY;
+      const toTs = to ? Date.parse(`${to}T23:59:59.999Z`) : Number.POSITIVE_INFINITY;
+      filtered = filtered.filter((o) => {
+        const rawDate = o?.date || o?.createdAt;
+        if (!rawDate) return false;
+        const ts = Date.parse(String(rawDate));
+        if (!Number.isFinite(ts)) return false;
+        return ts >= fromTs && ts <= toTs;
+      });
+    }
+
+    filtered = filtered.filter((o) => orderMatchesSearchPhone(o, phoneDigits));
+    res.json(filtered);
+  } catch (err) {
+    console.error('Error searching orders by phone', err);
+    res.status(500).json({ message: 'Failed to search orders by phone' });
   }
 });
 
@@ -752,10 +911,35 @@ app.post('/api/flipkart-orders', async (req, res) => {
   }
 });
 
-app.get('/api/wa-leads-orders', async (_req, res) => {
+app.get('/api/leads', async (req, res) => {
   try {
     const orders = await readWALeadsOrders();
-    res.json(orders);
+    const filtered = filterWALeadsOrdersByDateQuery(orders, req);
+    const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
+    const limitRaw = parseInt(String(req.query.limit), 10);
+    const limit = Math.min(1000, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 20));
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const slice = filtered.slice((page - 1) * limit, page * limit);
+    const rows = slice.map(mapWaLeadOrderToApiRow);
+    res.json({
+      count: rows.length,
+      total,
+      page,
+      limit,
+      totalPages,
+      rows,
+    });
+  } catch (err) {
+    console.error('Error reading leads (GET /api/leads)', err);
+    res.status(500).json({ message: 'Failed to read leads' });
+  }
+});
+
+app.get('/api/wa-leads-orders', async (req, res) => {
+  try {
+    const orders = await readWALeadsOrders();
+    res.json(filterWALeadsOrdersByDateQuery(orders, req));
   } catch (err) {
     console.error('Error reading wa-leads-orders.json', err);
     res.status(500).json({ message: 'Failed to read WA Leads orders' });
@@ -833,6 +1017,37 @@ app.delete('/api/wa-leads-orders/:id', async (req, res) => {
   } catch (err) {
     console.error('Error deleting from wa-leads-orders.json', err);
     res.status(500).json({ message: 'Failed to delete WA Leads order' });
+  }
+});
+
+/** Engage leads import: POST ?page=1–20 or POST ?mode=full (production should call Engage; local dev stubs). */
+app.post('/api/leads/import-engage', async (req, res) => {
+  try {
+    const token = req.get('x-engage-token');
+    if (!token || !String(token).trim()) {
+      return res.status(400).json({ message: 'x-engage-token header is required' });
+    }
+    const mode = String(req.query.mode || '');
+    if (mode === 'full') {
+      res.status(200).json({
+        ok: true,
+        mode: 'full',
+        message: 'Local dev: Engage full import not wired; implement upstream or proxy in production.',
+      });
+      return;
+    }
+    const pageRaw = parseInt(String(req.query.page), 10);
+    if (!Number.isFinite(pageRaw) || pageRaw < 1 || pageRaw > 20) {
+      return res.status(400).json({ message: 'page must be a number from 1 to 20, or use mode=full' });
+    }
+    res.status(200).json({
+      ok: true,
+      page: pageRaw,
+      message: 'Local dev: Engage import not wired; implement upstream or proxy in production.',
+    });
+  } catch (err) {
+    console.error('Error /api/leads/import-engage', err);
+    res.status(500).json({ message: 'Failed to import from Engage' });
   }
 });
 

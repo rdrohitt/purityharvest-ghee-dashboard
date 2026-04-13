@@ -293,6 +293,8 @@ export type LoadOrdersOptions = {
     platform?: string;
     paymentMode?: string;
     trackingStatus?: string;
+    /** When set, GET /api/orders includes shipped=true|false */
+    shipped?: boolean;
 };
 
 export type OrdersDashboardResponse = {
@@ -322,6 +324,9 @@ export async function loadOrdersDashboardFromApi(options?: LoadOrdersOptions): P
     if (options?.platform) params.set('platform', options.platform);
     if (options?.paymentMode) params.set('paymentMode', options.paymentMode);
     if (options?.trackingStatus) params.set('trackingStatus', options.trackingStatus);
+    if (typeof options?.shipped === 'boolean') {
+        params.set('shipped', options.shipped ? 'true' : 'false');
+    }
     const query = params.toString();
     const path = query ? `/api/orders?${query}` : '/api/orders';
     let response = await apiFetch(path);
@@ -375,6 +380,35 @@ export async function loadOrdersFromApi(options?: LoadOrdersOptions): Promise<Sh
     return dash.rows;
 }
 
+/**
+ * GET /api/orders/search-by-phone — orders matching a 10-digit phone in the given date range (YYYY-MM-DD).
+ */
+export async function searchOrdersByPhone(
+    phoneDigits10: string,
+    from: string,
+    to: string,
+): Promise<ShopifyOrderApi[]> {
+    const digits = String(phoneDigits10 || '').replace(/\D/g, '');
+    if (digits.length !== 10) {
+        return [];
+    }
+    const params = new URLSearchParams();
+    params.set('phoneNumber', digits);
+    params.set('from', from);
+    params.set('to', to);
+    const path = `/api/orders/search-by-phone?${params.toString()}`;
+    let response = await apiFetch(path);
+    if (response.status === 404) {
+        response = await apiFetch(`/orders/search-by-phone?${params.toString()}`);
+    }
+    if (!response.ok) {
+        throw new Error('Failed to search orders by phone');
+    }
+    const json = (await response.json()) as unknown;
+    const arr = extractOrdersArray(json);
+    return arr.map(normalizeOrder).filter((o): o is ShopifyOrderApi => o !== null);
+}
+
 export function mapFulfillmentStatus(s: string): FulfillmentStatus {
     const lower = (s || '').toLowerCase();
     if (lower === 'fulfilled') return 'Fulfilled';
@@ -397,11 +431,11 @@ export function mapOrderType(t: string): OrderType {
     return 'New';
 }
 
-function toBackendFulfillmentStatus(status: FulfillmentStatus): string {
-    const lower = status.toLowerCase();
-    if (lower === 'fulfilled') return 'fulfilled';
+/** API expects fulfilled | partial only (unfulfilled maps to fulfilled). */
+export function toBackendFulfillmentStatus(status: FulfillmentStatus): 'fulfilled' | 'partial' {
+    const lower = String(status).toLowerCase();
     if (lower === 'partial') return 'partial';
-    return 'unfulfilled';
+    return 'fulfilled';
 }
 
 /**
@@ -419,9 +453,13 @@ export function buildDefaultTrackingUrlFromCourier(awb: string, courierPartner: 
     return `https://www.delhivery.com/track-v2/package/${enc}`;
 }
 
-function toBackendOrderType(t?: OrderType): string | undefined {
+/** API expects lowercase: new | repeat | reference */
+export function toBackendOrderType(t?: OrderType): 'new' | 'repeat' | 'reference' | undefined {
     if (!t) return undefined;
-    return t.toLowerCase();
+    const lower = String(t).toLowerCase();
+    if (lower === 'repeat') return 'repeat';
+    if (lower === 'reference') return 'reference';
+    return 'new';
 }
 
 function toBackendPaymentMode(p: PaymentStatus): string {
@@ -436,13 +474,14 @@ export function buildShopifyOrderPayloadFromForm(
     products?: ProductApiItem[],
 ): ShopifyOrderApi {
     const paymentMode = toBackendPaymentMode(form.paymentStatus);
-    const fulfillmentStatus = toBackendFulfillmentStatus(form.fulfillmentStatus);
     const isRto = form.deliveryStatus === 'rto';
     /** Backend: RTO is indicated by returnStatus; tracking stays "delivered". */
     const trackingStatusForApi = isRto
         ? 'delivered'
         : String(normalizeDeliveryStatus(String(form.deliveryStatus)));
-    const awb = form.awbNumber || base.shippingDetails?.trackingNumber || '';
+    const awbFromForm =
+        typeof form.awbNumber === 'string' ? form.awbNumber.trim() : undefined;
+    const awb = awbFromForm !== undefined ? awbFromForm : (base.shippingDetails?.trackingNumber || '');
     const trackingCompany =
         (form.shippingTrackingCompany && form.shippingTrackingCompany.trim()) ||
         base.shippingDetails?.trackingCompany ||
@@ -519,6 +558,14 @@ export function buildShopifyOrderPayloadFromForm(
         ? String(form.platform).toLowerCase()
         : String(base.platform || 'shopify').toLowerCase();
 
+    const typeForApi =
+        toBackendOrderType(form.type) ??
+        toBackendOrderType(mapOrderType(String(base.type ?? ''))) ??
+        'new';
+    const fulfillmentForApi = toBackendFulfillmentStatus(
+        form.fulfillmentStatus ?? mapFulfillmentStatus(String(base.fulfillmentStatus ?? '')),
+    );
+
     return {
         ...base,
         customer: customerId || base.customer,
@@ -528,11 +575,11 @@ export function buildShopifyOrderPayloadFromForm(
         date: form.date,
         state: form.state,
         pincode: form.pincode ?? '',
-        type: toBackendOrderType(form.type) ?? base.type,
+        type: typeForApi,
         products: updatedProducts,
         platform: platformBackend,
         paymentMode,
-        fulfillmentStatus,
+        fulfillmentStatus: fulfillmentForApi,
         is_shipped: form.is_shipped,
         codCharges: form.codCharges ?? base.codCharges,
         shippingCharges: base.shippingCharges,

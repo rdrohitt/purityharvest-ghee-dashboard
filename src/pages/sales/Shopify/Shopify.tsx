@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { apiFetch } from '../../../api';
 import {
-    updateOrder,
     deleteOrder,
     type Order,
     type OrderItem,
@@ -26,13 +25,25 @@ import {
     getOrderState,
     getOrderPincode,
     updateShopifyOrderFromForm,
-    getShopifyProductUnitPrice,
     buildDefaultTrackingUrlFromCourier,
+    searchOrdersByPhone,
+    toBackendFulfillmentStatus,
+    toBackendOrderType,
 } from '../../../utils/shopify-orders';
 import type { ProductVariantApi } from '../../../types/products';
-import type { CustomerSearchResult, ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../../../types/shopify';
+import type {
+    AnalyticsOverviewMarketingSpendByPlatform,
+    AnalyticsOverviewPaymentSplit,
+    AnalyticsOverviewQuantityBySizeBucket,
+    AnalyticsOverviewResponse,
+    AnalyticsOverviewSalesEbita,
+    AnalyticsOverviewSalesEbitaCosts,
+    AnalyticsOverviewShippingPipeline,
+    AnalyticsOverviewVolume,
+} from '../../../types/analytics-overview';
+import type { ShopifyOrderApi, ShopifyOrderProduct, ShopifyOrderProductPopulated } from '../../../types/shopify';
+import { fetchAnalyticsOverview } from '../../../utils/analytics';
 import { loadProducts, type ProductApiItem } from '../../../utils/products';
-import { searchCustomersByPhone } from '../../../utils/customers';
 import { useAppDispatch, useAppSelector, setProducts, setProductsLoading } from '../../../store';
 import AddOrderModal, { type ProductVariantOption, formatVariantLabel } from './AddOrderModal';
 import { CustomerProfileModal } from './CustomerProfileModal';
@@ -55,87 +66,37 @@ function toBackendTrackingStatus(status: DeliveryStatus | ''): string | undefine
     return status;
 }
 
-/** Match order to customers returned from GET /api/customers/search (current page only). */
-function orderMatchesCustomerPhoneSearch(o: ShopifyOrderApi, matches: CustomerSearchResult[]): boolean {
-    const idSet = new Set(matches.map((m) => m._id));
-    const c = o.customer;
-    const custId =
-        c && typeof c === 'object' && '_id' in c
-            ? String((c as ShopifyOrderCustomer)._id ?? '')
-            : typeof c === 'string'
-              ? c
-              : '';
-    if (custId && idSet.has(custId)) return true;
-
-    const orderPhone = digitsOnly(getOrderCustomerPhone(o));
-    if (!orderPhone) return false;
-
-    return matches.some((m) => {
-        const mp = digitsOnly(m.phoneNumber);
-        if (!mp) return false;
-        return mp === orderPhone || mp.endsWith(orderPhone) || orderPhone.endsWith(mp);
-    });
-}
-
 type UiRange = 'all' | 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
 type CategoryTab = 'all' | 'milk' | 'ghee' | 'oils';
 type ShippedTab = 'shipped' | 'notShipped';
 
-/** Liters sold for each ghee product line (matched by product name from API / catalog). */
-export type GheeLitersByKind = { gir: number; desi: number; buffalo: number };
-
-function getShopifyLineProductName(line: ShopifyOrderProduct, productMap: Map<string, ProductApiItem>): string {
+/**
+ * One normalized category label per line (trimmed, lowercased).
+ * Prefer API `productId.category.name`; else product catalog map by product id.
+ */
+function resolveOrderLineCategoryNorm(
+    line: ShopifyOrderProduct,
+    productCategoryMap: Map<string, string>,
+    catalogLoaded: boolean,
+): string {
     const raw = line.productId;
-    if (raw && typeof raw === 'object' && 'name' in raw) {
-        return String((raw as { name?: string }).name || '').trim();
+    let productId: string | null = null;
+    if (raw && typeof raw === 'object' && '_id' in raw) {
+        const pop = raw as ShopifyOrderProductPopulated;
+        productId = String(pop._id);
+        const cat = pop.category;
+        if (cat?.name != null) {
+            const n = String(cat.name).trim().toLowerCase();
+            if (n) return n;
+        }
+    } else if (typeof raw === 'string') {
+        productId = raw;
     }
-    const id = typeof raw === 'string' ? raw : '';
-    if (id) {
-        const p = productMap.get(id);
-        if (p?.name) return String(p.name).trim();
+    if (productId && catalogLoaded) {
+        const fromMap = (productCategoryMap.get(productId) || '').trim().toLowerCase();
+        if (fromMap) return fromMap;
     }
     return '';
-}
-
-/** Map Gir / Desi / Buffalo from product name or from a full variant label. */
-function classifyGheeKindFromText(text: string): keyof GheeLitersByKind | null {
-    const n = text.toLowerCase();
-    if (!n) return null;
-    if (n.includes('buffalo')) return 'buffalo';
-    if (n.includes('gir')) return 'gir';
-    if (n.includes('desi')) return 'desi';
-    return null;
-}
-
-/**
- * Pack-size bucket used by the quantity table and headline "total liters" (must stay in sync).
- * 500 ml, 1 L, 2 L, 5 L (plus 250 ml → same bucket as 500 ml for counting).
- */
-function resolveShopifyVariantSizeKey(variantName: string): '' | '500ml' | '1ltr' | '2ltr' | '5ltr' {
-    const sizeMatch = variantName.match(/-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|L)/i);
-    if (!sizeMatch) return '';
-    const sizeValue = parseFloat(sizeMatch[1]);
-    const sizeUnit = sizeMatch[2].toLowerCase();
-    let sizeKey: '' | '500ml' | '1ltr' | '2ltr' | '5ltr' = '';
-    if (sizeUnit === 'ml') {
-        if (sizeValue === 500) sizeKey = '500ml';
-        else if (sizeValue === 1000) sizeKey = '1ltr';
-        else if (sizeValue === 2000) sizeKey = '2ltr';
-        else if (sizeValue === 5000) sizeKey = '5ltr';
-        else if (sizeValue === 250) sizeKey = '500ml';
-    } else if (sizeUnit === 'l' || sizeUnit === 'ltr') {
-        if (sizeValue === 1) sizeKey = '1ltr';
-        else if (sizeValue === 2) sizeKey = '2ltr';
-        else if (sizeValue === 5) sizeKey = '5ltr';
-    }
-    return sizeKey;
-}
-
-function litersInTableBucket(sizeKey: '500ml' | '1ltr' | '2ltr' | '5ltr', quantity: number): number {
-    if (sizeKey === '500ml') return 0.5 * quantity;
-    if (sizeKey === '1ltr') return quantity;
-    if (sizeKey === '2ltr') return 2 * quantity;
-    return 5 * quantity;
 }
 
 type ShopifyProps = {
@@ -155,7 +116,7 @@ type ShopifyProps = {
 export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps) {
     const [range, setRange] = useState<UiRange>('currentMonth');
     const [customerFilter, setCustomerFilter] = useState('');
-    const [phoneSearchCustomers, setPhoneSearchCustomers] = useState<CustomerSearchResult[]>([]);
+    const [phoneSearchOrders, setPhoneSearchOrders] = useState<ShopifyOrderApi[]>([]);
     const [phoneSearchLoading, setPhoneSearchLoading] = useState(false);
     const [customStart, setCustomStart] = useState<string>(toInputDate(new Date()));
     const [customEnd, setCustomEnd] = useState<string>(toInputDate(new Date()));
@@ -191,7 +152,13 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         page: number;
         limit: number;
     } | null>(null);
-    
+    const [analyticsShippingPipeline, setAnalyticsShippingPipeline] =
+        useState<AnalyticsOverviewShippingPipeline | null>(null);
+    const [analyticsVolume, setAnalyticsVolume] = useState<AnalyticsOverviewVolume | null>(null);
+    const [analyticsPaymentSplit, setAnalyticsPaymentSplit] = useState<AnalyticsOverviewPaymentSplit | null>(null);
+    const [analyticsSalesEbita, setAnalyticsSalesEbita] = useState<AnalyticsOverviewSalesEbita | null>(null);
+    const [analyticsOverviewLoading, setAnalyticsOverviewLoading] = useState(false);
+
     // Toast notifications
     const [toasts, setToasts] = useState<Toast[]>([]);
     function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
@@ -344,6 +311,51 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return { from: '2024-01-01', to: todayStr };
     }, [range, appliedCustomStart, appliedCustomEnd]);
 
+    const applyAnalyticsOverviewData = useCallback((data: AnalyticsOverviewResponse) => {
+        setAnalyticsShippingPipeline(data.shippingPipeline ?? null);
+        setAnalyticsVolume(data.volume ?? null);
+        setAnalyticsPaymentSplit(data.paymentSplit ?? null);
+        setAnalyticsSalesEbita(data.salesEbita ?? null);
+    }, []);
+
+    const refreshAnalyticsOverview = useCallback(async () => {
+        setAnalyticsOverviewLoading(true);
+        try {
+            const data = await fetchAnalyticsOverview(dateRangeForApi.from, dateRangeForApi.to);
+            applyAnalyticsOverviewData(data);
+        } catch (err) {
+            console.error('Failed to refresh analytics overview', err);
+        } finally {
+            setAnalyticsOverviewLoading(false);
+        }
+    }, [dateRangeForApi.from, dateRangeForApi.to, applyAnalyticsOverviewData]);
+
+    useEffect(() => {
+        let cancelled = false;
+        setAnalyticsOverviewLoading(true);
+        fetchAnalyticsOverview(dateRangeForApi.from, dateRangeForApi.to)
+            .then((data) => {
+                if (!cancelled) {
+                    applyAnalyticsOverviewData(data);
+                }
+            })
+            .catch((err) => {
+                console.error('Failed to load analytics overview', err);
+                if (!cancelled) {
+                    setAnalyticsShippingPipeline(null);
+                    setAnalyticsVolume(null);
+                    setAnalyticsPaymentSplit(null);
+                    setAnalyticsSalesEbita(null);
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setAnalyticsOverviewLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [dateRangeForApi.from, dateRangeForApi.to, applyAnalyticsOverviewData]);
+
     /** GET /api/orders with date range + pagination + selected dropdown filters. */
     const ordersListQuery = useMemo(
         () => ({
@@ -355,13 +367,32 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             platform: platformFilter ? String(platformFilter).toLowerCase() : undefined,
             paymentMode: paymentStatusFilter || undefined,
             trackingStatus: toBackendTrackingStatus(deliveryStatusFilter),
+            shipped: shippedTab === 'shipped' ? true : false,
         }),
-        [dateRangeForApi.from, dateRangeForApi.to, page, pageSize, typeFilter, platformFilter, paymentStatusFilter, deliveryStatusFilter],
+        [
+            dateRangeForApi.from,
+            dateRangeForApi.to,
+            page,
+            pageSize,
+            typeFilter,
+            platformFilter,
+            paymentStatusFilter,
+            deliveryStatusFilter,
+            shippedTab,
+        ],
     );
 
     useEffect(() => {
         setPage(1);
-    }, [dateRangeForApi.from, dateRangeForApi.to, typeFilter, platformFilter, paymentStatusFilter, deliveryStatusFilter]);
+    }, [
+        dateRangeForApi.from,
+        dateRangeForApi.to,
+        typeFilter,
+        platformFilter,
+        paymentStatusFilter,
+        deliveryStatusFilter,
+        shippedTab,
+    ]);
 
     const loadOrdersPage = async (query = ordersListQuery) => {
         const dash = await loadOrdersDashboardFromApi(query);
@@ -389,6 +420,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 return;
             }
             await loadOrdersPage(ordersListQuery);
+            await refreshAnalyticsOverview();
         } catch (err) {
             console.error('Failed to sync Shopify orders', err);
             showToast('Failed to Sync', 'error');
@@ -434,7 +466,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
     useEffect(() => {
         if (!isPhoneSearch) {
-            setPhoneSearchCustomers([]);
+            setPhoneSearchOrders([]);
             setPhoneSearchLoading(false);
             return;
         }
@@ -443,11 +475,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             (async () => {
                 try {
                     setPhoneSearchLoading(true);
-                    const rows = await searchCustomersByPhone(phoneDigits);
-                    if (!cancelled) setPhoneSearchCustomers(rows);
+                    setPhoneSearchOrders([]);
+                    const rows = await searchOrdersByPhone(phoneDigits, dateRangeForApi.from, dateRangeForApi.to);
+                    if (!cancelled) setPhoneSearchOrders(rows);
                 } catch (err) {
-                    console.error('Failed to search customers by phone', err);
-                    if (!cancelled) setPhoneSearchCustomers([]);
+                    console.error('Failed to search orders by phone', err);
+                    if (!cancelled) setPhoneSearchOrders([]);
                 } finally {
                     if (!cancelled) setPhoneSearchLoading(false);
                 }
@@ -457,7 +490,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             cancelled = true;
             window.clearTimeout(t);
         };
-    }, [phoneDigits, isPhoneSearch]);
+    }, [phoneDigits, isPhoneSearch, dateRangeForApi.from, dateRangeForApi.to]);
 
     // When Edit is clicked, fetch full order from GET /api/orders/:id then open modal
     useEffect(() => {
@@ -531,12 +564,13 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     }, [productsList]);
 
     const generatedPlusUser = useMemo(() => {
-        return [...orders].sort((a, b) => {
+        const source = isPhoneSearch ? phoneSearchOrders : orders;
+        return [...source].sort((a, b) => {
             const dA = a.createdAt ?? a.date ?? '';
             const dB = b.createdAt ?? b.date ?? '';
             return dA > dB ? -1 : dA < dB ? 1 : 0;
         });
-    }, [orders]);
+    }, [isPhoneSearch, phoneSearchOrders, orders]);
 
     // API already returns orders for the selected date range; no client-side date filter
     const byRange = generatedPlusUser;
@@ -546,8 +580,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             const matchesCustomer = (() => {
                 if (!isPhoneSearch) return true;
                 if (phoneSearchLoading) return false;
-                if (phoneSearchCustomers.length === 0) return false;
-                return orderMatchesCustomerPhoneSearch(o, phoneSearchCustomers);
+                return true;
             })();
             const paymentStatus = o.paymentMode === 'PAID' ? 'PAID' : 'COD';
             const matchesPayment = !paymentStatusFilter || paymentStatus === paymentStatusFilter;
@@ -563,28 +596,15 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 shippedTab === 'shipped' ? o.is_shipped === true : o.is_shipped === false;
             const matchesCategory = (() => {
                 if (categoryTab === 'all') return true;
-                // Avoid hiding all rows when product catalog hasn't loaded yet (common in local dev).
-                if (productCategoryMap.size === 0) return true;
                 const lines = o.products || [];
+                const catalogLoaded = productCategoryMap.size > 0;
+
                 for (const line of lines) {
-                    const rawProductId = (line as any).productId;
-                    let productId: string | null = null;
-                    let inlineProductName = '';
-                    if (rawProductId && typeof rawProductId === 'object' && '_id' in rawProductId) {
-                        productId = String((rawProductId as { _id: string })._id);
-                        if ('name' in rawProductId) {
-                            inlineProductName = String((rawProductId as { name?: string }).name ?? '').toLowerCase();
-                        }
-                    } else if (typeof rawProductId === 'string') {
-                        productId = rawProductId;
-                    }
-                    const catFromMap = productId ? (productCategoryMap.get(productId) || '') : '';
-                    const variantText = String((line as { variantName?: string }).variantName ?? '').toLowerCase();
-                    const catLower = `${catFromMap} ${inlineProductName} ${variantText}`.trim();
-                    if (!catLower) continue;
-                    if (categoryTab === 'milk' && catLower.includes('milk')) return true;
-                    if (categoryTab === 'ghee' && catLower.includes('ghee')) return true;
-                    if (categoryTab === 'oils' && (catLower.includes('oil') || catLower.includes('oils'))) return true;
+                    const catNorm = resolveOrderLineCategoryNorm(line, productCategoryMap, catalogLoaded);
+                    if (!catNorm) continue;
+                    if (categoryTab === 'milk' && catNorm === 'milk') return true;
+                    if (categoryTab === 'ghee' && catNorm === 'ghee') return true;
+                    if (categoryTab === 'oils' && catNorm.includes('oil')) return true;
                 }
                 return false;
             })();
@@ -603,7 +623,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         byRange,
         isPhoneSearch,
         phoneSearchLoading,
-        phoneSearchCustomers,
         paymentStatusFilter,
         deliveryStatusFilter,
         platformFilter,
@@ -613,208 +632,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         categoryTab,
         productCategoryMap,
     ]);
-
-    const metrics = useMemo(() => {
-        const totalSales = filtered.reduce((s, o) => s + o.totalAmount, 0);
-        const quantity = filtered.reduce((s, o) => s + (o.products || []).reduce((sum, p) => sum + p.quantity, 0), 0);
-        const codCharges = filtered.reduce((s, o) => s + (o.codCharges || 0), 0);
-        const deliveryStatusFor = (o: ShopifyOrderApi) =>
-            mapDeliveryStatusFromTracking(o.shippingDetails?.trackingStatus, o.returnStatus);
-        const deliveredOrders = filtered.filter((o) => deliveryStatusFor(o) === 'delivered');
-        const inTransitOrders = filtered.filter((o) => deliveryStatusFor(o) === 'in_transit');
-        const delivered = deliveredOrders.length;
-        const deliveredAmount = deliveredOrders.reduce((s, o) => s + o.totalAmount, 0);
-        const deliveredShippingCharges = deliveredOrders.reduce((s, o) => s + (o.shippingCharges || 0), 0);
-
-        const inTransit = inTransitOrders.length;
-        const inTransitAmount = inTransitOrders.reduce((s, o) => s + o.totalAmount, 0);
-
-        const metaSpend = 0;
-        const miscSpend = 0;
-        const delhiverySpend = 0;
-        const amazonShippingSpend = 0;
-        const shippingSpend = 0;
-        const totalMarketingSpend = 0;
-        const totalMiscCost = 0;
-        const roasCurrent = 0;
-        const roasExpected = 0;
-
-        const orderCountForPaymentMix = filtered.length;
-        let paidOrderCount = 0;
-        for (const o of filtered) {
-            if (o.paymentMode === 'PAID') paidOrderCount += 1;
-        }
-        const paidOrdersPct =
-            orderCountForPaymentMix > 0
-                ? Math.round((paidOrderCount / orderCountForPaymentMix) * 100)
-                : 0;
-        const codOrdersPct =
-            orderCountForPaymentMix > 0 ? Math.max(0, 100 - paidOrdersPct) : 0;
-
-        // Manufacturing cost based on delivered lines and product actual cost from /api/products.
-        const productMap = new Map<string, ProductApiItem>();
-        productsList.forEach((p) => {
-            if (p?._id) productMap.set(p._id, p);
-        });
-
-        const resolveUnitActualCost = (line: ShopifyOrderApi['products'][number]): number => {
-            const rawProductId = line.productId;
-            const productId =
-                rawProductId && typeof rawProductId === 'object' && '_id' in rawProductId
-                    ? String(rawProductId._id ?? '')
-                    : typeof rawProductId === 'string'
-                    ? rawProductId
-                    : '';
-
-            const product = productMap.get(productId);
-            if (!product) {
-                return getShopifyProductUnitPrice(line);
-            }
-
-            const variantName = String(line.variantName || '').trim().toLowerCase();
-            const matchedVariant = (product.variants || []).find((v) => {
-                const vName = String(v.name || '').trim().toLowerCase();
-                return vName === variantName || vName.includes(variantName) || variantName.includes(vName);
-            });
-
-            const unitActual =
-                matchedVariant?.actualPrice ??
-                product.actualPrice ??
-                matchedVariant?.price ??
-                product.price ??
-                getShopifyProductUnitPrice(line);
-
-            return Number(unitActual || 0);
-        };
-
-        const manufacturingCost = deliveredOrders.reduce((sum, order) => {
-            const orderManufacturing = (order.products || []).reduce((lineSum, line) => {
-                const qty = Number(line.quantity || 0);
-                const unitActualCost = resolveUnitActualCost(line);
-                return lineSum + unitActualCost * qty;
-            }, 0);
-            return sum + orderManufacturing;
-        }, 0);
-
-        const shippingCharges = deliveredShippingCharges;
-        const manufacturingCostInTransit = inTransitOrders.reduce((sum, order) => {
-            const orderManufacturing = (order.products || []).reduce((lineSum, line) => {
-                const qty = Number(line.quantity || 0);
-                const unitActualCost = resolveUnitActualCost(line);
-                return lineSum + unitActualCost * qty;
-            }, 0);
-            return sum + orderManufacturing;
-        }, 0);
-
-        const expectedManufacturingCost = manufacturingCost + manufacturingCostInTransit;
-        const ebita = deliveredAmount - manufacturingCost - metaSpend - shippingSpend - miscSpend;
-        const expectedEbita =
-            (deliveredAmount + inTransitAmount) -
-            expectedManufacturingCost -
-            metaSpend -
-            shippingSpend -
-            miscSpend;
-        
-        // Calculate quantities by size
-        const quantityBySize: { [key: string]: number } = {
-            '500ml': 0,
-            '1ltr': 0,
-            '2ltr': 0,
-            '5ltr': 0,
-        };
-        
-        // Calculate delivered quantities by size
-        const deliveredQuantityBySize: { [key: string]: number } = {
-            '500ml': 0,
-            '1ltr': 0,
-            '2ltr': 0,
-            '5ltr': 0,
-        };
-
-        // Calculate RTO quantities by size
-        const rtoQuantityBySize: { [key: string]: number } = {
-            '500ml': 0,
-            '1ltr': 0,
-            '2ltr': 0,
-            '5ltr': 0,
-        };
-
-        // Calculate In Transit quantities by size
-        const inTransitQuantityBySize: { [key: string]: number } = {
-            '500ml': 0,
-            '1ltr': 0,
-            '2ltr': 0,
-            '5ltr': 0,
-        };
-        
-        filtered.forEach((o: ShopifyOrderApi) => {
-            const delStatus = deliveryStatusFor(o);
-            (o.products || []).forEach(p => {
-                const variantName = p.variantName || '';
-                const sizeKey = resolveShopifyVariantSizeKey(variantName);
-                if (sizeKey) {
-                    quantityBySize[sizeKey] += p.quantity;
-                    if (delStatus === 'delivered') deliveredQuantityBySize[sizeKey] += p.quantity;
-                    if (delStatus === 'rto') rtoQuantityBySize[sizeKey] += p.quantity;
-                    if (delStatus === 'in_transit') inTransitQuantityBySize[sizeKey] += p.quantity;
-                }
-            });
-        });
-
-        const gheeLitersByKind: GheeLitersByKind = { gir: 0, desi: 0, buffalo: 0 };
-        filtered.forEach((o: ShopifyOrderApi) => {
-            (o.products || []).forEach((p) => {
-                const productName = getShopifyLineProductName(p, productMap);
-                const variantLabel = String(p.variantName || '');
-                const kind =
-                    classifyGheeKindFromText(productName) ?? classifyGheeKindFromText(variantLabel);
-                if (!kind) return;
-                const sizeKey = resolveShopifyVariantSizeKey(variantLabel);
-                if (!sizeKey) return;
-                const L = litersInTableBucket(sizeKey, Number(p.quantity || 0));
-                if (L <= 0) return;
-                gheeLitersByKind[kind] += L;
-            });
-        });
-
-        const rtoOrders = filtered.filter((o: ShopifyOrderApi) => deliveryStatusFor(o) === 'rto');
-        const rto = rtoOrders.length;
-        const rtoAmount = rtoOrders.reduce((s, o) => s + o.totalAmount, 0);
-        
-        return {
-            totalSales,
-            quantity,
-            quantityBySize,
-            deliveredQuantityBySize,
-            rtoQuantityBySize,
-            inTransitQuantityBySize,
-            gheeLitersByKind,
-            codCharges,
-            shippingCharges,
-            roasCurrent,
-            roasExpected,
-            paidOrdersPct,
-            codOrdersPct,
-            delivered,
-            deliveredAmount,
-            rto,
-            rtoAmount,
-            inTransit,
-            inTransitAmount,
-            totalOrders: filtered.length,
-            ebita,
-            expectedEbita,
-            manufacturingCost,
-            expectedManufacturingCost,
-            totalMiscCost,
-            totalMarketingSpend,
-            metaSpend,
-            miscSpend,
-            delhiverySpend,
-            amazonShippingSpend,
-            shippingSpend,
-        };
-    }, [filtered, productsList]);
 
     useEffect(() => {
         function onDocClick(e: MouseEvent) {
@@ -887,11 +704,16 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
     /** Remount orders table when a new API page loads so progressive row state resets cleanly. */
     const shopifyOrdersTableKey = useMemo(() => {
+        if (isPhoneSearch) {
+            if (phoneSearchOrders.length === 0) return `phone-${customerFilter}-empty`;
+            return `phone-${customerFilter}-n${phoneSearchOrders.length}-${phoneSearchOrders[0]._id}`;
+        }
         if (orders.length === 0) return `p${page}-l${pageSize}-empty`;
         return `p${page}-l${pageSize}-n${orders.length}-${orders[0]._id}-${orders[orders.length - 1]._id}`;
-    }, [orders, page, pageSize]);
+    }, [isPhoneSearch, customerFilter, phoneSearchOrders, orders, page, pageSize]);
 
-    const showFullPageSpinner = loading || (isPhoneSearch && phoneSearchLoading);
+    /** During phone search, only block on the phone API — not the paginated `/api/orders` fetch (can be very slow). */
+    const showFullPageSpinner = isPhoneSearch ? phoneSearchLoading : loading;
 
     return (
         <section className="shopify-page">
@@ -899,7 +721,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 <Spinner
                     overlay
                     fixed
-                    message={isPhoneSearch && phoneSearchLoading && !loading ? 'Searching by phone…' : 'Loading Orders'}
+                    message={isPhoneSearch ? 'Searching by phone…' : 'Loading Orders'}
                 />
             ) : null}
             <div className="card shopify-header-card">
@@ -1192,38 +1014,28 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     <div className="shopify-dash-mobile-inner">
                         <div className="shopify-dash-grid">
                             <ModernSalesWithEBITAMetric
-                                totalSales={metrics.totalSales}
-                                ebita={metrics.ebita}
-                                expectedEbita={metrics.expectedEbita}
-                                manufacturingCost={metrics.manufacturingCost}
-                                expectedManufacturingCost={metrics.expectedManufacturingCost}
-                                metaSpend={metrics.metaSpend}
-                                miscCost={metrics.miscSpend}
-                                shippingCost={metrics.shippingSpend}
+                                salesEbita={analyticsSalesEbita}
+                                loading={analyticsOverviewLoading}
                                 isMilkSelected={categoryTab === 'milk'}
+                                deliveredSalesAmount={analyticsShippingPipeline?.delivered.amount ?? 0}
+                                inTransitSalesAmount={analyticsShippingPipeline?.inTransit.amount ?? 0}
                             />
                             <ModernQuantityMetric
-                                quantityBySize={metrics.quantityBySize}
-                                deliveredQuantityBySize={metrics.deliveredQuantityBySize}
-                                rtoQuantityBySize={metrics.rtoQuantityBySize}
-                                inTransitQuantityBySize={metrics.inTransitQuantityBySize}
-                                gheeLitersByKind={metrics.gheeLitersByKind}
+                                volume={analyticsVolume}
+                                loading={analyticsOverviewLoading}
                                 isMilkSelected={categoryTab === 'milk'}
                             />
                             <ModernDeliveryStatusMetric
-                                delivered={metrics.delivered}
-                                deliveredAmount={metrics.deliveredAmount}
-                                rto={metrics.rto}
-                                rtoAmount={metrics.rtoAmount}
-                                inTransit={metrics.inTransit}
-                                inTransitAmount={metrics.inTransitAmount}
+                                pipeline={analyticsShippingPipeline}
+                                loading={analyticsOverviewLoading}
                                 isMilkSelected={categoryTab === 'milk'}
                             />
                             <ModernRoasMetric
-                                currentRoas={metrics.roasCurrent}
-                                expectedRoas={metrics.roasExpected}
-                                paidOrdersPct={metrics.paidOrdersPct}
-                                codOrdersPct={metrics.codOrdersPct}
+                                paymentSplit={analyticsPaymentSplit}
+                                loading={analyticsOverviewLoading}
+                                deliveredSalesAmount={analyticsShippingPipeline?.delivered.amount ?? 0}
+                                inTransitSalesAmount={analyticsShippingPipeline?.inTransit.amount ?? 0}
+                                marketingSpendTotal={analyticsSalesEbita?.costs?.marketingSpendTotal ?? 0}
                             />
                         </div>
                     </div>
@@ -1299,8 +1111,18 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             />
             <footer className="shopify-pagination" aria-label="Orders pagination">
                 <div className="shopify-pagination__range">
-                    {loading ? (
+                    {loading && !isPhoneSearch ? (
                         <span className="shopify-pagination__muted">Loading…</span>
+                    ) : isPhoneSearch && phoneSearchLoading ? (
+                        <span className="shopify-pagination__muted">Searching by phone…</span>
+                    ) : isPhoneSearch && !phoneSearchLoading ? (
+                        <>
+                            Phone search: showing{' '}
+                            <strong>
+                                {filtered.length === 0 ? 0 : 1}–{filtered.length}
+                            </strong>{' '}
+                            of <strong>{filtered.length.toLocaleString()}</strong> in range
+                        </>
                     ) : ordersMeta ? (
                         <>
                             Showing{' '}
@@ -1319,7 +1141,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     <select
                         className="shopify-pagination__select"
                         value={pageSize}
-                        disabled={loading}
+                        disabled={(!isPhoneSearch && loading) || (isPhoneSearch && !phoneSearchLoading)}
                         aria-label="Rows per page"
                         onChange={(e) => {
                             setPageSize(Number(e.target.value));
@@ -1334,24 +1156,36 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     </select>
                 </label>
                 <div className="shopify-pagination__nav">
-                    <button type="button" className="shopify-page-btn" disabled={loading || page <= 1} onClick={() => setPage(1)}>
+                    <button
+                        type="button"
+                        className="shopify-page-btn"
+                        disabled={(!isPhoneSearch && loading) || (isPhoneSearch && !phoneSearchLoading) || page <= 1}
+                        onClick={() => setPage(1)}
+                    >
                         First
                     </button>
                     <button
                         type="button"
                         className="shopify-page-btn"
-                        disabled={loading || page <= 1}
+                        disabled={(!isPhoneSearch && loading) || (isPhoneSearch && !phoneSearchLoading) || page <= 1}
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                     >
                         Prev
                     </button>
                     <span className="shopify-pagination__page-of">
-                        Page <strong>{page}</strong> of <strong>{Math.max(1, ordersMeta?.totalPages ?? 1)}</strong>
+                        Page <strong>{isPhoneSearch && !phoneSearchLoading ? 1 : page}</strong> of{' '}
+                        <strong>
+                            {isPhoneSearch && !phoneSearchLoading ? 1 : Math.max(1, ordersMeta?.totalPages ?? 1)}
+                        </strong>
                     </span>
                     <button
                         type="button"
                         className="shopify-page-btn"
-                        disabled={loading || page >= Math.max(1, ordersMeta?.totalPages ?? 1)}
+                        disabled={
+                            (!isPhoneSearch && loading) ||
+                            (isPhoneSearch && !phoneSearchLoading) ||
+                            page >= Math.max(1, ordersMeta?.totalPages ?? 1)
+                        }
                         onClick={() => setPage((p) => p + 1)}
                     >
                         Next
@@ -1359,7 +1193,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     <button
                         type="button"
                         className="shopify-page-btn"
-                        disabled={loading || page >= Math.max(1, ordersMeta?.totalPages ?? 1)}
+                        disabled={
+                            (!isPhoneSearch && loading) ||
+                            (isPhoneSearch && !phoneSearchLoading) ||
+                            page >= Math.max(1, ordersMeta?.totalPages ?? 1)
+                        }
                         onClick={() => setPage(Math.max(1, ordersMeta?.totalPages ?? 1))}
                     >
                         Last
@@ -1389,55 +1227,50 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     onCreate={async (o) => {
                         try {
                             if (editingOrder) {
-                                const base = orders.find((ord) => ord._id === editingOrder.id);
-                                if (base) {
-                                    await updateShopifyOrderFromForm(
-                                        base,
-                                        o,
-                                        (variantLabel) => {
-                                            const label = (variantLabel ?? '').trim();
-                                            if (!label) return undefined;
-
-                                            const [rawName, ...rest] = label.split('-');
-                                            const name = (rawName ?? '').trim();
-                                            const size = rest.join('-').trim();
-
-                                            let product: ProductApiItem | undefined =
-                                                modalProductSource.find((p) => p.name === name) ||
-                                                modalProductSource.find((p) => label.startsWith(p.name));
-
-                                            if (!product) return undefined;
-
-                                            if (!size) {
-                                                return product._id;
-                                            }
-
-                                            const hasVariant =
-                                                Array.isArray(product.variants) &&
-                                                product.variants.some((v) => v.name === size);
-
-                                            return hasVariant ? product._id : product._id;
-                                        },
-                                        modalProductSource,
-                                    );
-                                } else {
-                                    await updateOrder(o);
+                                let base = orders.find((ord) => ord._id === editingOrder.id);
+                                if (!base) {
+                                    base = await fetchOrderById(editingOrder.id);
                                 }
+                                await updateShopifyOrderFromForm(
+                                    base,
+                                    o,
+                                    (variantLabel) => {
+                                        const label = (variantLabel ?? '').trim();
+                                        if (!label) return undefined;
+
+                                        const [rawName, ...rest] = label.split('-');
+                                        const name = (rawName ?? '').trim();
+                                        const size = rest.join('-').trim();
+
+                                        let product: ProductApiItem | undefined =
+                                            modalProductSource.find((p) => p.name === name) ||
+                                            modalProductSource.find((p) => label.startsWith(p.name));
+
+                                        if (!product) return undefined;
+
+                                        if (!size) {
+                                            return product._id;
+                                        }
+
+                                        const hasVariant =
+                                            Array.isArray(product.variants) &&
+                                            product.variants.some((v) => v.name === size);
+
+                                        return hasVariant ? product._id : product._id;
+                                    },
+                                    modalProductSource,
+                                );
                                 await loadOrdersPage(ordersListQuery);
+                                await refreshAnalyticsOverview();
                                 setEditingOrder(null);
                                 showToast('Order updated successfully!', 'success');
                             } else {
                                 // Build Shopify-style payload for Add Order POST
-                                const fulfillmentStatusBackend = (() => {
-                                    const lower = o.fulfillmentStatus.toLowerCase();
-                                    if (lower === 'fulfilled') return 'fulfilled';
-                                    if (lower === 'partial') return 'partial';
-                                    return 'unfulfilled';
-                                })();
+                                const fulfillmentStatusBackend = toBackendFulfillmentStatus(o.fulfillmentStatus);
 
                                 const shippingStatusBackend = normalizeDeliveryStatus(o.deliveryStatus);
 
-                                const typeBackend = (o.type ?? 'New').toLowerCase();
+                                const typeBackend = toBackendOrderType(o.type) ?? 'new';
 
                                 const productsPayload = o.items.map((it) => {
                                     const option = productOptions.find(
@@ -1498,6 +1331,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     body: JSON.stringify(payload),
                                 });
                                 await loadOrdersPage(ordersListQuery);
+                                await refreshAnalyticsOverview();
                                 setShowAddOrder(false);
                                 showToast('Order added successfully!', 'success');
                             }
@@ -1599,17 +1433,48 @@ function ModernMetricItem({ icon, label, value, iconColor, isLast, isEven }: { i
     );
 }
 
+const EMPTY_PAYMENT_SPLIT: AnalyticsOverviewPaymentSplit = {
+    totalOrders: 0,
+    prepaid: { count: 0, percentage: 0 },
+    cod: { count: 0, percentage: 0 },
+    unknown: { count: 0, percentage: 0 },
+};
+
+function formatPctLabel(n: number): string {
+    const x = Number(n) || 0;
+    if (!Number.isFinite(x)) return '0';
+    return x % 1 === 0 ? String(x) : x.toFixed(1);
+}
+
+/**
+ * Current ROAS = delivered sales amount ÷ marketing spend total.
+ * Expected ROAS = (delivered + in-transit) sales amount ÷ marketing spend total.
+ * Payment mix donut still uses `paymentSplit`.
+ */
 function ModernRoasMetric({
-    currentRoas,
-    expectedRoas,
-    paidOrdersPct,
-    codOrdersPct,
+    paymentSplit,
+    loading,
+    deliveredSalesAmount,
+    inTransitSalesAmount,
+    marketingSpendTotal,
 }: {
-    currentRoas: number;
-    expectedRoas: number;
-    paidOrdersPct: number;
-    codOrdersPct: number;
+    paymentSplit: AnalyticsOverviewPaymentSplit | null;
+    loading: boolean;
+    deliveredSalesAmount: number;
+    inTransitSalesAmount: number;
+    marketingSpendTotal: number;
 }) {
+    const ps = paymentSplit ?? EMPTY_PAYMENT_SPLIT;
+    const prepaidPct = Math.max(0, Math.min(100, Number(ps.prepaid?.percentage) || 0));
+    const codPct = Math.max(0, Math.min(100, Number(ps.cod?.percentage) || 0));
+    const hasOrderPaymentMix = (ps.totalOrders ?? 0) > 0 && (prepaidPct > 0 || codPct > 0);
+
+    const spend = Math.max(0, Number(marketingSpendTotal) || 0);
+    const delivered = Math.max(0, Number(deliveredSalesAmount) || 0);
+    const inTransit = Math.max(0, Number(inTransitSalesAmount) || 0);
+    const currentRoas = spend > 0 ? delivered / spend : 0;
+    const expectedRoas = spend > 0 ? (delivered + inTransit) / spend : 0;
+
     const formatRoas = (v: number): string => {
         if (!Number.isFinite(v) || v <= 0) return '0.00';
         return v.toFixed(2);
@@ -1626,13 +1491,13 @@ function ModernRoasMetric({
               : 0;
 
     const paymentSplitDeg =
-        paidOrdersPct > 0 || codOrdersPct > 0
-            ? Math.min(360, Math.max(0, (paidOrdersPct / 100) * 360))
-            : 0;
-    const hasOrderPaymentMix = paidOrdersPct > 0 || codOrdersPct > 0;
+        prepaidPct > 0 || codPct > 0 ? Math.min(360, Math.max(0, (prepaidPct / 100) * 360)) : 0;
 
     return (
-        <article className="shopify-dash-card shopify-dash-card--roas">
+        <article
+            className={`shopify-dash-card shopify-dash-card--roas${loading ? ' shopify-dash-card--shimmer' : ''}`}
+            aria-busy={loading}
+        >
             <div className="shopify-dash-card__accent" aria-hidden />
             <div className="shopify-dash-card__noise" aria-hidden />
             <header className="shopify-dash-card__head">
@@ -1674,17 +1539,17 @@ function ModernRoasMetric({
                             } as CSSProperties
                         }
                         role="img"
-                        aria-label={`Orders Paid ${paidOrdersPct} percent, COD ${codOrdersPct} percent`}
+                        aria-label={`Prepaid ${formatPctLabel(prepaidPct)} percent, COD ${formatPctLabel(codPct)} percent`}
                     >
                         <div className="shopify-dash-card__gauge-cutout shopify-dash-card__gauge-cutout--payment shopify-dash-card__gauge-cutout--payment-lg">
                             {hasOrderPaymentMix ? (
                                 <>
                                     <div className="shopify-dash-card__pay-split-line">
-                                        <span className="shopify-dash-card__pay-split-pct">{paidOrdersPct}%</span>
+                                        <span className="shopify-dash-card__pay-split-pct">{formatPctLabel(prepaidPct)}%</span>
                                         <span className="shopify-dash-card__pay-split-name">Pre-Paid</span>
                                     </div>
                                     <div className="shopify-dash-card__pay-split-line">
-                                        <span className="shopify-dash-card__pay-split-pct">{codOrdersPct}%</span>
+                                        <span className="shopify-dash-card__pay-split-pct">{formatPctLabel(codPct)}%</span>
                                         <span className="shopify-dash-card__pay-split-name">COD</span>
                                     </div>
                                 </>
@@ -1702,30 +1567,73 @@ function ModernRoasMetric({
     );
 }
 
+const EMPTY_SALES_EBITA_COSTS: AnalyticsOverviewSalesEbitaCosts = {
+    manufacturingDelivered: 0,
+    manufacturingExpected: 0,
+    marketingSpendTotal: 0,
+    marketingSpendByPlatform: {},
+};
+
+const EMPTY_SALES_EBITA: AnalyticsOverviewSalesEbita = {
+    costs: EMPTY_SALES_EBITA_COSTS,
+};
+
+/** Meta ads line: sum buckets whose key starts with "meta" (e.g. meta1). */
+function sumMetaMarketingSpend(platform: AnalyticsOverviewMarketingSpendByPlatform): number {
+    let s = 0;
+    for (const [k, v] of Object.entries(platform)) {
+        if (/^meta/i.test(k)) s += Number(v) || 0;
+    }
+    return s;
+}
+
+/** Delhivery + Amazon Shipping from `marketingSpendByPlatform`. */
+function shippingMarketingSpendFromPlatforms(platform: AnalyticsOverviewMarketingSpendByPlatform): number {
+    return (Number(platform.delhivery) || 0) + (Number(platform.amazon_shipping) || 0);
+}
+
 function ModernSalesWithEBITAMetric({
-    totalSales,
-    ebita,
-    expectedEbita,
-    manufacturingCost,
-    expectedManufacturingCost,
-    metaSpend,
-    miscCost,
-    shippingCost,
+    salesEbita,
+    loading,
     isMilkSelected,
+    deliveredSalesAmount,
+    inTransitSalesAmount,
 }: {
-    totalSales: number;
-    ebita: number;
-    expectedEbita: number;
-    manufacturingCost: number;
-    expectedManufacturingCost: number;
-    metaSpend: number;
-    miscCost: number;
-    /** Delhivery + Amazon Shipping marketing spend in range. */
-    shippingCost: number;
+    salesEbita: AnalyticsOverviewSalesEbita | null;
+    loading: boolean;
     isMilkSelected: boolean;
+    deliveredSalesAmount: number;
+    inTransitSalesAmount: number;
 }) {
+    const se = salesEbita ?? EMPTY_SALES_EBITA;
+    const costs: AnalyticsOverviewSalesEbitaCosts = {
+        ...EMPTY_SALES_EBITA_COSTS,
+        ...se.costs,
+        marketingSpendByPlatform: {
+            ...EMPTY_SALES_EBITA_COSTS.marketingSpendByPlatform,
+            ...(se.costs?.marketingSpendByPlatform ?? {}),
+        },
+    };
+    const platform = costs.marketingSpendByPlatform;
+    const totalSales = Number(se.totalSales) || 0;
+    const spend = Math.max(0, Number(costs.marketingSpendTotal) || 0);
+    const delivered = Math.max(0, Number(deliveredSalesAmount) || 0);
+    const inTransit = Math.max(0, Number(inTransitSalesAmount) || 0);
+    const manufacturingCost = Number(costs.manufacturingDelivered) || 0;
+    const expectedManufacturingCost = Number(costs.manufacturingExpected) || 0;
+    /** Delivered pipeline amount − (marketingSpendTotal + Mfg · delivered). */
+    const ebita = delivered - (spend + manufacturingCost);
+    /** (Delivered + In Transit, shipping pipeline) − (Marketing spend · total + Mfg · expected). */
+    const expectedEbita = delivered + inTransit - (spend + expectedManufacturingCost);
+    const metaSpend = sumMetaMarketingSpend(platform);
+    const miscCost = Number(platform.misc) || 0;
+    const shippingCost = shippingMarketingSpendFromPlatforms(platform);
+
     return (
-        <article className="shopify-dash-card shopify-dash-card--sales">
+        <article
+            className={`shopify-dash-card shopify-dash-card--sales${loading ? ' shopify-dash-card--shimmer' : ''}`}
+            aria-busy={loading}
+        >
             <div className="shopify-dash-card__accent" aria-hidden />
             <div className="shopify-dash-card__noise" aria-hidden />
             <header className="shopify-dash-card__head">
@@ -1750,11 +1658,21 @@ function ModernSalesWithEBITAMetric({
                 <div className="shopify-dash-card__stat-row">
                     <div className={`shopify-dash-card__stat ${ebita >= 0 ? 'shopify-dash-card__stat--pos' : 'shopify-dash-card__stat--neg'}`}>
                         <span className="shopify-dash-card__stat-k">EBITA</span>
-                        <span className="shopify-dash-card__stat-v">{formatCurrency(ebita)}</span>
+                        <span
+                            className="shopify-dash-card__stat-v"
+                            title="Delivered amount (shipping pipeline) minus marketing spend total and Mfg · delivered"
+                        >
+                            {formatCurrency(ebita)}
+                        </span>
                     </div>
                     <div className={`shopify-dash-card__stat ${expectedEbita >= 0 ? 'shopify-dash-card__stat--pos' : 'shopify-dash-card__stat--neg'}`}>
                         <span className="shopify-dash-card__stat-k">Expected</span>
-                        <span className="shopify-dash-card__stat-v">{formatCurrency(expectedEbita)}</span>
+                        <span
+                            className="shopify-dash-card__stat-v"
+                            title="(Delivered + In Transit from shipping pipeline) minus (Marketing spend · total + Mfg · expected)"
+                        >
+                            {formatCurrency(expectedEbita)}
+                        </span>
                         <span className="shopify-dash-card__stat-h">Incl. in-transit orders</span>
                     </div>
                 </div>
@@ -1771,6 +1689,10 @@ function ModernSalesWithEBITAMetric({
                             <span>Shipping</span>
                             <span>{formatCurrency(shippingCost)}</span>
                         </li>
+                        <li title="marketingSpendTotal from analytics overview">
+                            <span>Marketing spend · total</span>
+                            <span>{formatCurrency(spend)}</span>
+                        </li>
                     </ul>
                 </section>
             </div>
@@ -1778,23 +1700,28 @@ function ModernSalesWithEBITAMetric({
     );
 }
 
+const EMPTY_SHIPPING_PIPELINE: AnalyticsOverviewShippingPipeline = {
+    delivered: { count: 0, amount: 0 },
+    rto: { count: 0, amount: 0 },
+    inTransit: { count: 0, amount: 0 },
+};
+
 function ModernDeliveryStatusMetric({
-    delivered,
-    deliveredAmount,
-    rto,
-    rtoAmount,
-    inTransit,
-    inTransitAmount,
+    pipeline,
+    loading,
     isMilkSelected,
 }: {
-    delivered: number;
-    deliveredAmount: number;
-    rto: number;
-    rtoAmount: number;
-    inTransit: number;
-    inTransitAmount: number;
+    pipeline: AnalyticsOverviewShippingPipeline | null;
+    loading: boolean;
     isMilkSelected: boolean;
 }) {
+    const p = pipeline ?? EMPTY_SHIPPING_PIPELINE;
+    const delivered = p.delivered.count;
+    const deliveredAmount = p.delivered.amount;
+    const rto = p.rto.count;
+    const rtoAmount = p.rto.amount;
+    const inTransit = p.inTransit.count;
+    const inTransitAmount = p.inTransit.amount;
     const totalOrders = delivered + rto + inTransit;
     const totalAmount = deliveredAmount + rtoAmount + inTransitAmount;
     const pct = (part: number, total: number): number => (total > 0 ? Math.round((part / total) * 100) : 0);
@@ -1814,7 +1741,12 @@ function ModernDeliveryStatusMetric({
         pctVal > 0 && pctVal < 9 ? ' shopify-dash-card__ship-split-seg--narrow' : '';
 
     return (
-        <article className={`shopify-dash-card shopify-dash-card--ship${isMilkSelected ? ' shopify-dash-card--disabled' : ''}`}>
+        <article
+            className={`shopify-dash-card shopify-dash-card--ship${isMilkSelected ? ' shopify-dash-card--disabled' : ''}${
+                loading ? ' shopify-dash-card--shimmer' : ''
+            }`}
+            aria-busy={loading}
+        >
             <div className="shopify-dash-card__accent" aria-hidden />
             <div className="shopify-dash-card__noise" aria-hidden />
             {isMilkSelected ? (
@@ -1831,7 +1763,7 @@ function ModernDeliveryStatusMetric({
                     <h3 className="shopify-dash-card__heading">Shipping pipeline</h3>
                 </div>
             </header>
-            <ul className="shopify-dash-card__ship-list">
+            <ul className="shopify-dash-card__ship-list" aria-busy={loading}>
                 <li className="shopify-dash-card__ship-item shopify-dash-card__ship-item--delivered">
                     <div className="shopify-dash-card__ship-track" />
                     <div className="shopify-dash-card__ship-body">
@@ -1955,42 +1887,66 @@ function ModernDeliveryStatusMetric({
     );
 }
 
+const EMPTY_VOLUME: AnalyticsOverviewVolume = {
+    totalLitres: 0,
+    litresByType: { girCow: 0, desiCow: 0, buffalo: 0 },
+    quantityBySize: {},
+};
+
+const VOLUME_SIZE_ROW_DEFS: { apiKeys: string[]; label: string; litersPerUnit: number }[] = [
+    { apiKeys: ['500ml'], label: '500 ml', litersPerUnit: 0.5 },
+    { apiKeys: ['1litre', '1ltr'], label: '1 L', litersPerUnit: 1 },
+    { apiKeys: ['2litre', '2ltr'], label: '2 L', litersPerUnit: 2 },
+    { apiKeys: ['5litre', '5ltr'], label: '5 L', litersPerUnit: 5 },
+];
+
+function bucketForVolumeRowKeys(
+    qbs: AnalyticsOverviewVolume['quantityBySize'],
+    apiKeys: string[],
+): AnalyticsOverviewQuantityBySizeBucket {
+    const empty: AnalyticsOverviewQuantityBySizeBucket = { ordered: 0, delivered: 0, rto: 0, inTransit: 0 };
+    for (const k of apiKeys) {
+        const b = qbs[k];
+        if (b) {
+            return {
+                ordered: Number(b.ordered) || 0,
+                delivered: Number(b.delivered) || 0,
+                rto: Number(b.rto) || 0,
+                inTransit: Number(b.inTransit) || 0,
+            };
+        }
+    }
+    return empty;
+}
+
 function ModernQuantityMetric({
-    quantityBySize,
-    deliveredQuantityBySize,
-    rtoQuantityBySize,
-    inTransitQuantityBySize,
-    gheeLitersByKind,
+    volume,
+    loading,
     isMilkSelected,
 }: {
-    quantityBySize: { [key: string]: number };
-    deliveredQuantityBySize: { [key: string]: number };
-    rtoQuantityBySize: { [key: string]: number };
-    inTransitQuantityBySize: { [key: string]: number };
-    gheeLitersByKind: GheeLitersByKind;
+    volume: AnalyticsOverviewVolume | null;
+    loading: boolean;
     isMilkSelected: boolean;
 }) {
-    const totalQuantityInLiters =
-        (quantityBySize['500ml'] || 0) * 0.5 +
-        (quantityBySize['1ltr'] || 0) * 1 +
-        (quantityBySize['2ltr'] || 0) * 2 +
-        (quantityBySize['5ltr'] || 0) * 5;
-    const totalDeliveredInLiters =
-        (deliveredQuantityBySize['500ml'] || 0) * 0.5 +
-        (deliveredQuantityBySize['1ltr'] || 0) * 1 +
-        (deliveredQuantityBySize['2ltr'] || 0) * 2 +
-        (deliveredQuantityBySize['5ltr'] || 0) * 5;
-    const formatLiters = (liters: number): string => (liters % 1 === 0 ? liters.toLocaleString() + ' L' : liters.toFixed(1).replace(/\.?0+$/, '') + ' L');
-
-    const sizeRows: { key: '500ml' | '1ltr' | '2ltr' | '5ltr'; label: string }[] = [
-        { key: '500ml', label: '500 ml' },
-        { key: '1ltr', label: '1 L' },
-        { key: '2ltr', label: '2 L' },
-        { key: '5ltr', label: '5 L' },
-    ];
+    const v = volume ?? EMPTY_VOLUME;
+    const totalLitres = Number(v.totalLitres) || 0;
+    const lt = v.litresByType;
+    const totalDeliveredLitres = VOLUME_SIZE_ROW_DEFS.reduce((sum, row) => {
+        const b = bucketForVolumeRowKeys(v.quantityBySize, row.apiKeys);
+        return sum + b.delivered * row.litersPerUnit;
+    }, 0);
+    const hasAnySizeRow = VOLUME_SIZE_ROW_DEFS.some(
+        (row) => bucketForVolumeRowKeys(v.quantityBySize, row.apiKeys).ordered > 0,
+    );
+    const showVolumeDetail = totalLitres > 0 || hasAnySizeRow;
+    const formatLiters = (liters: number): string =>
+        liters % 1 === 0 ? liters.toLocaleString() + ' L' : liters.toFixed(1).replace(/\.?0+$/, '') + ' L';
 
     return (
-        <article className="shopify-dash-card shopify-dash-card--qty">
+        <article
+            className={`shopify-dash-card shopify-dash-card--qty${loading ? ' shopify-dash-card--shimmer' : ''}`}
+            aria-busy={loading}
+        >
             <div className="shopify-dash-card__accent" aria-hidden />
             <div className="shopify-dash-card__noise" aria-hidden />
             <header className="shopify-dash-card__head">
@@ -2004,12 +1960,12 @@ function ModernQuantityMetric({
             </header>
             <div className="shopify-dash-card__hero shopify-dash-card__hero--split">
                 <div>
-                    <p className="shopify-dash-card__figure shopify-dash-card__figure--qty">{formatLiters(totalQuantityInLiters)}</p>
+                    <p className="shopify-dash-card__figure shopify-dash-card__figure--qty">{formatLiters(totalLitres)}</p>
                     <p className="shopify-dash-card__caption">Total liters</p>
                 </div>
                 <div className="shopify-dash-card__pill shopify-dash-card__pill--ok">
                     <span className="shopify-dash-card__pill-k">Delivered</span>
-                    <span className="shopify-dash-card__pill-v">{formatLiters(totalDeliveredInLiters)}</span>
+                    <span className="shopify-dash-card__pill-v">{formatLiters(totalDeliveredLitres)}</span>
                 </div>
             </div>
             <div className={isMilkSelected ? 'shopify-milk-blocked-area shopify-milk-blocked-area--active' : 'shopify-milk-blocked-area'}>
@@ -2023,19 +1979,19 @@ function ModernQuantityMetric({
                     <div className="shopify-dash-card__ghee-cols">
                         <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--gir">
                             <span className="shopify-dash-card__ghee-label">Gir cow</span>
-                            <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.gir)}</span>
+                            <span className="shopify-dash-card__ghee-val">{formatLiters(Number(lt.girCow) || 0)}</span>
                         </div>
                         <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--desi">
                             <span className="shopify-dash-card__ghee-label">Desi cow</span>
-                            <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.desi)}</span>
+                            <span className="shopify-dash-card__ghee-val">{formatLiters(Number(lt.desiCow) || 0)}</span>
                         </div>
                         <div className="shopify-dash-card__ghee-col shopify-dash-card__ghee-col--buffalo">
                             <span className="shopify-dash-card__ghee-label">Buffalo </span>
-                            <span className="shopify-dash-card__ghee-val">{formatLiters(gheeLitersByKind.buffalo)}</span>
+                            <span className="shopify-dash-card__ghee-val">{formatLiters(Number(lt.buffalo) || 0)}</span>
                         </div>
                     </div>
                 </section>
-                {totalQuantityInLiters > 0 ? (
+                {showVolumeDetail ? (
                     <div className="shopify-dash-card__table-wrap">
                         <div className="shopify-dash-card__table" role="table" aria-label="Units by pack size and status">
                             <div className="shopify-dash-card__tr shopify-dash-card__tr--head" role="row">
@@ -2045,17 +2001,20 @@ function ModernQuantityMetric({
                                 <span role="columnheader">RTO</span>
                                 <span role="columnheader" title="In transit">Trn</span>
                             </div>
-                            {sizeRows.map(({ key, label }) =>
-                                quantityBySize[key] > 0 ? (
-                                    <div key={key} className="shopify-dash-card__tr" role="row">
+                            {VOLUME_SIZE_ROW_DEFS.map(({ apiKeys, label }) => {
+                                const b = bucketForVolumeRowKeys(v.quantityBySize, apiKeys);
+                                if (b.ordered <= 0) return null;
+                                const rowKey = apiKeys[0] ?? label;
+                                return (
+                                    <div key={rowKey} className="shopify-dash-card__tr" role="row">
                                         <span className="shopify-dash-card__td--lead" role="cell">{label}</span>
-                                        <span className="shopify-dash-card__td--t" role="cell">{quantityBySize[key].toLocaleString()}</span>
-                                        <span className="shopify-dash-card__td--d" role="cell">{(deliveredQuantityBySize[key] || 0).toLocaleString()}</span>
-                                        <span className="shopify-dash-card__td--r" role="cell">{(rtoQuantityBySize[key] || 0).toLocaleString()}</span>
-                                        <span className="shopify-dash-card__td--i" role="cell">{(inTransitQuantityBySize[key] || 0).toLocaleString()}</span>
+                                        <span className="shopify-dash-card__td--t" role="cell">{b.ordered.toLocaleString()}</span>
+                                        <span className="shopify-dash-card__td--d" role="cell">{b.delivered.toLocaleString()}</span>
+                                        <span className="shopify-dash-card__td--r" role="cell">{b.rto.toLocaleString()}</span>
+                                        <span className="shopify-dash-card__td--i" role="cell">{b.inTransit.toLocaleString()}</span>
                                     </div>
-                                ) : null,
-                            )}
+                                );
+                            })}
                         </div>
                     </div>
                 ) : (

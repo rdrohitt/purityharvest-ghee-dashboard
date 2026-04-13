@@ -625,7 +625,7 @@ export function StatusFilter<T extends string>({
 
     return (
         <div className={`shopify-status-filter${ribbon ? ' shopify-status-filter--ribbon' : ''}`}>
-            <label className={ribbon ? 'shopify-status-filter__label' : 'label'}>{label}</label>
+            {ribbon ? null : <label className="label">{label}</label>}
             <ModernSelect<T>
                 variant={ribbon ? 'ribbon' : 'default'}
                 className={ribbon ? 'shopify-status-filter__modern' : 'shopify-status-filter__modern shopify-status-filter__modern--stacked'}
