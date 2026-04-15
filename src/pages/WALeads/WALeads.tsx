@@ -9,7 +9,7 @@ import '../sales/Shopify/Shopify.scss';
 import './WALeads.scss';
 
 type LeadStatus = 'New' | 'Contacted' | 'Converted' | 'Not Interested' | 'No Answer' | 'Potential Customer' | 'Very Interested' | 'CBA';
-type Platform = 'Maatripure' | 'STW' | 'Abandoned' | 'Whatsapp';
+type Platform = 'STW' | 'Abandoned' | 'Whatsapp';
 
 type Toast = {
     id: string;
@@ -41,24 +41,100 @@ const LEAD_STATUSES: LeadStatus[] = [
 ];
 
 const MIN_PHONE_SEARCH_DIGITS = 10;
+const ENGAGE_TOKEN_STORAGE_KEY = 'wa_leads_engage_token';
 
 const ENGAGE_IMPORT_PAGE_NUMBERS = Array.from({ length: 20 }, (_, i) => i + 1);
+const WHATSAPP_PRODUCT_LINKS = {
+    gir500: {
+        label: 'Gir Cow Ghee - 500ml',
+        url: 'https://purityharvest.in/products/a2-gir-cow-ghee?variant=43607987585117',
+    },
+    gir1: {
+        label: 'Gir Cow Ghee - 1 ltr',
+        url: 'https://purityharvest.in/products/a2-gir-cow-ghee?variant=43607975428189',
+    },
+    gir2: {
+        label: 'Gir Cow Ghee - 2 ltr',
+        url: 'https://purityharvest.in/products/a2-gir-cow-ghee?variant=43607988207709',
+    },
+    gir5: {
+        label: 'Gir Cow Ghee - 5 ltr',
+        url: 'https://purityharvest.in/products/a2-gir-cow-ghee?variant=43607988797533',
+    },
+    buffalo500: {
+        label: 'Buffalo Ghee - 500ml',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-buffalo-ghee-crafted-using-traditional-vedic-bilona-method-1?variant=43429726421085',
+    },
+    buffalo1: {
+        label: 'Buffalo Ghee - 1 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-buffalo-ghee-crafted-using-traditional-vedic-bilona-method-1?variant=43416353898589',
+    },
+    buffalo2: {
+        label: 'Buffalo Ghee - 2 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-buffalo-ghee-crafted-using-traditional-vedic-bilona-method-1?variant=43429726453853',
+    },
+    buffalo5: {
+        label: 'Buffalo Ghee - 5 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-buffalo-ghee-crafted-using-traditional-vedic-bilona-method-1?variant=43429726486621',
+    },
+    desi500: {
+        label: 'Desi Cow Ghee - 500ml',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-desi-cow-ghee-crafted-using-traditional-vedic-bilona-method?variant=43416440799325',
+    },
+    desi1: {
+        label: 'Desi Cow Ghee - 1 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-desi-cow-ghee-crafted-using-traditional-vedic-bilona-method?variant=43413517860957',
+    },
+    desi2: {
+        label: 'Desi Cow Ghee - 2 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-desi-cow-ghee-crafted-using-traditional-vedic-bilona-method?variant=43416440832093',
+    },
+    desi5: {
+        label: 'Desi Cow Ghee - 5 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-desi-cow-ghee-crafted-using-traditional-vedic-bilona-method?variant=43428579737693',
+    },
+} as const;
 
 function digitsOnly(s: string): string {
     return s.replace(/\D/g, '');
 }
 
-function formatLeadDateTime(iso: string | null | undefined): string {
+function formatLeadDate(iso: string | null | undefined): string {
     if (iso == null || iso === '') return '—';
     const t = Date.parse(iso);
     if (!Number.isFinite(t)) return '—';
-    return new Date(t).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+    return new Date(t).toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    });
 }
 
-function truncateMessage(text: string, maxLen: number): string {
-    const t = text.replace(/\s+/g, ' ').trim();
-    if (t.length <= maxLen) return t;
-    return `${t.slice(0, maxLen)}…`;
+/** Same pattern as `ShopifyOrdersTable` — clipboard API with textarea fallback. */
+async function copyTextToClipboard(text: string): Promise<boolean> {
+    const trimmed = text.trim();
+    if (!trimmed) return false;
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(trimmed);
+            return true;
+        }
+    } catch {
+        /* fall through */
+    }
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = trimmed;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch {
+        return false;
+    }
 }
 
 const WA_LEADS_NODATE_GROUP_KEY = '__nodate__';
@@ -146,13 +222,41 @@ export default function WALeads() {
     const [leadsRows, setLeadsRows] = useState<LeadApiRow[]>([]);
     const [leadsMeta, setLeadsMeta] = useState<LeadsListResponse | null>(null);
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(20);
+    const [pageSize, setPageSize] = useState(500);
     const [loading, setLoading] = useState(true);
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [showEngageImportModal, setShowEngageImportModal] = useState(false);
-    const [engageToken, setEngageToken] = useState('');
+    const [engageToken, setEngageToken] = useState<string>(() => {
+        if (typeof window === 'undefined') return '';
+        try {
+            return window.localStorage.getItem(ENGAGE_TOKEN_STORAGE_KEY) ?? '';
+        } catch {
+            return '';
+        }
+    });
     const [engageImportLoadingPage, setEngageImportLoadingPage] = useState<number | null>(null);
     const [engageFetchAllLoading, setEngageFetchAllLoading] = useState(false);
+    const [showEngageTokenExpiredModal, setShowEngageTokenExpiredModal] = useState(false);
+    const [copiedLeadId, setCopiedLeadId] = useState<string | null>(null);
+    const [showWhatsAppProductModal, setShowWhatsAppProductModal] = useState(false);
+    const [selectedWhatsAppPhone, setSelectedWhatsAppPhone] = useState('');
+    const [selectedWhatsAppCustomerName, setSelectedWhatsAppCustomerName] = useState('');
+    const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const flashCopied = useCallback((leadId: string) => {
+        if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+        setCopiedLeadId(leadId);
+        copiedTimerRef.current = setTimeout(() => {
+            setCopiedLeadId(null);
+            copiedTimerRef.current = null;
+        }, 2000);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+        };
+    }, []);
 
     function showToast(message: string, type: 'success' | 'error' | 'delete' = 'success') {
         const id = `toast-${Date.now()}-${Math.random()}`;
@@ -277,13 +381,13 @@ export default function WALeads() {
     }, [showCustom]);
 
     useEffect(() => {
-        if (!showEngageImportModal) return;
+        if (!showEngageImportModal && !showEngageTokenExpiredModal && !showWhatsAppProductModal) return;
         const prev = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
         return () => {
             document.body.style.overflow = prev;
         };
-    }, [showEngageImportModal]);
+    }, [showEngageImportModal, showEngageTokenExpiredModal, showWhatsAppProductModal]);
 
     useLayoutEffect(() => {
         if (!showCustom) return;
@@ -294,6 +398,15 @@ export default function WALeads() {
         }
     }, [showCustom, range]);
 
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            window.localStorage.setItem(ENGAGE_TOKEN_STORAGE_KEY, engageToken);
+        } catch {
+            // Ignore localStorage write failures (private mode / blocked storage)
+        }
+    }, [engageToken]);
+
     const runEngageImport = useCallback(
         async (page: number) => {
             const token = engageToken.trim();
@@ -303,7 +416,11 @@ export default function WALeads() {
             }
             setEngageImportLoadingPage(page);
             try {
-                const res = await apiFetch(`/api/leads/import-engage?page=${encodeURIComponent(page)}`, {
+                const endpoint =
+                    page === 1
+                        ? '/api/leads/import-engage'
+                        : `/api/leads/import-engage?page=${encodeURIComponent(page)}`;
+                const res = await apiFetch(endpoint, {
                     method: 'POST',
                     headers: { 'x-engage-token': token },
                 });
@@ -341,13 +458,9 @@ export default function WALeads() {
                 method: 'POST',
                 headers: { 'x-engage-token': token },
             });
-            const data: unknown = await res.json().catch(() => null);
             if (!res.ok) {
-                const msg =
-                    data && typeof data === 'object' && data !== null && 'message' in data
-                        ? String((data as { message?: unknown }).message)
-                        : `Request failed (${res.status})`;
-                throw new Error(msg);
+                setShowEngageTokenExpiredModal(true);
+                return;
             }
             showToast('Engage fetch all completed', 'success');
             await loadLeads();
@@ -358,6 +471,46 @@ export default function WALeads() {
             setEngageFetchAllLoading(false);
         }
     }, [engageToken, loadLeads]);
+
+    const openWhatsAppProductPicker = useCallback((phoneDigits: string, customerName: string) => {
+        if (!phoneDigits) {
+            showToast('No phone number for WhatsApp', 'error');
+            return;
+        }
+        setSelectedWhatsAppPhone(phoneDigits);
+        setSelectedWhatsAppCustomerName(customerName || 'Customer');
+        setShowWhatsAppProductModal(true);
+    }, []);
+
+    const sendWhatsAppProductLink = useCallback(
+        (linkKey: keyof typeof WHATSAPP_PRODUCT_LINKS) => {
+            if (!selectedWhatsAppPhone) return;
+            const link = WHATSAPP_PRODUCT_LINKS[linkKey];
+            const text = `Hello Sir/Madam,\nhere is the product link for ${link.label}:\n${link.url}`;
+            window.open(
+                `https://wa.me/${selectedWhatsAppPhone}?text=${encodeURIComponent(text)}`,
+                '_blank',
+                'noopener,noreferrer',
+            );
+            setShowWhatsAppProductModal(false);
+        },
+        [selectedWhatsAppPhone, selectedWhatsAppCustomerName],
+    );
+
+    const sendWhatsAppWithoutProductLink = useCallback(() => {
+        if (!selectedWhatsAppPhone) return;
+        const text = `Hello Sir/Madam,
+
+My name is Sarita Yadav, Founder of *Purity Harvest*.
+
+If you're looking for pure Desi Cow Ghee, we'd love to serve you. Our ghee is 100% in-house made using traditional methods, with a guarantee of purity for your family's health 💛`;
+        window.open(
+            `https://wa.me/${selectedWhatsAppPhone}?text=${encodeURIComponent(text)}`,
+            '_blank',
+            'noopener,noreferrer',
+        );
+        setShowWhatsAppProductModal(false);
+    }, [selectedWhatsAppPhone, selectedWhatsAppCustomerName]);
 
     const phoneDigits = useMemo(() => digitsOnly(phoneSearchInput), [phoneSearchInput]);
     const isPhoneSearch = phoneDigits.length === MIN_PHONE_SEARCH_DIGITS;
@@ -571,38 +724,38 @@ export default function WALeads() {
             </div>
             <div className="card wa-leads__metrics-card">
                 <div className="admin-metrics-row wa-leads-metrics">
-                    <ModernMetricItem 
-                        icon="👥" 
-                        label={isPhoneSearch ? 'Matches (this page)' : 'Total in range'} 
-                        value={metrics.totalLeads.toLocaleString()} 
+                    <ModernMetricItem
+                        icon="👥"
+                        label={isPhoneSearch ? 'Matches (this page)' : 'Total in range'}
+                        value={metrics.totalLeads.toLocaleString()}
                         isLast={false}
                         isEven={false}
                     />
-                    <ModernMetricItem 
-                        icon="📄" 
-                        label="Rows (this page)" 
-                        value={metrics.rowsOnPage.toLocaleString()} 
+                    <ModernMetricItem
+                        icon="📄"
+                        label="Rows (this page)"
+                        value={metrics.rowsOnPage.toLocaleString()}
                         isLast={false}
                         isEven={true}
                     />
-                    <ModernMetricItem 
-                        icon="🔢" 
-                        label="Page" 
-                        value={`${metrics.page} / ${metrics.totalPages}`} 
+                    <ModernMetricItem
+                        icon="🔢"
+                        label="Page"
+                        value={`${metrics.page} / ${metrics.totalPages}`}
                         isLast={false}
                         isEven={false}
                     />
-                    <ModernMetricItem 
-                        icon="⚙️" 
-                        label="Rows per page" 
-                        value={metrics.perPage.toLocaleString()} 
+                    <ModernMetricItem
+                        icon="⚙️"
+                        label="Rows per page"
+                        value={metrics.perPage.toLocaleString()}
                         isLast={false}
                         isEven={true}
                     />
-                    <ModernMetricItem 
-                        icon="📱" 
-                        label={isPhoneSearch ? 'Phone filter' : 'List'} 
-                        value={isPhoneSearch ? metrics.phoneMatchesOnPage.toLocaleString() : '—'} 
+                    <ModernMetricItem
+                        icon="📱"
+                        label={isPhoneSearch ? 'Phone filter' : 'List'}
+                        value={isPhoneSearch ? metrics.phoneMatchesOnPage.toLocaleString() : '—'}
                         isLast={true}
                         isEven={false}
                     />
@@ -618,32 +771,26 @@ export default function WALeads() {
                             <col />
                             <col />
                             <col />
-                            <col />
-                            <col />
-                            <col />
                         </colgroup>
                         <thead>
                             <tr>
                                 <Th align="center">Phone</Th>
                                 <Th>Name</Th>
                                 <Th>Message</Th>
-                                <Th>Lead time</Th>
-                                <Th>Created</Th>
-                                <Th>Created by</Th>
-                                <Th>Updated</Th>
-                                <Th align="right">Actions</Th>
+                                <Th align="center">WhatsApp</Th>
+                                <Th>Lead Date</Th>
                             </tr>
                         </thead>
                         <tbody>
                             {!loading && filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="shopify-td wa-leads__empty-cell">
+                                    <td colSpan={5} className="shopify-td wa-leads__empty-cell">
                                         No leads in this range{isPhoneSearch ? ' matching this phone on the current page' : ''}. Adjust filters or import from Engage.
                                     </td>
                                 </tr>
                             ) : loading ? (
                                 <tr aria-hidden>
-                                    <td colSpan={8} className="shopify-td wa-leads__skeleton-cell" />
+                                    <td colSpan={5} className="shopify-td wa-leads__skeleton-cell" />
                                 </tr>
                             ) : (
                                 (() => {
@@ -651,7 +798,7 @@ export default function WALeads() {
                                     return leadsGroupedByDate.flatMap(({ dateKey, rows: groupRows }) => {
                                         const headerTr = (
                                             <tr key={`wa-date-${dateKey}`} className="wa-leads__date-group-row">
-                                                <td colSpan={8} className="shopify-td wa-leads__date-group-header">
+                                                <td colSpan={5} className="shopify-td wa-leads__date-group-header">
                                                     <div className="wa-leads__date-group-inner">
                                                         <span className="wa-leads__date-group-title">
                                                             {formatWaLeadsDateGroupTitle(dateKey)}
@@ -670,7 +817,8 @@ export default function WALeads() {
                                             const displayPhone = `${row.countryCode} ${row.phoneNumber}`.trim();
                                             const rowPhoneDigits = digitsOnly(row.phoneNumber);
                                             const canCall = rowPhoneDigits.length > 0;
-                                            const msgPreview = truncateMessage(row.message, 80);
+                                            const waPhoneDigits = digitsOnly(`${row.countryCode}${row.phoneNumber}`);
+                                            const canWhatsApp = waPhoneDigits.length > 0;
                                             const callIcon = (
                                                 <svg
                                                     className="wa-leads-call-btn__icon"
@@ -716,9 +864,34 @@ export default function WALeads() {
                                                         <div className="wa-leads-customer-cell">
                                                             <span className="wa-leads-customer-name">{row.name || '—'}</span>
                                                             {canCall ? (
-                                                                <a className="wa-leads-customer-tel" href={`tel:${e164ish}`}>
-                                                                    {displayPhone}
-                                                                </a>
+                                                                copiedLeadId === row._id ? (
+                                                                    <span
+                                                                        className="shopify-customer-phone-copied"
+                                                                        role="status"
+                                                                        aria-live="polite"
+                                                                    >
+                                                                        Copied
+                                                                    </span>
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="shopify-customer-phone shopify-customer-phone--copy"
+                                                                        title="Click to copy number"
+                                                                        aria-label={`Copy phone number ${displayPhone}`}
+                                                                        onClick={async (e) => {
+                                                                            e.stopPropagation();
+                                                                            const toCopy = `${row.countryCode}${row.phoneNumber}`.replace(
+                                                                                /\s/g,
+                                                                                '',
+                                                                            );
+                                                                            const ok = await copyTextToClipboard(toCopy);
+                                                                            if (ok) flashCopied(row._id);
+                                                                            else showToast('Could not copy', 'error');
+                                                                        }}
+                                                                    >
+                                                                        {displayPhone}
+                                                                    </button>
+                                                                )
                                                             ) : (
                                                                 <span className="wa-leads-customer-tel wa-leads-customer-tel--na">
                                                                     —
@@ -727,33 +900,40 @@ export default function WALeads() {
                                                         </div>
                                                     </Td>
                                                     <Td className="wa-leads__msg-cell">
-                                                        <span title={row.message || undefined}>{msgPreview || '—'}</span>
+                                                        <span className="wa-leads__msg-text">
+                                                            {row.message != null && row.message.trim() !== ''
+                                                                ? row.message
+                                                                : '—'}
+                                                        </span>
                                                     </Td>
-                                                    <Td>{formatLeadDateTime(row.time)}</Td>
-                                                    <Td>{formatLeadDateTime(row.createdAt)}</Td>
-                                                    <Td>{row.createdBy?.name || '—'}</Td>
-                                                    <Td>{formatLeadDateTime(row.updatedAt)}</Td>
-                                                    <Td className="wa-leads__actions-cell">
-                                                        <div className="wa-leads__actions-inner">
+                                                    <Td className="wa-leads__td-whatsapp">
+                                                        {canWhatsApp ? (
                                                             <button
                                                                 type="button"
-                                                                className="icon-btn"
-                                                                title="Copy phone with country code"
-                                                                onClick={() => {
-                                                                    const toCopy = `${row.countryCode}${row.phoneNumber}`.replace(
-                                                                        /\s/g,
-                                                                        '',
-                                                                    );
-                                                                    void navigator.clipboard?.writeText(toCopy).then(
-                                                                        () => showToast('Phone copied', 'success'),
-                                                                        () => showToast('Could not copy', 'error'),
-                                                                    );
+                                                                className="wa-leads-whatsapp-btn"
+                                                                title={`Choose product link for ${row.name || displayPhone}`}
+                                                                aria-label={`Choose product link for ${row.name || displayPhone}`}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openWhatsAppProductPicker(waPhoneDigits, row.name || 'Customer');
                                                                 }}
                                                             >
-                                                                Copy
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                                                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                                                                </svg>
                                                             </button>
-                                                        </div>
+                                                        ) : (
+                                                            <span
+                                                                className="wa-leads-whatsapp-btn wa-leads-whatsapp-btn--disabled"
+                                                                aria-label="No phone number for WhatsApp"
+                                                            >
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                                                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                                                                </svg>
+                                                            </span>
+                                                        )}
                                                     </Td>
+                                                    <Td>{formatLeadDate(row.time)}</Td>
                                                 </tr>
                                             );
                                         });
@@ -853,6 +1033,69 @@ export default function WALeads() {
                 </div>
             </footer>
 
+            {showWhatsAppProductModal ? (
+                <div
+                    className="wa-leads-wa-product-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="wa-leads-wa-product-title"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowWhatsAppProductModal(false);
+                    }}
+                >
+                    <div className="card wa-leads-wa-product-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="wa-leads-wa-product-modal__head">
+                            <h3 id="wa-leads-wa-product-title" className="wa-leads-wa-product-modal__title">
+                                Select product link to send
+                            </h3>
+                            <button
+                                type="button"
+                                className="wa-leads-wa-product-modal__close"
+                                aria-label="Close"
+                                onClick={() => setShowWhatsAppProductModal(false)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <p className="wa-leads-wa-product-modal__sub">Choose the link you want to send on WhatsApp.</p>
+                        <div className="wa-leads-wa-product-modal__group">
+                            <div className="wa-leads-wa-product-modal__group-title">Gir Cow Ghee</div>
+                            <div className="wa-leads-wa-product-modal__grid">
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('gir500')}>500ml</button>
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('gir1')}>1 ltr</button>
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('gir2')}>2 ltr</button>
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('gir5')}>5 ltr</button>
+                            </div>
+                        </div>
+                        <div className="wa-leads-wa-product-modal__group">
+                            <div className="wa-leads-wa-product-modal__group-title">Buffalo Ghee</div>
+                            <div className="wa-leads-wa-product-modal__grid">
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('buffalo500')}>500ml</button>
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('buffalo1')}>1 ltr</button>
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('buffalo2')}>2 ltr</button>
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('buffalo5')}>5 ltr</button>
+                            </div>
+                        </div>
+                        <div className="wa-leads-wa-product-modal__group">
+                            <div className="wa-leads-wa-product-modal__group-title">Desi Cow Ghee</div>
+                            <div className="wa-leads-wa-product-modal__grid">
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('desi500')}>500ml</button>
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('desi1')}>1 ltr</button>
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('desi2')}>2 ltr</button>
+                                <button type="button" className="button wa-leads-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('desi5')}>5 ltr</button>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            className="button wa-leads-wa-product-modal__btn wa-leads-wa-product-modal__btn--no-link"
+                            onClick={sendWhatsAppWithoutProductLink}
+                        >
+                            Without Product Link
+                        </button>
+                    </div>
+                </div>
+            ) : null}
+
             {showEngageImportModal ? (
                 <div
                     className="wa-leads-engage-backdrop"
@@ -920,15 +1163,59 @@ export default function WALeads() {
                     </div>
                 </div>
             ) : null}
+            {showEngageTokenExpiredModal ? (
+                <div
+                    className="wa-leads-engage-backdrop"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="wa-leads-engage-token-expired-title"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowEngageTokenExpiredModal(false);
+                    }}
+                >
+                    <div className="card wa-leads-engage-modal wa-leads-engage-modal--alert" onClick={(e) => e.stopPropagation()}>
+                        <div className="wa-leads-engage__header">
+                            <h2 id="wa-leads-engage-token-expired-title" className="wa-leads-engage__title">
+                                Alert
+                            </h2>
+                            <button
+                                type="button"
+                                className="icon-btn"
+                                aria-label="Close"
+                                onClick={() => setShowEngageTokenExpiredModal(false)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="wa-leads-engage__alert-row">
+                            <span className="wa-leads-engage__alert-icon" aria-hidden="true">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 9v4" />
+                                    <path d="M12 17h.01" />
+                                    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.72 3h17a2 2 0 0 0 1.72-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
+                                </svg>
+                            </span>
+                            <p className="wa-leads-engage__alert-message">Engage token expired , Use the Updated token</p>
+                        </div>
+                        <button
+                            type="button"
+                            className="button wa-leads-engage__alert-btn"
+                            onClick={() => setShowEngageTokenExpiredModal(false)}
+                        >
+                            OK
+                        </button>
+                    </div>
+                </div>
+            ) : null}
 
             {showAddLead ? (
-                <AddLeadModal 
+                <AddLeadModal
                     lead={editingLead}
                     existingLeads={existingLeadsForModal}
                     onClose={() => {
                         setShowAddLead(false);
                         setEditingLead(null);
-                    }} 
+                    }}
                     onSave={async (lead) => {
                         try {
                             if (editingLead) {
@@ -955,7 +1242,7 @@ export default function WALeads() {
                             console.error('Failed to save lead', err);
                             showToast(`Failed to ${editingLead ? 'update' : 'create'} lead. Please check that the server is running and try again.`, 'error');
                         }
-                    }} 
+                    }}
                 />
             ) : null}
         </section>
@@ -1007,21 +1294,21 @@ function DatePicker({ value, onChange, required, placeholder }: { value: string;
             const popup = popupRef.current;
             const popupHeight = 350; // Approximate height of calendar
             const popupWidth = 280;
-            
+
             // Position below the input by default
             let top = inputRect.bottom + window.scrollY + 4;
             let left = inputRect.left + window.scrollX;
-            
+
             // Check if there's enough space below, if not, position above
             if (inputRect.bottom + popupHeight > window.innerHeight) {
                 top = inputRect.top + window.scrollY - popupHeight - 4;
             }
-            
+
             // Check if there's enough space on the right, if not, adjust left
             if (inputRect.left + popupWidth > window.innerWidth) {
                 left = window.innerWidth - popupWidth - 10;
             }
-            
+
             popup.style.top = `${top}px`;
             popup.style.left = `${left}px`;
         }
@@ -1169,18 +1456,18 @@ function StatusDropdown({ value, onChange, required }: { value: LeadStatus; onCh
             const popup = popupRef.current;
             const popupHeight = 260;
             const popupWidth = 220;
-            
+
             let top = buttonRect.bottom + window.scrollY + 4;
             let left = buttonRect.left + window.scrollX;
-            
+
             if (buttonRect.bottom + popupHeight > window.innerHeight) {
                 top = buttonRect.top + window.scrollY - popupHeight - 4;
             }
-            
+
             if (buttonRect.left + popupWidth > window.innerWidth) {
                 left = window.innerWidth - popupWidth - 10;
             }
-            
+
             popup.style.top = `${top}px`;
             popup.style.left = `${left}px`;
         }
@@ -1291,23 +1578,23 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
     function submit(e: React.FormEvent) {
         e.preventDefault();
         setMobileError('');
-        
+
         // Validate mobile number format
         if (mobile.length !== 10 || !/^\d{10}$/.test(mobile)) {
             setMobileError('Mobile number must be exactly 10 digits');
             return;
         }
-        
+
         // Check for duplicate mobile number
-        const duplicateLead = existingLeads.find(l => 
+        const duplicateLead = existingLeads.find(l =>
             l.mobile === mobile && l.id !== lead?.id
         );
-        
+
         if (duplicateLead) {
             setMobileError(`Mobile number already exists for customer: ${duplicateLead.customerName}`);
             return;
         }
-        
+
         const leadData: WALead = {
             id: lead?.id || '', // Keep existing ID for updates
             customerName,
@@ -1359,7 +1646,7 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
                                 onBlur={() => {
                                     // Check for duplicate on blur
                                     if (mobile.length === 10 && /^\d{10}$/.test(mobile)) {
-                                        const duplicateLead = existingLeads.find(l => 
+                                        const duplicateLead = existingLeads.find(l =>
                                             l.mobile === mobile && l.id !== lead?.id
                                         );
                                         if (duplicateLead) {
@@ -1370,7 +1657,7 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
                                 pattern="[0-9]{10}"
                                 minLength={10}
                                 maxLength={10}
-                                required 
+                                required
                                 placeholder="Enter 10 digit mobile number"
                             />
                             {mobile && mobile.length !== 10 && !mobileError ? (
@@ -1381,15 +1668,15 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
                     </div>
 
                     <div className="wa-leads-modal__grid-4">
-                    <div>
+                        <div>
                             <label className="label">Calling Date</label>
                             <DatePicker value={callingDate} onChange={setCallingDate} placeholder="Select calling date" />
-                                    </div>
-                                    <div>
+                        </div>
+                        <div>
                             <label className="label">Call Back Date</label>
                             <DatePicker value={callBackDate} onChange={setCallBackDate} placeholder="Select call back date" />
-                                    </div>
-                                    <div>
+                        </div>
+                        <div>
                             <label className="label">Status</label>
                             <StatusDropdown value={status} onChange={setStatus} />
                         </div>
@@ -1401,7 +1688,6 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
                                 onChange={(e) => setPlatform(e.target.value as Platform | '')}
                             >
                                 <option value="">Select Platform</option>
-                                <option value="Maatripure">Maatripure</option>
                                 <option value="STW">STW</option>
                                 <option value="Abandoned">Abandoned</option>
                                 <option value="Whatsapp">Whatsapp</option>
@@ -1409,12 +1695,12 @@ function AddLeadModal({ lead, existingLeads, onClose, onSave }: { lead?: WALead 
                         </div>
                     </div>
 
-                        <div>
+                    <div>
                         <label className="label">Calling Detail</label>
                         <textarea className="input wa-leads-modal__textarea" value={callingDetail} onChange={(e) => setCallingDetail(e.target.value)} />
                     </div>
 
-                        <div>
+                    <div>
                         <label className="label">Notes</label>
                         <textarea className="input wa-leads-modal__textarea" value={notes} onChange={(e) => setNotes(e.target.value)} />
                     </div>

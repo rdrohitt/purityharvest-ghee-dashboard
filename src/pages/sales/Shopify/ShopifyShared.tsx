@@ -205,9 +205,9 @@ function orderTypeIcon(t: string) {
 function statusFilterOptionIcon(filterLabel: string, value: string): React.ReactNode {
     if (value === '') return iconAll();
     const L = filterLabel.toLowerCase();
-    if (L === 'payment') return paymentIcon(value);
+    if (L === 'payment' || L.startsWith('payment ')) return paymentIcon(value);
     if (L === 'fulfill' || L === 'fulfillment') return fulfillmentIcon(value);
-    if (L === 'delivery' || L === 'shipping') return deliveryIcon(value);
+    if (L === 'delivery' || L === 'shipping' || L === 'status') return deliveryIcon(value);
     if (L === 'platform') return platformIcon(value);
     if (L === 'type') return orderTypeIcon(value);
     return iconPlaceholder();
@@ -625,15 +625,31 @@ export function StatusFilter<T extends string>({
 
     return (
         <div className={`shopify-status-filter${ribbon ? ' shopify-status-filter--ribbon' : ''}`}>
-            {ribbon ? null : <label className="label">{label}</label>}
-            <ModernSelect<T>
-                variant={ribbon ? 'ribbon' : 'default'}
-                className={ribbon ? 'shopify-status-filter__modern' : 'shopify-status-filter__modern shopify-status-filter__modern--stacked'}
-                value={value}
-                onChange={onChange}
-                options={modernOptions}
-                aria-label={label}
-            />
+            {ribbon ? (
+                <div className="shopify-status-filter__ribbon-shell">
+                    <span className="label shopify-status-filter__ribbon-label">{label}</span>
+                    <ModernSelect<T>
+                        variant="ribbon"
+                        className="shopify-status-filter__modern"
+                        value={value}
+                        onChange={onChange}
+                        options={modernOptions}
+                        aria-label={label}
+                    />
+                </div>
+            ) : (
+                <>
+                    <label className="label">{label}</label>
+                    <ModernSelect<T>
+                        variant="default"
+                        className="shopify-status-filter__modern shopify-status-filter__modern--stacked"
+                        value={value}
+                        onChange={onChange}
+                        options={modernOptions}
+                        aria-label={label}
+                    />
+                </>
+            )}
         </div>
     );
 }

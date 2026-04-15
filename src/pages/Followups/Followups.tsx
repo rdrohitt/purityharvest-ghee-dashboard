@@ -24,6 +24,56 @@ import './Followups.scss';
 
 /** Thrown after an error toast so callers (e.g. delete confirm) can keep the dialog open. */
 const FOLLOWUP_DELETE_TOASTED = 'FOLLOWUP_DELETE_TOASTED';
+const WHATSAPP_PRODUCT_LINKS = {
+    gir500: {
+        label: 'Gir Cow Ghee - 500ml',
+        url: 'https://purityharvest.in/products/a2-gir-cow-ghee?variant=43607987585117',
+    },
+    gir1: {
+        label: 'Gir Cow Ghee - 1 ltr',
+        url: 'https://purityharvest.in/products/a2-gir-cow-ghee?variant=43607975428189',
+    },
+    gir2: {
+        label: 'Gir Cow Ghee - 2 ltr',
+        url: 'https://purityharvest.in/products/a2-gir-cow-ghee?variant=43607988207709',
+    },
+    gir5: {
+        label: 'Gir Cow Ghee - 5 ltr',
+        url: 'https://purityharvest.in/products/a2-gir-cow-ghee?variant=43607988797533',
+    },
+    buffalo500: {
+        label: 'Buffalo Ghee - 500ml',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-buffalo-ghee-crafted-using-traditional-vedic-bilona-method-1?variant=43429726421085',
+    },
+    buffalo1: {
+        label: 'Buffalo Ghee - 1 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-buffalo-ghee-crafted-using-traditional-vedic-bilona-method-1?variant=43416353898589',
+    },
+    buffalo2: {
+        label: 'Buffalo Ghee - 2 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-buffalo-ghee-crafted-using-traditional-vedic-bilona-method-1?variant=43429726453853',
+    },
+    buffalo5: {
+        label: 'Buffalo Ghee - 5 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-buffalo-ghee-crafted-using-traditional-vedic-bilona-method-1?variant=43429726486621',
+    },
+    desi500: {
+        label: 'Desi Cow Ghee - 500ml',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-desi-cow-ghee-crafted-using-traditional-vedic-bilona-method?variant=43416440799325',
+    },
+    desi1: {
+        label: 'Desi Cow Ghee - 1 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-desi-cow-ghee-crafted-using-traditional-vedic-bilona-method?variant=43413517860957',
+    },
+    desi2: {
+        label: 'Desi Cow Ghee - 2 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-desi-cow-ghee-crafted-using-traditional-vedic-bilona-method?variant=43416440832093',
+    },
+    desi5: {
+        label: 'Desi Cow Ghee - 5 ltr',
+        url: 'https://purityharvest.in/products/pure-and-natural-a2-desi-cow-ghee-crafted-using-traditional-vedic-bilona-method?variant=43428579737693',
+    },
+} as const;
 
 async function readFollowupApiErrorMessage(res: Response): Promise<string> {
     try {
@@ -100,9 +150,12 @@ export default function Followups() {
     const [historyModalFollowup, setHistoryModalFollowup] = useState<Followup | null>(null);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [deletingHistoryEntryId, setDeletingHistoryEntryId] = useState<string | null>(null);
+    const [showWhatsAppProductModal, setShowWhatsAppProductModal] = useState(false);
+    const [selectedWhatsAppPhone, setSelectedWhatsAppPhone] = useState<string>('');
+    const [selectedWhatsAppCustomerName, setSelectedWhatsAppCustomerName] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(50);
+    const [pageSize, setPageSize] = useState(100);
     const [dashboardMeta, setDashboardMeta] = useState<{
         total: number;
         totalPages: number;
@@ -511,6 +564,46 @@ export default function Followups() {
         [showToast],
     );
 
+    const onOpenWhatsAppPicker = useCallback(
+        (f: Followup) => {
+            const phoneDigits = String(f.customerPhone ?? '').replace(/\D/g, '');
+            if (!phoneDigits) {
+                showToast('No phone number for WhatsApp', 'error');
+                return;
+            }
+            setSelectedWhatsAppPhone(phoneDigits);
+            setSelectedWhatsAppCustomerName(f.customerName || 'Customer');
+            setShowWhatsAppProductModal(true);
+        },
+        [showToast],
+    );
+
+    const sendWhatsAppProductLink = useCallback(
+        (linkKey: keyof typeof WHATSAPP_PRODUCT_LINKS) => {
+            if (!selectedWhatsAppPhone) return;
+            const link = WHATSAPP_PRODUCT_LINKS[linkKey];
+            const text = `Dear ${selectedWhatsAppCustomerName},\nhere is the product link for ${link.label}:\n${link.url}`;
+            window.open(
+                `https://wa.me/${selectedWhatsAppPhone}?text=${encodeURIComponent(text)}`,
+                '_blank',
+                'noopener,noreferrer',
+            );
+            setShowWhatsAppProductModal(false);
+        },
+        [selectedWhatsAppPhone, selectedWhatsAppCustomerName],
+    );
+
+    const sendWhatsAppWithoutProductLink = useCallback(() => {
+        if (!selectedWhatsAppPhone) return;
+        const text = `Hi ${selectedWhatsAppCustomerName}, thank you for your interest. Please let us know which product and size you want.`;
+        window.open(
+            `https://wa.me/${selectedWhatsAppPhone}?text=${encodeURIComponent(text)}`,
+            '_blank',
+            'noopener,noreferrer',
+        );
+        setShowWhatsAppProductModal(false);
+    }, [selectedWhatsAppPhone, selectedWhatsAppCustomerName]);
+
     return (
         <section className="followups-page">
             {loading ? <Spinner overlay fixed message="Loading followups…" /> : null}
@@ -556,6 +649,7 @@ export default function Followups() {
                     baseFollowups={baseFollowups}
                     onCustomerClick={onCustomerClick}
                     onOpenHistory={onOpenHistory}
+                    onOpenWhatsAppPicker={onOpenWhatsAppPicker}
                     onUpdate={updateFollowup}
                 />
                 <FollowupsPagination
@@ -599,6 +693,64 @@ export default function Followups() {
                     deletingHistoryEntryId={deletingHistoryEntryId}
                     onDeleteHistoryEntry={(entryId: string) => removeCallLogEntry(historyModalFollowup.id, entryId)}
                 />
+            ) : null}
+            {showWhatsAppProductModal ? (
+                <div
+                    className="fu-wa-product-overlay"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="fu-wa-product-title"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setShowWhatsAppProductModal(false);
+                    }}
+                >
+                    <div className="card fu-wa-product-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="fu-wa-product-modal__head">
+                            <h3 id="fu-wa-product-title" className="fu-wa-product-modal__title">
+                                Select product link to send
+                            </h3>
+                            <button
+                                type="button"
+                                className="fu-wa-product-modal__close"
+                                aria-label="Close"
+                                onClick={() => setShowWhatsAppProductModal(false)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <p className="fu-wa-product-modal__sub">Choose the link you want to send on WhatsApp.</p>
+                        <div className="fu-wa-product-modal__group">
+                            <div className="fu-wa-product-modal__group-title">Gir Cow Ghee</div>
+                            <div className="fu-wa-product-modal__grid">
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('gir500')}>500ml</button>
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('gir1')}>1 ltr</button>
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('gir2')}>2 ltr</button>
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('gir5')}>5 ltr</button>
+                            </div>
+                        </div>
+                        <div className="fu-wa-product-modal__group">
+                            <div className="fu-wa-product-modal__group-title">Buffalo Ghee</div>
+                            <div className="fu-wa-product-modal__grid">
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('buffalo500')}>500ml</button>
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('buffalo1')}>1 ltr</button>
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('buffalo2')}>2 ltr</button>
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('buffalo5')}>5 ltr</button>
+                            </div>
+                        </div>
+                        <div className="fu-wa-product-modal__group">
+                            <div className="fu-wa-product-modal__group-title">Desi Cow Ghee</div>
+                            <div className="fu-wa-product-modal__grid">
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('desi500')}>500ml</button>
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('desi1')}>1 ltr</button>
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('desi2')}>2 ltr</button>
+                                <button type="button" className="button fu-wa-product-modal__btn" onClick={() => sendWhatsAppProductLink('desi5')}>5 ltr</button>
+                            </div>
+                        </div>
+                        <button type="button" className="button fu-wa-product-modal__btn fu-wa-product-modal__btn--no-link" onClick={sendWhatsAppWithoutProductLink}>
+                            Without Product Link
+                        </button>
+                    </div>
+                </div>
             ) : null}
             <ToastContainer toasts={toasts} />
         </section>

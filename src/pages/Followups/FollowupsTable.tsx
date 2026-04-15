@@ -14,6 +14,7 @@ type Props = {
     baseFollowups: Followup[];
     onCustomerClick: (f: Followup) => void;
     onOpenHistory: (f: Followup) => void;
+    onOpenWhatsAppPicker: (f: Followup) => void;
     onUpdate: (id: string, field: keyof Followup, value: string | null) => void;
 };
 
@@ -23,6 +24,7 @@ export function FollowupsTable({
     baseFollowups,
     onCustomerClick,
     onOpenHistory,
+    onOpenWhatsAppPicker,
     onUpdate,
 }: Props) {
     const totalRows = filtered.length;
@@ -117,6 +119,7 @@ export function FollowupsTable({
                                       followup={f}
                                       onCustomerClick={onCustomerClick}
                                       onOpenHistory={onOpenHistory}
+                                      onOpenWhatsAppPicker={onOpenWhatsAppPicker}
                                       onUpdate={onUpdate}
                                   />
                               ))

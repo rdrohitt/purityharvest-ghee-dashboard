@@ -194,8 +194,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const [typeFilter, setTypeFilter] = useState<OrderType | ''>('');
     const customBtnRef = useRef<HTMLButtonElement | null>(null);
     const popoverRef = useRef<HTMLDivElement | null>(null);
-    /** Narrow viewports: metric cards start collapsed; expand from filters toolbar */
-    const [mobileMetricsOpen, setMobileMetricsOpen] = useState(false);
+    /** Metric summary cards collapsed by default; expand via toolbar control (all viewports) */
+    const [metricsSummaryOpen, setMetricsSummaryOpen] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -776,7 +776,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         <div className="shopify-header-spacer" />
                         <div className="shopify-search-wrapper">
                             <span className="shopify-search-icon" aria-hidden>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
                             </span>
                             <input
                                 className="input shopify-search-input"
@@ -828,14 +828,14 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     <div className="status-filters-row shopify-status-filters shopify-status-filters--toolbar">
                         <StatusFilter
                             layout="ribbon"
-                            label="Payment"
+                            label="Payment Mode"
                             value={paymentStatusFilter}
                             onChange={setPaymentStatusFilter}
                             options={['COD', 'PAID'] as PaymentStatus[]}
                         />
                         <StatusFilter
                             layout="ribbon"
-                            label="Shipping"
+                            label="Status"
                             value={deliveryStatusFilter}
                             onChange={setDeliveryStatusFilter}
                             options={DELIVERY_STATUSES}
@@ -949,7 +949,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     ...rows.map(rowToCsvLine),
                                     rowToCsvLine(totalRow),
                                 ].join('\n');
-                                
+
                                 // Create blob and download
                                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                                 const link = document.createElement('a');
@@ -974,69 +974,73 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             <button
                                 type="button"
                                 className="shopify-clear-filters-btn"
-                                onClick={() => { 
-                                    setPaymentStatusFilter(''); 
-                                    setDeliveryStatusFilter(''); 
-                                    setPlatformFilter(''); 
-                                    setTypeFilter(''); 
+                                onClick={() => {
+                                    setPaymentStatusFilter('');
+                                    setDeliveryStatusFilter('');
+                                    setPlatformFilter('');
+                                    setTypeFilter('');
                                 }}
                             >
                                 Clear All
                             </button>
                         ) : null}
                     </div>
-                    <button
-                        type="button"
-                        className="shopify-mobile-metrics-toggle"
-                        aria-expanded={mobileMetricsOpen}
-                        onClick={() => setMobileMetricsOpen((o) => !o)}
+                    <div
+                        className={`shopify-metrics-summary${metricsSummaryOpen ? ' shopify-metrics-summary--open' : ''}`}
                     >
-                        <span className="shopify-mobile-metrics-toggle__label">Metrics summary</span>
-                        <svg
-                            className={`shopify-mobile-metrics-toggle__chev${mobileMetricsOpen ? ' is-open' : ''}`}
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden
+                        <button
+                            type="button"
+                            className="shopify-mobile-metrics-toggle"
+                            aria-expanded={metricsSummaryOpen}
+                            onClick={() => setMetricsSummaryOpen((o) => !o)}
                         >
-                            <polyline points="6 9 12 15 18 9" />
-                        </svg>
-                    </button>
-                </div>
-                <div
-                    className={`shopify-dash-mobile-wrap${mobileMetricsOpen ? ' shopify-dash-mobile-wrap--open' : ''}`}
-                >
-                    <div className="shopify-dash-mobile-inner">
-                        <div className="shopify-dash-grid">
-                            <ModernSalesWithEBITAMetric
-                                salesEbita={analyticsSalesEbita}
-                                loading={analyticsOverviewLoading}
-                                isMilkSelected={categoryTab === 'milk'}
-                                deliveredSalesAmount={analyticsShippingPipeline?.delivered.amount ?? 0}
-                                inTransitSalesAmount={analyticsShippingPipeline?.inTransit.amount ?? 0}
-                            />
-                            <ModernQuantityMetric
-                                volume={analyticsVolume}
-                                loading={analyticsOverviewLoading}
-                                isMilkSelected={categoryTab === 'milk'}
-                            />
-                            <ModernDeliveryStatusMetric
-                                pipeline={analyticsShippingPipeline}
-                                loading={analyticsOverviewLoading}
-                                isMilkSelected={categoryTab === 'milk'}
-                            />
-                            <ModernRoasMetric
-                                paymentSplit={analyticsPaymentSplit}
-                                loading={analyticsOverviewLoading}
-                                deliveredSalesAmount={analyticsShippingPipeline?.delivered.amount ?? 0}
-                                inTransitSalesAmount={analyticsShippingPipeline?.inTransit.amount ?? 0}
-                                marketingSpendTotal={analyticsSalesEbita?.costs?.marketingSpendTotal ?? 0}
-                            />
+                            <span className="shopify-mobile-metrics-toggle__label">Metrics summary</span>
+                            <svg
+                                className={`shopify-mobile-metrics-toggle__chev${metricsSummaryOpen ? ' is-open' : ''}`}
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden
+                            >
+                                <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                        </button>
+                        <div
+                            className={`shopify-dash-mobile-wrap${metricsSummaryOpen ? ' shopify-dash-mobile-wrap--open' : ''}`}
+                        >
+                            <div className="shopify-dash-mobile-inner">
+                                <div className="shopify-dash-grid">
+                                    <ModernSalesWithEBITAMetric
+                                        salesEbita={analyticsSalesEbita}
+                                        loading={analyticsOverviewLoading}
+                                        isMilkSelected={categoryTab === 'milk'}
+                                        deliveredSalesAmount={analyticsShippingPipeline?.delivered.amount ?? 0}
+                                        inTransitSalesAmount={analyticsShippingPipeline?.inTransit.amount ?? 0}
+                                    />
+                                    <ModernQuantityMetric
+                                        volume={analyticsVolume}
+                                        loading={analyticsOverviewLoading}
+                                        isMilkSelected={categoryTab === 'milk'}
+                                    />
+                                    <ModernDeliveryStatusMetric
+                                        pipeline={analyticsShippingPipeline}
+                                        loading={analyticsOverviewLoading}
+                                        isMilkSelected={categoryTab === 'milk'}
+                                    />
+                                    <ModernRoasMetric
+                                        paymentSplit={analyticsPaymentSplit}
+                                        loading={analyticsOverviewLoading}
+                                        deliveredSalesAmount={analyticsShippingPipeline?.delivered.amount ?? 0}
+                                        inTransitSalesAmount={analyticsShippingPipeline?.inTransit.amount ?? 0}
+                                        marketingSpendTotal={analyticsSalesEbita?.costs?.marketingSpendTotal ?? 0}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1210,7 +1214,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             {syncingShopify && <Spinner overlay fixed message="Syncing Shopify orders…" />}
 
             {showAddOrder || editingOrder ? (
-                <AddOrderModal 
+                <AddOrderModal
                     products={productOptions}
                     orders={orders.map(shopifyOrderToOrder)}
                     mode={editingOrder ? 'edit' : 'add'}
@@ -1221,9 +1225,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         setEditingOrder(null);
                         // Ensure list refresh uses the same from/to as the date filter (bare GET /orders otherwise).
                         if (wasEditing) {
-                            void loadOrdersPage(ordersListQuery).catch(() => {});
+                            void loadOrdersPage(ordersListQuery).catch(() => { });
                         }
-                    }} 
+                    }}
                     onCreate={async (o) => {
                         try {
                             if (editingOrder) {
@@ -1339,7 +1343,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             console.error('Failed to save order', err);
                             showToast('Failed to save order. Please check that the server is running and try again.', 'error');
                         }
-                    }} 
+                    }}
                 />
             ) : null}
 
@@ -1375,7 +1379,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     onCancel={() => setOrderToDelete(null)}
                 />
             ) : null}
-            
+
             <ToastContainer toasts={toasts} />
         </section>
     );
@@ -1482,13 +1486,13 @@ function ModernRoasMetric({
 
     const gaugeDeg =
         Number.isFinite(currentRoas) &&
-        currentRoas > 0 &&
-        Number.isFinite(expectedRoas) &&
-        expectedRoas > 0
+            currentRoas > 0 &&
+            Number.isFinite(expectedRoas) &&
+            expectedRoas > 0
             ? Math.min(360, (currentRoas / expectedRoas) * 360)
             : Number.isFinite(currentRoas) && currentRoas > 0
-              ? Math.min(360, (currentRoas / 5) * 360)
-              : 0;
+                ? Math.min(360, (currentRoas / 5) * 360)
+                : 0;
 
     const paymentSplitDeg =
         prepaidPct > 0 || codPct > 0 ? Math.min(360, Math.max(0, (prepaidPct / 100) * 360)) : 0;
@@ -1530,9 +1534,8 @@ function ModernRoasMetric({
                 </div>
                 <div className="shopify-dash-card__roas-payment-row">
                     <div
-                        className={`shopify-dash-card__gauge shopify-dash-card__gauge--payment shopify-dash-card__gauge--payment-lg${
-                            hasOrderPaymentMix ? '' : ' shopify-dash-card__gauge--payment-empty'
-                        }`}
+                        className={`shopify-dash-card__gauge shopify-dash-card__gauge--payment shopify-dash-card__gauge--payment-lg${hasOrderPaymentMix ? '' : ' shopify-dash-card__gauge--payment-empty'
+                            }`}
                         style={
                             {
                                 '--shopify-pay-split': `${paymentSplitDeg}deg`,
@@ -1742,9 +1745,8 @@ function ModernDeliveryStatusMetric({
 
     return (
         <article
-            className={`shopify-dash-card shopify-dash-card--ship${isMilkSelected ? ' shopify-dash-card--disabled' : ''}${
-                loading ? ' shopify-dash-card--shimmer' : ''
-            }`}
+            className={`shopify-dash-card shopify-dash-card--ship${isMilkSelected ? ' shopify-dash-card--disabled' : ''}${loading ? ' shopify-dash-card--shimmer' : ''
+                }`}
             aria-busy={loading}
         >
             <div className="shopify-dash-card__accent" aria-hidden />
