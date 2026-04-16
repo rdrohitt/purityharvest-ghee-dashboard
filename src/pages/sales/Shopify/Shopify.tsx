@@ -321,19 +321,37 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const refreshAnalyticsOverview = useCallback(async () => {
         setAnalyticsOverviewLoading(true);
         try {
-            const data = await fetchAnalyticsOverview(dateRangeForApi.from, dateRangeForApi.to);
+            const data = await fetchAnalyticsOverview(dateRangeForApi.from, dateRangeForApi.to, {
+                paymentMode: paymentStatusFilter || undefined,
+                status: deliveryStatusFilter || undefined,
+                platform: platformFilter || undefined,
+                type: typeFilter || undefined,
+            });
             applyAnalyticsOverviewData(data);
         } catch (err) {
             console.error('Failed to refresh analytics overview', err);
         } finally {
             setAnalyticsOverviewLoading(false);
         }
-    }, [dateRangeForApi.from, dateRangeForApi.to, applyAnalyticsOverviewData]);
+    }, [
+        dateRangeForApi.from,
+        dateRangeForApi.to,
+        paymentStatusFilter,
+        deliveryStatusFilter,
+        platformFilter,
+        typeFilter,
+        applyAnalyticsOverviewData,
+    ]);
 
     useEffect(() => {
         let cancelled = false;
         setAnalyticsOverviewLoading(true);
-        fetchAnalyticsOverview(dateRangeForApi.from, dateRangeForApi.to)
+        fetchAnalyticsOverview(dateRangeForApi.from, dateRangeForApi.to, {
+            paymentMode: paymentStatusFilter || undefined,
+            status: deliveryStatusFilter || undefined,
+            platform: platformFilter || undefined,
+            type: typeFilter || undefined,
+        })
             .then((data) => {
                 if (!cancelled) {
                     applyAnalyticsOverviewData(data);
@@ -354,7 +372,15 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return () => {
             cancelled = true;
         };
-    }, [dateRangeForApi.from, dateRangeForApi.to, applyAnalyticsOverviewData]);
+    }, [
+        dateRangeForApi.from,
+        dateRangeForApi.to,
+        paymentStatusFilter,
+        deliveryStatusFilter,
+        platformFilter,
+        typeFilter,
+        applyAnalyticsOverviewData,
+    ]);
 
     /** GET /api/orders with date range + pagination + selected dropdown filters. */
     const ordersListQuery = useMemo(

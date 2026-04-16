@@ -645,6 +645,28 @@ app.get('/api/analytics/overview', async (req, res) => {
   }
 });
 
+/** Placeholder for local dev; production returns full order-reporting payload. */
+app.get('/api/analytics/order-reporting', async (req, res) => {
+  try {
+    const from = typeof req.query.from === 'string' ? req.query.from : '';
+    const to = typeof req.query.to === 'string' ? req.query.to : '';
+    const fromIso = from ? `${from}T00:00:00.000Z` : '';
+    const toIso = to ? `${to}T23:59:59.999Z` : '';
+    res.json({
+      filters: {
+        from: from || to,
+        to: to || from,
+        appliedDateRange: { $gte: fromIso, $lte: toIso },
+      },
+      stateCounts: [],
+      pincodeCounts: [],
+    });
+  } catch (err) {
+    console.error('Error analytics order-reporting', err);
+    res.status(500).json({ message: 'Failed to load order reporting' });
+  }
+});
+
 app.get('/api/orders', async (req, res) => {
   try {
     const orders = await readOrders();

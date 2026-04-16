@@ -1,5 +1,5 @@
 export type MetricKey = 'sales' | 'rto' | 'delivered' | 'inTransit';
-export type RangeKey = 'today' | 'yesterday' | 'last7' | 'last30' | 'custom';
+export type RangeKey = 'today' | 'yesterday' | 'last7' | 'last30' | 'currentMonth' | 'custom';
 
 export type DateRange = { start: Date; end: Date };
 
@@ -24,6 +24,11 @@ export function getPresetRange(key: Exclude<RangeKey, 'custom'>, now = new Date(
 		s.setDate(s.getDate() - 29);
 		s.setHours(0, 0, 0, 0);
 		return { start: s, end };
+	}
+	if (key === 'currentMonth') {
+		const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+		monthStart.setHours(0, 0, 0, 0);
+		return { start: monthStart, end };
 	}
 	return { start, end };
 }
