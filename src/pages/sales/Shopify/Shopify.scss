@@ -1017,6 +1017,61 @@
   box-shadow: none !important;
 }
 
+/* State searchable dropdown (button inside prefixed wrap) */
+.shopify-add-modal-input-wrap
+  button.shopify-add-modal-input.shopify-add-modal-input--with-prefix.state-search-dropdown__trigger {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0 !important;
+  border: none !important;
+  border-radius: 0 8px 8px 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 10px 8px 0;
+  font: inherit;
+  color: inherit;
+}
+
+.shopify-add-modal-input-wrap
+  button.shopify-add-modal-input.shopify-add-modal-input--with-prefix.state-search-dropdown__trigger:focus-visible {
+  outline: none;
+  box-shadow: none !important;
+}
+
+.state-search-dropdown {
+  width: 100%;
+}
+
+.state-search-dropdown__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.state-search-dropdown__value--placeholder {
+  color: #6b7280;
+}
+
+.state-search-dropdown__chev {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.state-search-dropdown__popup .state-search-dropdown__option {
+  flex-direction: row;
+  align-items: center;
+}
+
 .shopify-add-modal-notes--in-section .shopify-add-modal-input-wrap {
   margin-top: 8px;
 }

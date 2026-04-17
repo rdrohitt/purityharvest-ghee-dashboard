@@ -24,6 +24,7 @@ import {
 } from '../../../utils/orders';
 import type { CustomerSearchResult } from '../../../types/shopify';
 import { searchCustomersByPhone } from '../../../utils/customers';
+import { INDIAN_STATES_AND_UTS } from '../../../utils/indianStates';
 import {
     toInputDate,
     ModernSelect,
@@ -568,6 +569,202 @@ function PhoneDropdown({
                 </div>
             )}
             <input type="hidden" value={selectedPhone} required={required} />
+        </div>
+    );
+}
+
+function StateSearchDropdown({
+    value,
+    onChange,
+    placeholder = 'Select state',
+    required,
+    disabled,
+}: {
+    value: string;
+    onChange: (state: string) => void;
+    placeholder?: string;
+    required?: boolean;
+    disabled?: boolean;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const containerRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const popupRef = useRef<HTMLDivElement>(null);
+
+    const allOptions = useMemo(() => {
+        const list = [...INDIAN_STATES_AND_UTS];
+        const v = value.trim();
+        if (v && !list.some((s) => s.toLowerCase() === v.toLowerCase())) {
+            list.unshift(v);
+        }
+        return list;
+    }, [value]);
+
+    const searchLower = searchQuery.trim().toLowerCase();
+    const filteredOptions =
+        searchLower === ''
+            ? allOptions
+            : allOptions.filter((s) => s.toLowerCase().includes(searchLower));
+
+    useEffect(() => {
+        if (disabled) setIsOpen(false);
+    }, [disabled]);
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            const target = e.target as Node;
+            const inContainer = containerRef.current?.contains(target);
+            const inPopup = popupRef.current?.contains(target);
+            if (!inContainer && !inPopup) {
+                setIsOpen(false);
+                setSearchQuery('');
+            }
+        }
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => document.removeEventListener('mousedown', handleClickOutside);
+        }
+    }, [isOpen]);
+
+    useLayoutEffect(() => {
+        if (!isOpen || !popupRef.current || !triggerRef.current) return;
+
+        const positionPopup = () => {
+            if (!popupRef.current || !triggerRef.current) return;
+            const rect = triggerRef.current.getBoundingClientRect();
+            const popup = popupRef.current;
+            const gutter = 12;
+            const popupWidth = Math.max(280, rect.width);
+            let left = rect.left;
+            if (left + popupWidth > window.innerWidth - gutter) {
+                left = window.innerWidth - popupWidth - gutter;
+            }
+            left = Math.max(gutter, left);
+            popup.style.left = `${left}px`;
+            popup.style.width = `${popupWidth}px`;
+            popup.style.maxWidth = `${Math.max(280, window.innerWidth - gutter * 2)}px`;
+
+            const popupHeight = Math.min(popup.offsetHeight || 320, window.innerHeight - gutter * 2);
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const shouldOpenUp = spaceBelow < popupHeight + 8 && rect.top > popupHeight + 8;
+            let top = shouldOpenUp ? rect.top - popupHeight - 4 : rect.bottom + 4;
+            top = Math.max(gutter, Math.min(top, window.innerHeight - popupHeight - gutter));
+            popup.style.top = `${top}px`;
+        };
+
+        positionPopup();
+        const rafId = window.requestAnimationFrame(positionPopup);
+        const onViewportChange = () => positionPopup();
+        window.addEventListener('resize', onViewportChange);
+        window.addEventListener('scroll', onViewportChange, true);
+        return () => {
+            window.cancelAnimationFrame(rafId);
+            window.removeEventListener('resize', onViewportChange);
+            window.removeEventListener('scroll', onViewportChange, true);
+        };
+    }, [isOpen, searchQuery, filteredOptions.length]);
+
+    const displayLabel = value.trim() ? value.trim() : placeholder;
+
+    return (
+        <div ref={containerRef} className="state-search-dropdown">
+            <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.building}>
+                <button
+                    ref={triggerRef}
+                    type="button"
+                    className={`input shopify-add-modal-input shopify-add-modal-input--with-prefix state-search-dropdown__trigger${disabled ? ' shopify-add-modal-input--readonly' : ''}`}
+                    onClick={() => !disabled && setIsOpen((o) => !o)}
+                    aria-haspopup="listbox"
+                    aria-expanded={isOpen}
+                    aria-label="State"
+                    disabled={disabled}
+                >
+                    <span
+                        className={`state-search-dropdown__value${!value.trim() ? ' state-search-dropdown__value--placeholder' : ''}`}
+                    >
+                        {displayLabel}
+                    </span>
+                    <span className="state-search-dropdown__chev" aria-hidden>
+                        {isOpen ? '▲' : '▼'}
+                    </span>
+                </button>
+            </AddModalInputWrap>
+            <input type="hidden" value={value} required={required} readOnly tabIndex={-1} aria-hidden />
+            {isOpen && !disabled && typeof document !== 'undefined' && document.body
+                ? createPortal(
+                      <div
+                          ref={popupRef}
+                          className="variant-dropdown-popup state-search-dropdown__popup"
+                          role="listbox"
+                          style={{
+                              position: 'fixed',
+                              minWidth: 280,
+                              maxWidth: 400,
+                              maxHeight: 320,
+                              zIndex: 10001,
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                      >
+                          <div className="variant-dropdown-search-wrap">
+                              <svg
+                                  className="variant-dropdown-search-icon"
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden
+                              >
+                                  <circle cx="11" cy="11" r="8" />
+                                  <path d="m21 21-4.35-4.35" />
+                              </svg>
+                              <input
+                                  type="text"
+                                  className="variant-dropdown-search"
+                                  placeholder="Search state…"
+                                  value={searchQuery}
+                                  onChange={(e) => setSearchQuery(e.target.value)}
+                                  onKeyDown={(e) => {
+                                      e.stopPropagation();
+                                      if (e.key === 'Enter') e.preventDefault();
+                                  }}
+                                  autoFocus
+                              />
+                          </div>
+                          <div className="variant-dropdown-list">
+                              {filteredOptions.length === 0 ? (
+                                  <div className="variant-dropdown-empty">No matching state</div>
+                              ) : (
+                                  filteredOptions.map((name) => {
+                                      const isSelected = value.trim().toLowerCase() === name.toLowerCase();
+                                      return (
+                                          <button
+                                              type="button"
+                                              key={name}
+                                              role="option"
+                                              aria-selected={isSelected}
+                                              className={`variant-dropdown-option state-search-dropdown__option${isSelected ? ' variant-dropdown-option--selected' : ''}`}
+                                              onClick={() => {
+                                                  onChange(name);
+                                                  setIsOpen(false);
+                                                  setSearchQuery('');
+                                              }}
+                                          >
+                                              <span className="variant-dropdown-option-title">{name}</span>
+                                          </button>
+                                      );
+                                  })
+                              )}
+                          </div>
+                      </div>,
+                      document.body
+                  )
+                : null}
         </div>
     );
 }
@@ -1287,15 +1484,13 @@ function AddOrderModal({
                                         </div>
                                         <div>
                                             <label className="label">State</label>
-                                            <AddModalInputWrap icon={ADD_MODAL_FIELD_ICONS.building}>
-                                                <input
-                                                    className={`input shopify-add-modal-input${customerSectionLocked ? ' shopify-add-modal-input--readonly' : ''}`}
-                                                    value={state}
-                                                    onChange={(e) => setState(e.target.value)}
-                                                    required={!customerSectionLocked}
-                                                    disabled={customerSectionLocked}
-                                                />
-                                            </AddModalInputWrap>
+                                            <StateSearchDropdown
+                                                value={state}
+                                                onChange={setState}
+                                                placeholder="Select state"
+                                                required={!customerSectionLocked}
+                                                disabled={customerSectionLocked}
+                                            />
                                         </div>
                                         <div>
                                             <label className="label">Date</label>
