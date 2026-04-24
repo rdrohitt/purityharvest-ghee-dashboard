@@ -1082,6 +1082,17 @@ function AddOrderModal({
     const courierForDefaultUrl = shippingTrackingCompanyInput.trim() || 'Delhivery';
     const resolvedTrackingUrl = buildDefaultTrackingUrlFromCourier(awb, courierForDefaultUrl);
 
+    /** Line items + COD − discount − partial (same as Total Amount field − partial). */
+    const amountToCollect = useMemo(() => {
+        const itemsSubtotal = items.reduce((sum, it) => sum + it.variantPrice * it.quantity, 0);
+        return (
+            itemsSubtotal +
+            (Number(codCharges) || 0) -
+            (Number(discount) || 0) -
+            (Number(partialAmount) || 0)
+        );
+    }, [items, codCharges, discount, partialAmount]);
+
     const [saving, setSaving] = useState(false);
 
     const getAvailableProducts = (currentIdx: number) => {
@@ -1814,6 +1825,21 @@ function AddOrderModal({
                                                 </a>
                                             </div>
                                         ) : null}
+                                    </div>
+
+                                    <div
+                                        className="shopify-add-modal-amount-to-collect"
+                                        aria-live="polite"
+                                    >
+                                        <div className="shopify-add-modal-amount-to-collect__label">
+                                            Amount to Collect
+                                        </div>
+                                        <div className="shopify-add-modal-amount-to-collect__value">
+                                            ₹
+                                            {amountToCollect.toLocaleString('en-IN', {
+                                                maximumFractionDigits: 2,
+                                            })}
+                                        </div>
                                     </div>
                                 </AddModalSection>
                             </div>

@@ -4,12 +4,13 @@ import { Spinner } from '../../components/Spinner';
 import type { LeadApiRow, LeadsListResponse } from '../../types/leads';
 import { parseLeadsListResponse } from '../../types/leads';
 import { DatePicker as ShopifyDatePicker } from '../sales/Shopify/DatePicker';
-import { FilterButton, Th, Td, toInputDate } from '../sales/Shopify/ShopifyShared';
+import { FilterButton, Th, Td, toInputDate, ModernSelect, type ModernSelectOption } from '../sales/Shopify/ShopifyShared';
 import '../sales/Shopify/Shopify.scss';
 import './WALeads.scss';
 
 type LeadStatus = 'New' | 'Contacted' | 'Converted' | 'Not Interested' | 'No Answer' | 'Potential Customer' | 'Very Interested' | 'CBA';
 type Platform = 'STW' | 'Abandoned' | 'Whatsapp';
+type LeadTableDraft = { callbackDate: string; status: LeadStatus; notes: string };
 
 type Toast = {
     id: string;
@@ -38,6 +39,17 @@ const LEAD_STATUSES: LeadStatus[] = [
     'Potential Customer',
     'Very Interested',
     'CBA',
+];
+
+const LEAD_STATUS_MODERN_OPTIONS: ModernSelectOption<LeadStatus>[] = [
+    { value: 'New', label: 'New', icon: '🆕' },
+    { value: 'Contacted', label: 'Contacted', icon: '📞' },
+    { value: 'Converted', label: 'Converted', icon: '✅' },
+    { value: 'Not Interested', label: 'Not Interested', icon: '❌' },
+    { value: 'No Answer', label: 'No Answer', icon: '📵' },
+    { value: 'Potential Customer', label: 'Potential Customer', icon: '✨' },
+    { value: 'Very Interested', label: 'Very Interested', icon: '🔥' },
+    { value: 'CBA', label: 'CBA', icon: '🕒' },
 ];
 
 const MIN_PHONE_SEARCH_DIGITS = 10;
@@ -220,6 +232,7 @@ export default function WALeads() {
     const [showAddLead, setShowAddLead] = useState(false);
     const [editingLead, setEditingLead] = useState<WALead | null>(null);
     const [leadsRows, setLeadsRows] = useState<LeadApiRow[]>([]);
+    const [leadTableDrafts, setLeadTableDrafts] = useState<Record<string, LeadTableDraft>>({});
     const [leadsMeta, setLeadsMeta] = useState<LeadsListResponse | null>(null);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(500);
@@ -238,6 +251,8 @@ export default function WALeads() {
     const [engageFetchAllLoading, setEngageFetchAllLoading] = useState(false);
     const [showEngageTokenExpiredModal, setShowEngageTokenExpiredModal] = useState(false);
     const [copiedLeadId, setCopiedLeadId] = useState<string | null>(null);
+    const [savingRowId, setSavingRowId] = useState<string | null>(null);
+    const [deletingRowId, setDeletingRowId] = useState<string | null>(null);
     const [showWhatsAppProductModal, setShowWhatsAppProductModal] = useState(false);
     const [selectedWhatsAppPhone, setSelectedWhatsAppPhone] = useState('');
     const [selectedWhatsAppCustomerName, setSelectedWhatsAppCustomerName] = useState('');
@@ -264,6 +279,104 @@ export default function WALeads() {
         setTimeout(() => {
             setToasts((prev) => prev.filter((t) => t.id !== id));
         }, 3000);
+    }
+
+    function getLeadTableDraft(row: LeadApiRow): LeadTableDraft {
+        const callbackDateValue =
+            row.callbackDate && Number.isFinite(Date.parse(row.callbackDate))
+                ? toInputDate(new Date(row.callbackDate))
+                : '';
+        return leadTableDrafts[row._id] ?? {
+            callbackDate: callbackDateValue,
+            status: LEAD_STATUSES.includes(row.status as LeadStatus) ? (row.status as LeadStatus) : 'New',
+            notes: row.notes ?? '',
+        };
+    }
+
+    function updateLeadTableDraft(rowId: string, patch: Partial<LeadTableDraft>) {
+        setLeadTableDrafts((prev) => ({
+            ...prev,
+            [rowId]: {
+                callbackDate: prev[rowId]?.callbackDate ?? '',
+                status: prev[rowId]?.status ?? 'New',
+                notes: prev[rowId]?.notes ?? '',
+                ...patch,
+            },
+        }));
+    }
+
+    function leadRowToWALead(row: LeadApiRow): WALead {
+        const rowStatus = LEAD_STATUSES.includes(row.status as LeadStatus)
+            ? (row.status as LeadStatus)
+            : 'New';
+        return {
+            id: row._id,
+            customerName: row.name || '',
+            mobile: digitsOnly(row.phoneNumber).slice(-10) || digitsOnly(row.phoneNumber) || row.phoneNumber,
+            callingDate: row.time || row.createdAt || '',
+            callingDetail: row.message || '',
+            callBackDate: row.callbackDate || undefined,
+            notes: row.notes || '',
+            status: rowStatus,
+            platform: 'Whatsapp',
+        };
+    }
+
+    async function saveInlineRow(row: LeadApiRow) {
+        const d = getLeadTableDraft(row);
+        setSavingRowId(row._id);
+        try {
+            const callbackDateIso =
+                d.callbackDate && Number.isFinite(Date.parse(d.callbackDate))
+                    ? new Date(d.callbackDate).toISOString()
+                    : null;
+            const payload: LeadApiRow = {
+                ...row,
+                callbackDate: callbackDateIso,
+                status: d.status,
+                notes: d.notes,
+            };
+            const res = await apiFetch(`/api/leads/${row._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error(`Failed to save (${res.status})`);
+            showToast('Lead saved', 'success');
+            setLeadTableDrafts((prev) => {
+                const next = { ...prev };
+                delete next[row._id];
+                return next;
+            });
+            await loadLeads();
+        } catch (err) {
+            console.error('Failed to save inline lead row', err);
+            showToast('Failed to save lead', 'error');
+        } finally {
+            setSavingRowId(null);
+        }
+    }
+
+    async function deleteInlineRow(row: LeadApiRow) {
+        const ok = window.confirm(`Delete lead for ${row.name || row.phoneNumber || 'this row'}?`);
+        if (!ok) return;
+        setDeletingRowId(row._id);
+        try {
+            const res = await apiFetch(`/api/wa-leads-orders/${row._id}`, { method: 'DELETE' });
+            if (!res.ok && res.status !== 204) throw new Error(`Failed to delete (${res.status})`);
+            showToast('Lead deleted', 'delete');
+            setLeadTableDrafts((prev) => {
+                const next = { ...prev };
+                delete next[row._id];
+                return next;
+            });
+            await loadLeads();
+        } catch (err) {
+            console.error('Failed to delete inline lead row', err);
+            showToast('Failed to delete lead', 'error');
+        } finally {
+            setDeletingRowId(null);
+        }
     }
 
     const getLocalDateString = (date: Date): string => {
@@ -331,8 +444,15 @@ export default function WALeads() {
                     name: w.customerName,
                     phoneNumber: digitsOnly(w.mobile).slice(-10) || digitsOnly(w.mobile),
                     countryCode: '+91',
+                    email: '',
+                    address: '',
+                    state: '',
+                    pincode: '',
                     message: [w.notes, w.callingDetail].filter(Boolean).join('\n') || '',
                     time: w.callingDate?.trim() ? w.callingDate : null,
+                    status: w.status,
+                    notes: w.notes || '',
+                    callbackDate: w.callBackDate?.trim() ? w.callBackDate : null,
                     createdBy: { _id: '', name: '—' },
                     updatedBy: { _id: '', name: '—' },
                     createdAt: w.callingDate || new Date().toISOString(),
@@ -549,6 +669,18 @@ If you're looking for pure Desi Cow Ghee, we'd love to serve you. Our ghee is 10
             return matchesPhone;
         });
     }, [sortedLeadRows, phoneDigits, isPhoneSearch]);
+
+    useEffect(() => {
+        setLeadTableDrafts((prev) => {
+            if (Object.keys(prev).length === 0) return prev;
+            const next: Record<string, LeadTableDraft> = {};
+            for (const row of sortedLeadRows) {
+                const draft = prev[row._id];
+                if (draft) next[row._id] = draft;
+            }
+            return next;
+        });
+    }, [sortedLeadRows]);
 
     const leadsGroupedByDate = useMemo((): { dateKey: string; rows: LeadApiRow[] }[] => {
         const map = new Map<string, LeadApiRow[]>();
@@ -771,6 +903,10 @@ If you're looking for pure Desi Cow Ghee, we'd love to serve you. Our ghee is 10
                             <col />
                             <col />
                             <col />
+                            <col />
+                            <col />
+                            <col />
+                            <col />
                         </colgroup>
                         <thead>
                             <tr>
@@ -779,18 +915,22 @@ If you're looking for pure Desi Cow Ghee, we'd love to serve you. Our ghee is 10
                                 <Th>Message</Th>
                                 <Th align="center">WhatsApp</Th>
                                 <Th>Lead Date</Th>
+                                <Th>Call Back Date</Th>
+                                <Th>Status</Th>
+                                <Th>Notes</Th>
+                                <Th align="center">Actions</Th>
                             </tr>
                         </thead>
                         <tbody>
                             {!loading && filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="shopify-td wa-leads__empty-cell">
+                                    <td colSpan={9} className="shopify-td wa-leads__empty-cell">
                                         No leads in this range{isPhoneSearch ? ' matching this phone on the current page' : ''}. Adjust filters or import from Engage.
                                     </td>
                                 </tr>
                             ) : loading ? (
                                 <tr aria-hidden>
-                                    <td colSpan={5} className="shopify-td wa-leads__skeleton-cell" />
+                                    <td colSpan={9} className="shopify-td wa-leads__skeleton-cell" />
                                 </tr>
                             ) : (
                                 (() => {
@@ -798,7 +938,7 @@ If you're looking for pure Desi Cow Ghee, we'd love to serve you. Our ghee is 10
                                     return leadsGroupedByDate.flatMap(({ dateKey, rows: groupRows }) => {
                                         const headerTr = (
                                             <tr key={`wa-date-${dateKey}`} className="wa-leads__date-group-row">
-                                                <td colSpan={5} className="shopify-td wa-leads__date-group-header">
+                                                <td colSpan={9} className="shopify-td wa-leads__date-group-header">
                                                     <div className="wa-leads__date-group-inner">
                                                         <span className="wa-leads__date-group-title">
                                                             {formatWaLeadsDateGroupTitle(dateKey)}
@@ -813,6 +953,7 @@ If you're looking for pure Desi Cow Ghee, we'd love to serve you. Our ghee is 10
                                         const dataTrs = groupRows.map((row) => {
                                             const isEven = dataRowIndex % 2 === 1;
                                             dataRowIndex += 1;
+                                            const rowDraft = getLeadTableDraft(row);
                                             const e164ish = `${row.countryCode}${row.phoneNumber}`.replace(/\s/g, '');
                                             const displayPhone = `${row.countryCode} ${row.phoneNumber}`.trim();
                                             const rowPhoneDigits = digitsOnly(row.phoneNumber);
@@ -934,6 +1075,76 @@ If you're looking for pure Desi Cow Ghee, we'd love to serve you. Our ghee is 10
                                                         )}
                                                     </Td>
                                                     <Td>{formatLeadDate(row.time)}</Td>
+                                                    <Td className="wa-leads__td-callback">
+                                                        <div className="wa-leads__inline-date-wrap">
+                                                            <ShopifyDatePicker
+                                                                value={rowDraft.callbackDate}
+                                                                onChange={(v) => updateLeadTableDraft(row._id, { callbackDate: v })}
+                                                                placeholder="Select date"
+                                                            />
+                                                        </div>
+                                                    </Td>
+                                                    <Td className="wa-leads__td-status">
+                                                        <ModernSelect<LeadStatus>
+                                                            value={rowDraft.status}
+                                                            onChange={(v) =>
+                                                                updateLeadTableDraft(row._id, {
+                                                                    status: (v || 'New') as LeadStatus,
+                                                                })
+                                                            }
+                                                            options={LEAD_STATUS_MODERN_OPTIONS}
+                                                            placeholder="Select status"
+                                                            aria-label={`Status for ${row.name || displayPhone}`}
+                                                            className="wa-leads__inline-status"
+                                                        />
+                                                    </Td>
+                                                    <Td className="wa-leads__td-notes">
+                                                        <textarea
+                                                            className="input wa-leads__notes-input"
+                                                            rows={2}
+                                                            value={rowDraft.notes}
+                                                            placeholder="Add notes"
+                                                            onChange={(e) =>
+                                                                updateLeadTableDraft(row._id, { notes: e.target.value })
+                                                            }
+                                                        />
+                                                    </Td>
+                                                    <Td className="wa-leads__td-actions">
+                                                        <div className="wa-leads__row-actions">
+                                                            <button
+                                                                type="button"
+                                                                className="icon-btn"
+                                                                aria-label="Save row"
+                                                                title="Save row"
+                                                                disabled={savingRowId === row._id}
+                                                                onClick={() => void saveInlineRow(row)}
+                                                            >
+                                                                {savingRowId === row._id ? '…' : '✓'}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="icon-btn"
+                                                                aria-label="Edit lead"
+                                                                title="Edit lead"
+                                                                onClick={() => {
+                                                                    setEditingLead(leadRowToWALead(row));
+                                                                    setShowAddLead(true);
+                                                                }}
+                                                            >
+                                                                ✏️
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className="icon-btn icon-btn--danger"
+                                                                aria-label="Delete lead"
+                                                                title="Delete lead"
+                                                                disabled={deletingRowId === row._id}
+                                                                onClick={() => void deleteInlineRow(row)}
+                                                            >
+                                                                {deletingRowId === row._id ? '…' : '🗑️'}
+                                                            </button>
+                                                        </div>
+                                                    </Td>
                                                 </tr>
                                             );
                                         });

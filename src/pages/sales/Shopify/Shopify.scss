@@ -1633,6 +1633,28 @@
   gap: 14px;
  }
 
+ .shopify-add-modal-amount-to-collect {
+   margin-top: 4px;
+   padding-top: 16px;
+   border-top: 1px solid var(--border);
+ }
+
+ .shopify-add-modal-amount-to-collect__label {
+   font-size: 15px;
+   font-weight: 700;
+   color: var(--text);
+   letter-spacing: -0.01em;
+   margin-bottom: 6px;
+ }
+
+ .shopify-add-modal-amount-to-collect__value {
+   font-size: 1.5rem;
+   font-weight: 800;
+   letter-spacing: -0.02em;
+   color: var(--text);
+   line-height: 1.2;
+ }
+
  .shopify-add-modal-tracking-card {
    background: var(--bg-elev);
    border: 1px solid var(--border);

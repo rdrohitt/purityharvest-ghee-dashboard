@@ -9,8 +9,15 @@ export interface LeadApiRow {
     name: string;
     phoneNumber: string;
     countryCode: string;
+    email: string;
+    address: string;
+    state: string;
+    pincode: string;
     message: string;
     time: string | null;
+    status: string;
+    notes: string;
+    callbackDate: string | null;
     createdBy: LeadApiUserRef;
     updatedBy: LeadApiUserRef;
     createdAt: string;
@@ -54,8 +61,16 @@ export function parseLeadsListResponse(raw: unknown): LeadsListResponse | null {
             name: String(r.name ?? ''),
             phoneNumber: String(r.phoneNumber ?? ''),
             countryCode: String(r.countryCode ?? '+91'),
+            email: typeof r.email === 'string' ? r.email : '',
+            address: typeof r.address === 'string' ? r.address : '',
+            state: typeof r.state === 'string' ? r.state : '',
+            pincode: typeof r.pincode === 'string' ? r.pincode : '',
             message: typeof r.message === 'string' ? r.message : '',
             time: r.time == null || r.time === '' ? null : String(r.time),
+            status: typeof r.status === 'string' ? r.status : '',
+            notes: typeof r.notes === 'string' ? r.notes : '',
+            callbackDate:
+                r.callbackDate == null || r.callbackDate === '' ? null : String(r.callbackDate),
             createdBy: normalizeUserRef(r.createdBy),
             updatedBy: normalizeUserRef(r.updatedBy),
             createdAt: String(r.createdAt ?? ''),

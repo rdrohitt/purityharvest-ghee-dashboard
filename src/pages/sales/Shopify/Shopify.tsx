@@ -41,7 +41,7 @@ import type {
     AnalyticsOverviewShippingPipeline,
     AnalyticsOverviewVolume,
 } from '../../../types/analytics-overview';
-import type { ShopifyOrderApi, ShopifyOrderProduct, ShopifyOrderProductPopulated } from '../../../types/shopify';
+import type { ShopifyOrderApi, ShopifyOrderProduct } from '../../../types/shopify';
 import { fetchAnalyticsOverview } from '../../../utils/analytics';
 import { loadProducts, type ProductApiItem } from '../../../utils/products';
 import { useAppDispatch, useAppSelector, setProducts, setProductsLoading } from '../../../store';
@@ -72,7 +72,7 @@ type ShippedTab = 'shipped' | 'notShipped';
 
 /**
  * One normalized category label per line (trimmed, lowercased).
- * Prefer API `productId.category.name`; else product catalog map by product id.
+ * Prefer API `productId.category.name` (or `category` as string); else product catalog map by product id.
  */
 function resolveOrderLineCategoryNorm(
     line: ShopifyOrderProduct,
@@ -81,17 +81,26 @@ function resolveOrderLineCategoryNorm(
 ): string {
     const raw = line.productId;
     let productId: string | null = null;
-    if (raw && typeof raw === 'object' && '_id' in raw) {
-        const pop = raw as ShopifyOrderProductPopulated;
-        productId = String(pop._id);
+
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const pop = raw as unknown as Record<string, unknown>;
+        const idVal = pop._id ?? pop.id;
+        if (idVal != null && String(idVal).trim()) {
+            productId = String(idVal).trim();
+        }
+
         const cat = pop.category;
-        if (cat?.name != null) {
-            const n = String(cat.name).trim().toLowerCase();
+        if (typeof cat === 'string' && cat.trim()) {
+            return cat.trim().toLowerCase();
+        }
+        if (cat && typeof cat === 'object' && !Array.isArray(cat) && 'name' in cat) {
+            const n = String((cat as { name?: unknown }).name ?? '').trim().toLowerCase();
             if (n) return n;
         }
     } else if (typeof raw === 'string') {
-        productId = raw;
+        productId = raw.trim() || null;
     }
+
     if (productId && catalogLoaded) {
         const fromMap = (productCategoryMap.get(productId) || '').trim().toLowerCase();
         if (fromMap) return fromMap;
@@ -144,7 +153,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const [shippedTab, setShippedTab] = useState<ShippedTab>('shipped');
     const [syncingShopify, setSyncingShopify] = useState(false);
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(20);
+    const [pageSize, setPageSize] = useState(100);
     const [ordersMeta, setOrdersMeta] = useState<{
         total: number;
         totalPages: number;
