@@ -697,8 +697,20 @@
 
  .shopify-orders-date-header {
    display: flex;
-   align-items: center;
-   gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+}
+
+.shopify-orders-date-title {
+  display: block;
+  width: 100%;
+  margin: 4px 0;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.05;
+  color: #0f172a;
  }
 
  .shopify-whatsapp-summary-link {
@@ -728,28 +740,94 @@
  .shopify-orders-date-badges {
    display: flex;
    flex-wrap: wrap;
-   gap: 6px;
-   font-size: 10px;
-   color: var(--muted);
+  gap: 8px;
+  align-items: flex-start;
  }
 
  .shopify-badge {
-   padding: 2px 6px;
-   border-radius: 999px;
-   font-weight: 600;
-   text-transform: uppercase;
-   letter-spacing: 0.06em;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 56px;
+  min-width: 102px;
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.shopify-badge__key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 24px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.shopify-badge__value {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  margin-top: 0;
+  padding: 0 2px 1px;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  word-break: break-word;
  }
 
  .shopify-badge--orders {
-   background: #eff6ff;
-   color: #1d4ed8;
+  background: #ffffff;
+  color: #334155;
+  border-color: #e2e8f0;
+}
+
+.shopify-badge--orders .shopify-badge__key {
+  background: #f1f5f9;
  }
 
  .shopify-badge--amount {
-   background: #dbeafe;
-   color: #1d4ed8;
+  background: #ffffff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.shopify-badge--amount .shopify-badge__key {
+  background: #eff6ff;
  }
+
+.shopify-badge--shopify-orders {
+  background: #ffffff;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.shopify-badge--shopify-orders .shopify-badge__key {
+  background: #e8f7ef;
+}
+
+.shopify-badge--shopify-amount {
+  background: #ffffff;
+  color: #14532d;
+  border-color: #4ade80;
+}
+
+.shopify-badge--shopify-amount .shopify-badge__key {
+  background: #dcfce7;
+}
 
  .shopify-badge--shipping {
    background: #fef3c7;
@@ -757,14 +835,34 @@
  }
 
  .shopify-badge--cod {
-   background: #eef2ff;
-   color: #3730a3;
+  background: #ffffff;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.shopify-badge--cod .shopify-badge__key {
+  background: #fff7ed;
  }
 
  .shopify-badge--paid {
-   background: #dbeafe;
-   color: #1d4ed8;
+  background: #ffffff;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.shopify-badge--paid .shopify-badge__key {
+  background: #ecfdf5;
  }
+
+.shopify-badge--rto {
+  background: #ffffff;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.shopify-badge--rto .shopify-badge__key {
+  background: #fef2f2;
+}
 
  .shopify-customer-cell {
    display: flex;
@@ -2373,6 +2471,62 @@
   word-break: break-word;
 }
 
+.shopify-badge--compact {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.shopify-badge--compact .shopify-badge__key {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent !important;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.shopify-badge--compact .shopify-badge__value {
+  width: auto;
+  display: inline;
+  flex: 0;
+  margin-top: 0;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: left;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.shopify-badge--compact.shopify-badge--cod {
+  background: #fff7ed;
+}
+
+.shopify-badge--compact.shopify-badge--orders {
+  background: #f1f5f9;
+}
+
+.shopify-badge--compact.shopify-badge--paid {
+  background: #ecfdf5;
+}
+
+.shopify-badge--compact.shopify-badge--rto {
+  background: #fef2f2;
+}
+
 .customer-info-phone-link {
   font-weight: 600;
   font-size: 14px;
@@ -2891,61 +3045,60 @@
     font-size: 13px;
   }
 }
-/* Orders table — payment: uppercase strip + left accent */
+/* Orders table tags — cleaner, modern, unified visual language */
 .shopify-payment-tag {
   display: inline-flex;
   align-items: center;
-  min-height: 26px;
-  padding: 0 11px 0 12px;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  border-radius: 4px;
-  border: 1px solid transparent;
-  border-left-width: 4px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 .shopify-payment-tag--paid {
-  background: #ecfdf5;
-  color: #047857;
-  border-color: #a7f3d0;
-  border-left-color: #059669;
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
 }
 
 .shopify-payment-tag--cod {
-  background: #fffbeb;
-  color: #b45309;
-  border-color: #fde68a;
-  border-left-color: #d97706;
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fdba74;
 }
 
 .shopify-payment-tag--default {
   background: #f1f5f9;
-  color: #475569;
+  color: #334155;
   border-color: #e2e8f0;
-  border-left-color: #94a3b8;
 }
 
-/* Orders table — delivery: pill + status dot */
 .shopify-delivery-tag {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 26px;
-  padding: 0 12px;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
   font-size: 11px;
   font-weight: 700;
   border-radius: 999px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid;
   background: #f8fafc;
   color: #334155;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 .shopify-delivery-tag::before {
   content: '';
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -2990,32 +3143,39 @@
   background: #dc2626;
 }
 
+.shopify-delivery-tag--default {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+
 .shopify-delivery-tag--default::before {
   background: #94a3b8;
 }
 
-/* Orders table — platform: dashed outline + square mark */
 .shopify-platform-tag {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 26px;
-  padding: 0 11px;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
   font-size: 11px;
   font-weight: 700;
-  border-radius: 2px;
-  border: 2px dashed;
-  background: transparent;
+  border-radius: 999px;
+  border: 1px solid;
+  background: #fff;
   line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 .shopify-platform-tag__mark {
-  width: 6px;
-  height: 6px;
-  border-radius: 1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
   flex-shrink: 0;
   background: currentColor;
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
 .shopify-platform-tag--shopify {
@@ -3056,21 +3216,22 @@
 
 .shopify-platform-tag--default {
   color: #475569;
-  border-color: #94a3b8;
+  border-color: #cbd5e1;
   background: #f8fafc;
 }
 
-/* Orders table — type: glyph tile + soft pill */
 .shopify-type-tag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 26px;
-  padding: 1px 10px 1px 3px;
+  min-height: 28px;
+  padding: 1px 10px 1px 4px;
   font-size: 11px;
   font-weight: 700;
   border-radius: 999px;
   border: 1px solid;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 .shopify-type-tag__glyph {
@@ -3079,7 +3240,7 @@
   justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: 6px;
+  border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
   flex-shrink: 0;

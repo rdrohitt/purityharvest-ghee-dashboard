@@ -687,9 +687,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             items: ShopifyOrderApi[];
             metaSpent: number;
             totalAmount: number;
+            shopifyAmount: number;
             totalShipping: number;
             codCount: number;
             paidCount: number;
+            rtoCount: number;
+            shopifyOrderCount: number;
         }> = [];
         const dateToIndex = new Map<string, number>();
         for (const o of filtered) {
@@ -702,9 +705,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     items: [o],
                     metaSpent: 0,
                     totalAmount: 0,
+                    shopifyAmount: 0,
                     totalShipping: 0,
                     codCount: 0,
                     paidCount: 0,
+                    rtoCount: 0,
+                    shopifyOrderCount: 0,
                 });
                 dateToIndex.set(label, groups.length - 1);
             } else {
@@ -713,19 +719,35 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         }
         for (const g of groups) {
             let totalAmount = 0;
+            let shopifyAmount = 0;
             let totalShipping = 0;
             let codCount = 0;
             let paidCount = 0;
+            let rtoCount = 0;
+            let shopifyOrderCount = 0;
             for (const it of g.items) {
                 totalAmount += it.totalAmount;
                 totalShipping += it.shippingCharges ?? 0;
-                if (it.paymentMode === 'COD') codCount += 1;
-                if (it.paymentMode === 'PAID') paidCount += 1;
+                if ((it.platform ?? '').toLowerCase() === 'shopify') {
+                    shopifyOrderCount += 1;
+                    shopifyAmount += it.totalAmount;
+                }
+                if (it.paymentMode === 'PAID') {
+                    paidCount += 1;
+                } else {
+                    // Mirror UI semantics where all non-PAID payments are treated as COD.
+                    codCount += 1;
+                }
+                const delivery = mapDeliveryStatusFromTracking(it.shippingDetails?.trackingStatus, it.returnStatus);
+                if (delivery === 'rto') rtoCount += 1;
             }
             g.totalAmount = totalAmount;
+            g.shopifyAmount = shopifyAmount;
             g.totalShipping = totalShipping;
             g.codCount = codCount;
             g.paidCount = paidCount;
+            g.rtoCount = rtoCount;
+            g.shopifyOrderCount = shopifyOrderCount;
             g.metaSpent = 0;
         }
         // Sort groups by order date descending (newest first)

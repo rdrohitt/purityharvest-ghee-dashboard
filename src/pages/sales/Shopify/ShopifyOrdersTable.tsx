@@ -24,9 +24,12 @@ export type GroupedOrdersByDate = {
     items: ShopifyOrderApi[];
     metaSpent: number;
     totalAmount: number;
+    shopifyAmount: number;
     totalShipping: number;
     codCount: number;
     paidCount: number;
+    rtoCount: number;
+    shopifyOrderCount: number;
 };
 
 /** Below this many rows, render the full table at once (no progressive pass). */
@@ -63,28 +66,47 @@ function buildDisplayGroupsFromFlatSlice(slice: FlatOrderRow[]): GroupedOrdersBy
                 ...fr.group,
                 items: [fr.order],
                 totalAmount: 0,
+                shopifyAmount: 0,
                 totalShipping: 0,
                 codCount: 0,
                 paidCount: 0,
+                rtoCount: 0,
+                shopifyOrderCount: 0,
                 metaSpent: 0,
             });
         }
     }
     for (const g of result) {
         let totalAmount = 0;
+        let shopifyAmount = 0;
         let totalShipping = 0;
         let codCount = 0;
         let paidCount = 0;
+        let rtoCount = 0;
+        let shopifyOrderCount = 0;
         for (const it of g.items) {
             totalAmount += it.totalAmount;
             totalShipping += it.shippingCharges ?? 0;
-            if (it.paymentMode === 'COD') codCount += 1;
-            if (it.paymentMode === 'PAID') paidCount += 1;
+            if ((it.platform ?? '').toLowerCase() === 'shopify') {
+                shopifyOrderCount += 1;
+                shopifyAmount += it.totalAmount;
+            }
+            if (it.paymentMode === 'PAID') {
+                paidCount += 1;
+            } else {
+                // Keep badge counts consistent with payment tags: any non-PAID mode is shown as COD.
+                codCount += 1;
+            }
+            const delivery = mapDeliveryStatusFromTracking(it.shippingDetails?.trackingStatus, it.returnStatus);
+            if (delivery === 'rto') rtoCount += 1;
         }
         g.totalAmount = totalAmount;
+        g.shopifyAmount = shopifyAmount;
         g.totalShipping = totalShipping;
         g.codCount = codCount;
         g.paidCount = paidCount;
+        g.rtoCount = rtoCount;
+        g.shopifyOrderCount = shopifyOrderCount;
     }
     return result;
 }
@@ -619,7 +641,6 @@ export function ShopifyOrdersTable({
                                                 <td rowSpan={group.items.length} className="shopify-orders-date-cell">
                                                     <div className="shopify-orders-date-wrapper">
                                                         <div className="shopify-orders-date-header">
-                                                            <span>{group.label}</span>
                                                             {group.items.length > 0 && (
                                                                 <a
                                                                     href={`https://wa.me/918685045943?text=${encodeURIComponent(generateWhatsAppSummary(group.label, group.items.map(shopifyOrderToOrder), marketingSpend))}`}
@@ -633,15 +654,37 @@ export function ShopifyOrdersTable({
                                                                     </svg>
                                                                 </a>
                                                             )}
+                                                            <span className="shopify-orders-date-title">{group.label}</span>
                                                         </div>
                                                         <div className="shopify-orders-date-badges">
-                                                            <span className="shopify-badge shopify-badge--orders">{group.items.length} Orders</span>
-                                                            <span className="shopify-badge shopify-badge--amount">{formatCurrency(group.totalAmount)}</span>
-                                                            {group.totalShipping > 0 && (
-                                                                <span className="shopify-badge shopify-badge--shipping">Shipping {formatCurrency(group.totalShipping)}</span>
-                                                            )}
-                                                            <span className="shopify-badge shopify-badge--cod">COD {group.codCount}</span>
-                                                            <span className="shopify-badge shopify-badge--paid">Paid {group.paidCount}</span>
+                                                            <span className="shopify-badge shopify-badge--amount">
+                                                                <span className="shopify-badge__key">Amount</span>
+                                                                <span className="shopify-badge__value">{formatCurrency(group.totalAmount)}</span>
+                                                            </span>
+                                                            <span className="shopify-badge shopify-badge--shopify-orders">
+                                                                <span className="shopify-badge__key">Shopify Orders</span>
+                                                                <span className="shopify-badge__value">{group.shopifyOrderCount}</span>
+                                                            </span>
+                                                            <span className="shopify-badge shopify-badge--shopify-amount">
+                                                                <span className="shopify-badge__key">Shopify Amount</span>
+                                                                <span className="shopify-badge__value">{formatCurrency(group.shopifyAmount)}</span>
+                                                            </span>
+                                                            <span className="shopify-badge shopify-badge--compact shopify-badge--orders">
+                                                                <span className="shopify-badge__key">Orders</span>
+                                                                <span className="shopify-badge__value">{group.items.length}</span>
+                                                            </span>
+                                                            <span className="shopify-badge shopify-badge--compact shopify-badge--cod">
+                                                                <span className="shopify-badge__key">COD</span>
+                                                                <span className="shopify-badge__value">{group.codCount}</span>
+                                                            </span>
+                                                            <span className="shopify-badge shopify-badge--compact shopify-badge--paid">
+                                                                <span className="shopify-badge__key">Paid</span>
+                                                                <span className="shopify-badge__value">{group.paidCount}</span>
+                                                            </span>
+                                                            <span className="shopify-badge shopify-badge--compact shopify-badge--rto">
+                                                                <span className="shopify-badge__key">RTO</span>
+                                                                <span className="shopify-badge__value">{group.rtoCount}</span>
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 </td>
