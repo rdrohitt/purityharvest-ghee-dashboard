@@ -14,16 +14,19 @@ export type AnalyticsOrderReportingFilters = {
 
 export type AnalyticsOrderReportingStateCount = {
     count: number;
+    revenue?: number;
     state: string;
 };
 
 export type AnalyticsOrderReportingPincodeCount = {
     count: number;
+    revenue?: number;
     pincode: string;
 };
 
 export type AnalyticsOrderReportingResponse = {
     filters: AnalyticsOrderReportingFilters;
+    totalOrders?: number;
     stateCounts: AnalyticsOrderReportingStateCount[];
     pincodeCounts: AnalyticsOrderReportingPincodeCount[];
 };

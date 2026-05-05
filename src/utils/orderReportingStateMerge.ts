@@ -45,15 +45,20 @@ function displayStateLabel(bucket: string): string {
  * Other states merge on case-insensitive trimmed text.
  */
 export function mergeStateCountsForDisplay(rows: AnalyticsOrderReportingStateCount[]): AnalyticsOrderReportingStateCount[] {
-	const map = new Map<string, { count: number; label: string }>();
+	const map = new Map<string, { count: number; revenue: number; label: string }>();
 	for (const row of rows) {
 		const bucket = stateMergeBucket(row.state);
 		const label = displayStateLabel(bucket);
 		const n = typeof row.count === 'number' ? row.count : Number(row.count);
 		const add = Number.isFinite(n) ? n : 0;
+		const rawRevenue = typeof row.revenue === 'number' ? row.revenue : Number(row.revenue);
+		const addRevenue = Number.isFinite(rawRevenue) ? rawRevenue : 0;
 		const prev = map.get(bucket);
-		if (!prev) map.set(bucket, { count: add, label });
-		else prev.count += add;
+		if (!prev) map.set(bucket, { count: add, revenue: addRevenue, label });
+		else {
+			prev.count += add;
+			prev.revenue += addRevenue;
+		}
 	}
-	return Array.from(map.values()).map(({ count, label }) => ({ state: label, count }));
+	return Array.from(map.values()).map(({ count, revenue, label }) => ({ state: label, count, revenue }));
 }

@@ -486,62 +486,65 @@ export function formatDate(date: string | Date): string {
     return `${day}-${month}-${year}`;
 }
 
-export function generateWhatsAppSummary(date: string, orders: Order[], marketingSpend: SpendRecord[]): string {
-    const platformNewTotals: { [key: string]: number } = {};
-    const platformRepeatTotals: { [key: string]: number } = {};
+/** Product tab on the Shopify orders page — drives the WhatsApp summary title (e.g. Milk vs Ghee). */
+export type WhatsAppSummaryCategoryTab = 'all' | 'milk' | 'ghee' | 'oils';
 
-    orders.forEach((order) => {
-        const platform = order.platform || 'Unknown';
-        if (order.type === 'New') {
-            platformNewTotals[platform] = (platformNewTotals[platform] || 0) + order.amount;
-        }
-        if (order.type === 'Repeat') {
-            platformRepeatTotals[platform] = (platformRepeatTotals[platform] || 0) + order.amount;
-        }
-    });
+function whatsAppSummaryTitlePrefix(tab: WhatsAppSummaryCategoryTab): string {
+    switch (tab) {
+        case 'milk':
+            return 'Milk Summary';
+        case 'oils':
+            return 'Oils Summary';
+        case 'all':
+            return 'Summary';
+        case 'ghee':
+        default:
+            return 'Ghee Summary';
+    }
+}
 
+/**
+ * WhatsApp prefill text for a single calendar day (`date` is the table group label, e.g. `02-May-2026`).
+ * Total revenue, order count, and ROAS use Shopify-platform orders only; spend matches marketing records for that day.
+ */
+export function generateWhatsAppSummary(
+    date: string,
+    orders: Order[],
+    marketingSpend: SpendRecord[],
+    categoryTab: WhatsAppSummaryCategoryTab = 'ghee',
+): string {
     const dateParts = date.split('-');
     const months: { [key: string]: string } = {
         Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
         Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12',
     };
-    const dateStr = `${dateParts[2]}-${months[dateParts[1]]}-${dateParts[0]}`;
+    const ymd =
+        dateParts.length === 3 && months[dateParts[1]]
+            ? `${dateParts[2]}-${months[dateParts[1]]}-${dateParts[0]}`
+            : '';
 
-    const metaSpendForDate = marketingSpend
-        .filter((spend) => {
-            const spendDate = spend.date.split('T')[0];
-            return spendDate === dateStr;
-        })
-        .reduce((sum, spend) => sum + spend.amount, 0);
+    const totalSpend =
+        ymd === ''
+            ? 0
+            : marketingSpend
+                  .filter((spend) => spend.date.split('T')[0] === ymd)
+                  .reduce((sum, spend) => sum + spend.amount, 0);
 
-    let message = `📊 *Daily Sales Summary*\n\n`;
-    message += `📅 *Date:* ${date}\n\n`;
+    const shopifyOrders = orders.filter((o) => (o.platform || '').toLowerCase() === 'shopify');
+    const totalRevenue = shopifyOrders.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
+    const orderCount = shopifyOrders.length;
 
-    if (Object.keys(platformNewTotals).length > 0) {
-        message += `*Platform-wise (New Orders Only):*\n`;
-        Object.entries(platformNewTotals)
-            .sort((a, b) => b[1] - a[1])
-            .forEach(([platform, total]) => {
-                message += `• ${platform}: ${formatCurrency(total)}\n`;
-            });
-        message += `\n`;
-    }
+    const roas =
+        totalSpend > 0 ? (totalRevenue / totalSpend).toFixed(2) : '—';
 
-    if (Object.keys(platformRepeatTotals).length > 0) {
-        message += `*Platform-wise (Repeat Orders Only):*\n`;
-        Object.entries(platformRepeatTotals)
-            .sort((a, b) => b[1] - a[1])
-            .forEach(([platform, total]) => {
-                message += `• ${platform}: ${formatCurrency(total)}\n`;
-            });
-        message += `\n`;
-    }
-
-    const grandTotal = orders.reduce((sum, o) => sum + o.amount, 0);
-    message += `💰 *Grand Total:* ${formatCurrency(grandTotal)}\n\n`;
-    message += `📊 *Meta Spend:* ${formatCurrency(metaSpendForDate)}`;
-
-    return message;
+    return [
+        `*${whatsAppSummaryTitlePrefix(categoryTab)} ${date}*`,
+        '',
+        `Total Spend: ${formatCurrency(totalSpend)}`,
+        `Total Revenue: ${formatCurrency(totalRevenue)}`,
+        `Order Count: ${orderCount}`,
+        `ROAS: ${roas}`,
+    ].join('\n');
 }
 
 export function FilterButton({

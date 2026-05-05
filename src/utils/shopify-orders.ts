@@ -138,15 +138,42 @@ function normalizeOrder(raw: unknown): ShopifyOrderApi | null {
             ''
     ).trim();
     const trackingUrl = buildDefaultTrackingUrlFromCourier(trackingNumber, trackingCompany);
-    const shippingDetails =
-        trackingNumber || trackingStatus || trackingUrl || trackingCompany
-            ? {
-                  trackingNumber,
-                  trackingStatus,
-                  trackingUrl,
-                  trackingCompany,
-              }
-            : undefined;
+    const strShipField = (k: string, snake?: string): string | undefined => {
+        const v = shippingDetailsRaw?.[k] ?? (snake ? shippingDetailsRaw?.[snake] : undefined);
+        return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+    };
+    const rootLoose = o as unknown as Record<string, unknown>;
+    const pickedUpDateRaw =
+        strShipField('pickedUpDate', 'picked_up_date') ??
+        strShipField('pickupDate', 'pickup_date') ??
+        readLooseString(rootLoose, 'pickedUpDate', 'picked_up_date') ??
+        readLooseString(rootLoose, 'pickupDate', 'pickup_date');
+    const deliveredAtRaw =
+        strShipField('deliveredAt', 'delivered_at') ?? readLooseString(rootLoose, 'deliveredAt', 'delivered_at');
+    const returnedAtRaw =
+        strShipField('returnedAt', 'returned_at') ?? readLooseString(rootLoose, 'returnedAt', 'returned_at');
+    const pickedUpDate = pickedUpDateRaw ? apiDateStringToLocalYmd(pickedUpDateRaw) : undefined;
+    const deliveredAt = deliveredAtRaw ? apiDateStringToLocalYmd(deliveredAtRaw) : undefined;
+    const returnedAt = returnedAtRaw ? apiDateStringToLocalYmd(returnedAtRaw) : undefined;
+    const hasShipping =
+        trackingNumber ||
+        trackingStatus ||
+        trackingUrl ||
+        trackingCompany ||
+        pickedUpDate ||
+        deliveredAt ||
+        returnedAt;
+    const shippingDetails = hasShipping
+        ? {
+              trackingNumber,
+              trackingStatus,
+              trackingUrl,
+              trackingCompany,
+              ...(pickedUpDate ? { pickedUpDate } : {}),
+              ...(deliveredAt ? { deliveredAt } : {}),
+              ...(returnedAt ? { returnedAt } : {}),
+          }
+        : undefined;
     return {
         _id,
         shopifyOrderId: o.shopifyOrderId as string | undefined,
@@ -281,6 +308,7 @@ export function orderDetailToOrder(o: ShopifyOrderApi): Order {
             ) || undefined,
         shippingTrackingCompany: o.shippingDetails?.trackingCompany,
         is_shipped: Boolean(o.is_shipped),
+        ...shippingTimestampsFromApi(o),
     };
 }
 
@@ -467,6 +495,54 @@ function toBackendPaymentMode(p: PaymentStatus): string {
     return 'COD';
 }
 
+/** Local calendar date as YYYY-MM-DD from an API ISO or date string (date-only in UI). */
+function apiDateStringToLocalYmd(input?: string): string | undefined {
+    if (!input || typeof input !== 'string' || !input.trim()) return undefined;
+    const t = input.trim();
+    const d = new Date(t);
+    if (Number.isNaN(d.getTime())) {
+        const m = t.match(/^(\d{4}-\d{2}-\d{2})/);
+        return m ? m[1] : undefined;
+    }
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${day}`;
+}
+
+function readLooseString(obj: Record<string, unknown> | null | undefined, camel: string, snake: string): string | undefined {
+    if (!obj) return undefined;
+    const v = obj[camel] ?? obj[snake];
+    return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+}
+
+function shippingTimestampsFromApi(o: ShopifyOrderApi): {
+    pickedUpDate?: string;
+    deliveredAt?: string;
+    returnedAt?: string;
+} {
+    const r =
+        o.shippingDetails && typeof o.shippingDetails === 'object'
+            ? (o.shippingDetails as Record<string, unknown>)
+            : null;
+    const root = o as unknown as Record<string, unknown>;
+    const rawPickedUp =
+        readLooseString(r, 'pickedUpDate', 'picked_up_date') ??
+        readLooseString(r, 'pickupDate', 'pickup_date') ??
+        readLooseString(root, 'pickedUpDate', 'picked_up_date') ??
+        readLooseString(root, 'pickupDate', 'pickup_date');
+    const rawDel =
+        readLooseString(r, 'deliveredAt', 'delivered_at') ?? readLooseString(root, 'deliveredAt', 'delivered_at');
+    const rawRet =
+        readLooseString(r, 'returnedAt', 'returned_at') ?? readLooseString(root, 'returnedAt', 'returned_at');
+    const ymd = (raw: string | undefined) => (raw ? apiDateStringToLocalYmd(raw) : undefined);
+    return {
+        pickedUpDate: ymd(rawPickedUp),
+        deliveredAt: ymd(rawDel),
+        returnedAt: ymd(rawRet),
+    };
+}
+
 export function buildShopifyOrderPayloadFromForm(
     base: ShopifyOrderApi,
     form: Order,
@@ -566,6 +642,10 @@ export function buildShopifyOrderPayloadFromForm(
         form.fulfillmentStatus ?? mapFulfillmentStatus(String(base.fulfillmentStatus ?? '')),
     );
 
+    const pickedUpDateYmd = form.pickedUpDate?.trim() ? form.pickedUpDate.trim().split('T')[0] : '';
+    const deliveredAtYmd = form.deliveredAt?.trim() ? form.deliveredAt.trim().split('T')[0] : '';
+    const returnedAtYmd = form.returnedAt?.trim() ? form.returnedAt.trim().split('T')[0] : '';
+
     return {
         ...base,
         customer: customerId || base.customer,
@@ -591,11 +671,17 @@ export function buildShopifyOrderPayloadFromForm(
         totalAmount: form.amount,
         notes: form.notes ?? base.notes,
         returnStatus: isRto,
+        pickedUpDate: pickedUpDateYmd,
+        deliveredAt: deliveredAtYmd,
+        returnedAt: returnedAtYmd,
         shippingDetails: {
             trackingNumber: awb,
             trackingStatus: trackingStatusForApi,
             trackingUrl,
             trackingCompany,
+            pickedUpDate: pickedUpDateYmd,
+            deliveredAt: deliveredAtYmd,
+            returnedAt: returnedAtYmd,
         },
     };
 }
@@ -675,5 +761,6 @@ export function shopifyOrderToOrder(o: ShopifyOrderApi): Order {
             ) || undefined,
         shippingTrackingCompany: o.shippingDetails?.trackingCompany,
         is_shipped: Boolean(o.is_shipped),
+        ...shippingTimestampsFromApi(o),
     };
 }

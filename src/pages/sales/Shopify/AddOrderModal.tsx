@@ -18,9 +18,6 @@ import {
     type DeliveryStatus,
     type Platform,
     type OrderType,
-    DELIVERY_STATUSES,
-    deliveryStatusLabel,
-    normalizeDeliveryStatus,
 } from '../../../utils/orders';
 import type { CustomerSearchResult } from '../../../types/shopify';
 import { searchCustomersByPhone } from '../../../utils/customers';
@@ -43,6 +40,18 @@ import { apiFetch } from '../../../api';
 import './Shopify.scss';
 
 const DEBOUNCE_MS = 350;
+
+/** Map API ISO / date string to YYYY-MM-DD for `DatePicker` (local calendar date). */
+function orderDateFieldToYmd(v?: string): string {
+    if (!v?.trim()) return '';
+    const t = v.trim();
+    const d = new Date(t);
+    if (Number.isNaN(d.getTime())) {
+        const m = t.match(/^(\d{4}-\d{2}-\d{2})/);
+        return m ? m[1] : '';
+    }
+    return toInputDate(d);
+}
 
 function ModalFieldSvg({ children }: { children: ReactNode }) {
     return (
@@ -1048,24 +1057,28 @@ function AddOrderModal({
     useEffect(() => {
         setIsShipped(initialOrder?.is_shipped ?? false);
     }, [initialOrder?.id]);
-    const [tracking, setTracking] = useState<{
-        awb: string;
-        statusText?: string;
-        statusLocation?: string;
-        statusDateTime?: string;
-        expectedDeliveryDate?: string;
-        pickupDate?: string;
-        origin?: string;
-        destination?: string;
-        scans: Array<{
-            status: string;
-            instructions: string;
-            location: string;
-            dateTime: string;
-        }>;
-    } | null>(null);
-    const [trackingLoading, setTrackingLoading] = useState(false);
-    const [trackingError, setTrackingError] = useState<string | null>(null);
+
+    const [pickedUpDateInput, setPickedUpDateInput] = useState(() =>
+        orderDateFieldToYmd(initialOrder?.pickedUpDate),
+    );
+    const [deliveredAtInput, setDeliveredAtInput] = useState(() =>
+        orderDateFieldToYmd(initialOrder?.deliveredAt),
+    );
+    const [returnedAtInput, setReturnedAtInput] = useState(() =>
+        orderDateFieldToYmd(initialOrder?.returnedAt),
+    );
+
+    useEffect(() => {
+        setPickedUpDateInput(orderDateFieldToYmd(initialOrder?.pickedUpDate));
+        setDeliveredAtInput(orderDateFieldToYmd(initialOrder?.deliveredAt));
+        setReturnedAtInput(orderDateFieldToYmd(initialOrder?.returnedAt));
+    }, [
+        initialOrder?.id,
+        initialOrder?.pickedUpDate,
+        initialOrder?.deliveredAt,
+        initialOrder?.returnedAt,
+    ]);
+
     const [delhiveryWaybillLoading, setDelhiveryWaybillLoading] = useState(false);
     const [delhiveryWaybillError, setDelhiveryWaybillError] = useState<string | null>(null);
 
@@ -1112,88 +1125,6 @@ function AddOrderModal({
         const total = itemsTotal + codChargesAmount - discountAmount;
         setAmount(String(total));
     }, [items, codCharges, discount]);
-
-    useEffect(() => {
-        const trimmed = awb.trim();
-        if (!trimmed) {
-            setTracking(null);
-            setTrackingError(null);
-            return;
-        }
-
-        let cancelled = false;
-        setTrackingLoading(true);
-        setTrackingError(null);
-
-        apiFetch(`/api/delhivery-track?awb=${encodeURIComponent(trimmed)}`)
-            .then(async (res) => {
-                if (!res.ok) {
-                    const text = await res.text();
-                    throw new Error(text || `Request failed with ${res.status}`);
-                }
-                return res.json();
-            })
-            .then((data) => {
-                if (cancelled) return;
-                const shipment = data?.ShipmentData?.[0]?.Shipment;
-                if (!shipment) {
-                    setTracking(null);
-                    setTrackingError('No tracking information found for this AWB.');
-                    return;
-                }
-
-                const status = shipment.Status || {};
-                const scans = Array.isArray(shipment.Scans)
-                    ? shipment.Scans.map((s: any) => s.ScanDetail).filter(Boolean)
-                    : [];
-
-                const mappedScans =
-                    scans
-                        .map((scan: any) => ({
-                            status: scan.Scan || '',
-                            instructions: scan.Instructions || '',
-                            location: scan.ScannedLocation || '',
-                            dateTime: scan.ScanDateTime || '',
-                        }))
-                        .sort(
-                            (a: any, b: any) =>
-                                new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
-                        ) ?? [];
-
-                setTracking({
-                    awb: shipment.AWB,
-                    statusText: status.Status || '',
-                    statusLocation: status.StatusLocation || '',
-                    statusDateTime: status.StatusDateTime || '',
-                    expectedDeliveryDate:
-                        shipment.ExpectedDeliveryDate ||
-                        shipment.PromisedDeliveryDate ||
-                        null,
-                    pickupDate: shipment.PickUpDate || shipment.PickedupDate || null,
-                    origin: shipment.Origin || shipment.PickupLocation || '',
-                    destination:
-                        shipment.Destination ||
-                        (shipment.Consignee && shipment.Consignee.City) ||
-                        '',
-                    scans: mappedScans,
-                });
-            })
-            .catch((err) => {
-                if (cancelled) return;
-                console.error('Failed to load Delhivery tracking', err);
-                setTracking(null);
-                setTrackingError('Failed to load tracking details. Please try again.');
-            })
-            .finally(() => {
-                if (!cancelled) {
-                    setTrackingLoading(false);
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [awb]);
 
     const generateDelhiveryWaybill = useCallback(async () => {
         if (delhiveryWaybillLoading) return;
@@ -1363,6 +1294,9 @@ function AddOrderModal({
             platform: platform as Platform,
             type: (type || initialOrder?.type || 'New') as OrderType,
             is_shipped: isShipped,
+            pickedUpDate: pickedUpDateInput.trim() || undefined,
+            deliveredAt: deliveredAtInput.trim() || undefined,
+            returnedAt: returnedAtInput.trim() || undefined,
         };
         try {
             setSaving(true);
@@ -1763,19 +1697,34 @@ function AddOrderModal({
                                     </div>
 
                                     <div className="shopify-add-modal-timeline-block">
-                                        <div className="shopify-add-modal-timeline-block__label">
-                                            Shipping timeline
+                                        <div className="shopify-add-modal-shipping-dates">
+                                            <label className="label shopify-add-modal-tracking-label">
+                                                Pickup date
+                                            </label>
+                                            <DatePicker
+                                                value={pickedUpDateInput}
+                                                onChange={setPickedUpDateInput}
+                                                placeholder="Select pickup date"
+                                            />
+                                            <label className="label shopify-add-modal-tracking-label">
+                                                Delivered on
+                                            </label>
+                                            <DatePicker
+                                                value={deliveredAtInput}
+                                                onChange={setDeliveredAtInput}
+                                                placeholder="Select date"
+                                                disabled
+                                            />
+                                            <label className="label shopify-add-modal-tracking-label">
+                                                Returned on
+                                            </label>
+                                            <DatePicker
+                                                value={returnedAtInput}
+                                                onChange={setReturnedAtInput}
+                                                placeholder="Select date"
+                                                disabled
+                                            />
                                         </div>
-                                        <ShippingTimeline
-                                            status={delivery}
-                                            awb={awb}
-                                            tracking={tracking}
-                                            loading={trackingLoading}
-                                            error={trackingError}
-                                            trackingCompany={
-                                                shippingTrackingCompanyInput || undefined
-                                            }
-                                        />
                                         <div className="shopify-delhivery-waybill-actions">
                                             <button
                                                 type="button"
@@ -1867,217 +1816,6 @@ function AddOrderModal({
                     </div>
                 </form>
             </div>
-        </div>
-    );
-}
-
-function ShippingTimeline({
-    status,
-    awb,
-    tracking,
-    loading,
-    error,
-    trackingCompany,
-}: {
-    status: DeliveryStatus;
-    awb: string;
-    tracking: {
-        awb: string;
-        statusText?: string;
-        statusLocation?: string;
-        statusDateTime?: string;
-        expectedDeliveryDate?: string;
-        pickupDate?: string;
-        origin?: string;
-        destination?: string;
-        scans: Array<{
-            status: string;
-            instructions: string;
-            location: string;
-            dateTime: string;
-        }>;
-    } | null;
-    loading: boolean;
-    error: string | null;
-    trackingCompany?: string;
-}) {
-    const steps: DeliveryStatus[] = [...DELIVERY_STATUSES];
-    const [blinkOn, setBlinkOn] = useState(true);
-
-    useEffect(() => {
-        const id = setInterval(() => {
-            setBlinkOn((v) => !v);
-        }, 800);
-        return () => clearInterval(id);
-    }, []);
-
-    function formatShortDate(input?: string) {
-        if (!input) return '';
-        const d = new Date(input);
-        if (Number.isNaN(d.getTime())) return input;
-        return d.toLocaleString('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    }
-
-    const currentStepIndex = steps.indexOf(status);
-    const safeCurrentStep = currentStepIndex === -1 ? 0 : currentStepIndex;
-
-    const scans = tracking?.scans ?? [];
-    const sortedScans = [...scans].sort(
-        (a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
-    );
-
-    const hasAwb = awb.trim().length > 0;
-
-    if (!hasAwb) {
-        return (
-            <div className="shopify-timeline-empty">
-                <span className="shopify-timeline-empty-icon">📦</span>
-                Enter an AWB number above to view live Delhivery tracking.
-            </div>
-        );
-    }
-
-    const hasTrackingInfo =
-        !!tracking &&
-        (sortedScans.length > 0 || tracking.statusText || tracking.statusLocation);
-
-    if (!hasTrackingInfo && !loading && !error) {
-        return (
-            <div className="shopify-timeline-empty">
-                <span className="shopify-timeline-empty-icon">🔍</span>
-                No tracking information found for this AWB yet.
-            </div>
-        );
-    }
-
-    return (
-        <div className="shopify-timeline-card">
-            <div
-                className={`shopify-timeline-header${
-                    normalizeDeliveryStatus(tracking?.statusText) === 'delivered'
-                        ? ' shopify-timeline-header--delivered'
-                        : ''
-                }`}
-            >
-                <div className="shopify-timeline-header-row">
-                    <div className="shopify-timeline-awb-wrap">
-                        <div className="shopify-timeline-awb-label">AWB</div>
-                        <div className="shopify-timeline-awb-value">{awb || 'Not assigned'}</div>
-                    </div>
-                    <div className="shopify-timeline-badge">
-                        <span>🚚</span>
-                        <span>{trackingCompany || 'Delhivery'}</span>
-                    </div>
-                </div>
-
-                {tracking && (
-                    <div className="shopify-timeline-dates">
-                        <div>
-                            <div className="shopify-timeline-date-label">Pickup</div>
-                            <div className="shopify-timeline-date-value">{formatShortDate(tracking.pickupDate) || '—'}</div>
-                        </div>
-                        <div>
-                            <div className="shopify-timeline-date-label">Expected Delivery</div>
-                            <div className="shopify-timeline-date-value">{formatShortDate(tracking.expectedDeliveryDate) || '—'}</div>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {hasTrackingInfo && (
-                <div className="shopify-timeline-steps">
-                    {steps.map((step, index) => {
-                        const isActive = index === safeCurrentStep;
-                        const isPast = index < safeCurrentStep;
-
-                        let activeColor = '#0f172a';
-                        let glowColor = 'rgba(15,23,42,0.15)';
-                        if (step === 'in_transit') {
-                            activeColor = '#2563eb';
-                            glowColor = 'rgba(37,99,235,0.20)';
-                        } else if (step === 'delivered') {
-                            activeColor = '#2563eb';
-                            glowColor = 'rgba(22,163,74,0.20)';
-                        } else if (step === 'rto') {
-                            activeColor = '#b91c1c';
-                            glowColor = 'rgba(185,28,28,0.25)';
-                        }
-
-                        return (
-                            <div key={step} className="shopify-timeline-step">
-                                <div
-                                    className="shopify-timeline-step-dot"
-                                    style={{
-                                        borderColor: isActive ? activeColor : isPast ? '#4b5563' : '#d1d5db',
-                                        background: isActive ? activeColor : isPast ? '#4b5563' : '#f9fafb',
-                                        opacity: isActive ? (blinkOn ? 1 : 0.25) : 1,
-                                        boxShadow: isActive && blinkOn ? `0 0 0 4px ${glowColor}` : 'none',
-                                    }}
-                                />
-                                <div
-                                    className="shopify-timeline-step-label"
-                                    style={{
-                                        fontWeight: isActive ? 700 : isPast ? 600 : 500,
-                                        color: isActive ? activeColor : isPast ? '#4b5563' : '#9ca3af',
-                                    }}
-                                >
-                                    {deliveryStatusLabel(step)}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-
-            <div className="shopify-timeline-footer">
-                {loading && <div className="tracking-loading">Loading live tracking…</div>}
-                {!loading && error && <div className="tracking-error">{error}</div>}
-            </div>
-
-            {tracking && sortedScans.length > 0 && (
-                <div className="tracking-scans">
-                    <div className="tracking-scans-title">Latest updates</div>
-                    <div className="tracking-scans-list">
-                        {[...sortedScans].reverse().map((scan, idx) => {
-                            const d = scan.dateTime ? new Date(scan.dateTime) : null;
-                            const ts = d
-                                ? d.toLocaleString('en-IN', {
-                                      day: '2-digit',
-                                      month: 'short',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                  })
-                                : scan.dateTime;
-                            return (
-                                <div
-                                    key={`${scan.status}-${scan.dateTime}-${idx}`}
-                                    className="tracking-scan-item"
-                                >
-                                    <div className="tracking-scan-header">
-                                        <div className="tracking-scan-status">{scan.status}</div>
-                                        {ts && <span className="tracking-scan-ts">{ts}</span>}
-                                    </div>
-                                    {scan.instructions && (
-                                        <div className="tracking-scan-instructions">
-                                            {scan.instructions}
-                                        </div>
-                                    )}
-                                    {scan.location && (
-                                        <div className="tracking-scan-location">
-                                            📍 {scan.location}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

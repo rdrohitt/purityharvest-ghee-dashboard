@@ -557,6 +557,43 @@
   gap: 28px;
 }
 
+.dashboard-order-reporting-chart__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dashboard-order-reporting-chart__kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dashboard-order-reporting-chart__kpi {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, var(--primary) 10%);
+  background: color-mix(in srgb, var(--bg) 88%, var(--primary-weak));
+}
+
+.dashboard-order-reporting-chart__kpi em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dashboard-order-reporting-chart__kpi strong {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+
 .dashboard-order-reporting-chart__scroll {
   width: 100%;
   max-width: 100%;
@@ -636,6 +673,82 @@
   border-radius: 12px;
   border: 1px dashed var(--border);
   background: color-mix(in srgb, var(--bg) 96%, var(--primary-weak));
+}
+
+.dashboard-potential-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-potential-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.dashboard-potential-table {
+  min-width: 920px;
+}
+
+.dashboard-potential-table th:nth-child(2),
+.dashboard-potential-table th:nth-child(3),
+.dashboard-potential-table th:nth-child(4),
+.dashboard-potential-table td:nth-child(2),
+.dashboard-potential-table td:nth-child(3),
+.dashboard-potential-table td:nth-child(4) {
+  text-align: left;
+}
+
+.dashboard-potential-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 12px;
+}
+
+.dashboard-potential-card__title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--text);
+}
+
+.dashboard-potential-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-potential-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px dashed color-mix(in srgb, var(--border) 86%, transparent);
+}
+
+.dashboard-potential-list li:last-child {
+  border-bottom: none;
+}
+
+.dashboard-potential-list span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dashboard-potential-list strong {
+  font-size: 12px;
+  color: var(--text);
+  text-align: right;
+}
+
+.dashboard-potential-strategy {
+  margin-top: 12px;
 }
 
 .dashboard-skeleton {

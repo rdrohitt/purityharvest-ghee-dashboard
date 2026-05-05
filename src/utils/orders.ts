@@ -72,6 +72,12 @@ export type Order = {
      */
     shippingTrackingUrl?: string;
     shippingTrackingCompany?: string;
+    /** Local calendar date YYYY-MM-DD; API `pickedUpDate` (shown DD-MMM-YYYY in UI). */
+    pickedUpDate?: string;
+    /** Local calendar date YYYY-MM-DD; API `deliveredAt`. */
+    deliveredAt?: string;
+    /** Local calendar date YYYY-MM-DD; API `returnedAt`. */
+    returnedAt?: string;
 };
 
 /**

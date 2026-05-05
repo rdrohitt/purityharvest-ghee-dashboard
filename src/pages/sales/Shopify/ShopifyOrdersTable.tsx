@@ -15,7 +15,16 @@ import {
     buildDefaultTrackingUrlFromCourier,
 } from '../../../utils/shopify-orders';
 import { Spinner } from '../../../components/Spinner';
-import { formatCurrency, generateWhatsAppSummary, Th, Td, StatusTag, PlatformTag, TypeTag } from './ShopifyShared';
+import {
+    formatCurrency,
+    generateWhatsAppSummary,
+    type WhatsAppSummaryCategoryTab,
+    Th,
+    Td,
+    StatusTag,
+    PlatformTag,
+    TypeTag,
+} from './ShopifyShared';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -226,6 +235,17 @@ function formatInvoiceDate(iso?: string): string {
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+    });
+}
+
+function formatOrderTimelineDate(iso?: string): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
     });
 }
 
@@ -485,6 +505,7 @@ export function ShopifyOrdersTable({
     loading,
     loadingMessage = 'Loading Orders',
     orderCount,
+    summaryCategoryTab = 'ghee',
     onCustomerClick,
     onEdit,
     onDelete,
@@ -495,6 +516,8 @@ export function ShopifyOrdersTable({
     /** Shown under the spinner when `loading` (e.g. phone search vs initial load). */
     loadingMessage?: string;
     orderCount: number;
+    /** Matches header product tab — WhatsApp day summary title uses Milk vs Ghee vs Oils. */
+    summaryCategoryTab?: WhatsAppSummaryCategoryTab;
     onCustomerClick: (customerId: string, phone: string) => void;
     onEdit: (order: Order) => void;
     onDelete: (order: Order) => void;
@@ -597,7 +620,7 @@ export function ShopifyOrdersTable({
                 <div className="table-scroll-wrapper">
                     <table className="orders-table shopify-orders-table">
                         <colgroup>
-                            <col /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col />
+                            <col /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col />
                         </colgroup>
                         <thead>
                             <tr className="shopify-orders-header-row">
@@ -611,13 +634,16 @@ export function ShopifyOrdersTable({
                                 <Th>Shipped</Th>
                                 <Th>Type</Th>
                                 <Th>Updated by</Th>
+                                <Th>Pickup Date</Th>
+                                <Th>Delivered On</Th>
+                                <Th>Returned On</Th>
                                 <Th>Actions</Th>
                             </tr>
                         </thead>
                         <tbody>
                             {displayGroups.length === 0 ? (
                                 <tr>
-                                    <td colSpan={11} className="shopify-orders-empty-cell shopify-orders-empty-cell--panel">
+                                    <td colSpan={14} className="shopify-orders-empty-cell shopify-orders-empty-cell--panel">
                                         <div className="shopify-orders-empty-panel">
                                             <div className="shopify-orders-empty-panel__icon-wrap">
                                                 <ShopifyOrdersEmptyIcon />
@@ -643,7 +669,14 @@ export function ShopifyOrdersTable({
                                                         <div className="shopify-orders-date-header">
                                                             {group.items.length > 0 && (
                                                                 <a
-                                                                    href={`https://wa.me/918685045943?text=${encodeURIComponent(generateWhatsAppSummary(group.label, group.items.map(shopifyOrderToOrder), marketingSpend))}`}
+                                                                    href={`https://wa.me/918685045943?text=${encodeURIComponent(
+                                                                        generateWhatsAppSummary(
+                                                                            group.label,
+                                                                            group.items.map(shopifyOrderToOrder),
+                                                                            marketingSpend,
+                                                                            summaryCategoryTab,
+                                                                        ),
+                                                                    )}`}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
                                                                     className="shopify-whatsapp-summary-link"
@@ -871,6 +904,21 @@ export function ShopifyOrdersTable({
                                                     'name' in o.updatedBy
                                                         ? (o.updatedBy as { name?: string }).name || 'Shopify'
                                                         : 'Shopify'}
+                                                </span>
+                                            </Td>
+                                            <Td>
+                                                <span className="shopify-order-timeline-date shopify-order-timeline-date--pickup">
+                                                    {formatOrderTimelineDate(o.shippingDetails?.pickedUpDate || o.pickedUpDate)}
+                                                </span>
+                                            </Td>
+                                            <Td>
+                                                <span className="shopify-order-timeline-date shopify-order-timeline-date--delivered">
+                                                    {formatOrderTimelineDate(o.shippingDetails?.deliveredAt || o.deliveredAt)}
+                                                </span>
+                                            </Td>
+                                            <Td>
+                                                <span className="shopify-order-timeline-date shopify-order-timeline-date--returned">
+                                                    {formatOrderTimelineDate(o.shippingDetails?.returnedAt || o.returnedAt)}
                                                 </span>
                                             </Td>
                                             <Td>

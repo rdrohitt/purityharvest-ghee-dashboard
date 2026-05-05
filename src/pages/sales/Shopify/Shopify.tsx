@@ -49,7 +49,7 @@ import AddOrderModal, { type ProductVariantOption, formatVariantLabel } from './
 import { CustomerProfileModal } from './CustomerProfileModal';
 import { DatePicker } from './DatePicker';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
-import { formatCurrency, formatDate, FilterButton, generateWhatsAppSummary, StatusFilter, toInputDate } from './ShopifyShared';
+import { formatCurrency, formatDate, FilterButton, StatusFilter, toInputDate } from './ShopifyShared';
 import { Spinner } from '../../../components/Spinner';
 import { ShopifyOrdersTable } from './ShopifyOrdersTable';
 import { ToastContainer, type Toast } from './ToastContainer';
@@ -59,6 +59,22 @@ const MIN_PHONE_SEARCH_DIGITS = 10;
 
 function digitsOnly(s: string): string {
     return s.replace(/\D/g, '');
+}
+
+function lineLitersFromVariant(variantName: string, quantity: number): number {
+    const sizeMatch = (variantName || '').match(/-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|l)\b/i);
+    if (!sizeMatch) return 0;
+    const sizeValue = parseFloat(sizeMatch[1]);
+    const unit = sizeMatch[2].toLowerCase();
+    const litersPerUnit = unit === 'ml' ? sizeValue / 1000 : sizeValue;
+    return litersPerUnit * (Number(quantity) || 0);
+}
+
+function orderLiters(order: ShopifyOrderApi): number {
+    return (order.products || []).reduce(
+        (sum, p) => sum + lineLitersFromVariant(String(p.variantName || ''), Number(p.quantity) || 0),
+        0,
+    );
 }
 
 function toBackendTrackingStatus(status: DeliveryStatus | ''): string | undefined {
@@ -106,6 +122,19 @@ function resolveOrderLineCategoryNorm(
         if (fromMap) return fromMap;
     }
     return '';
+}
+
+/** Normalized product name per line (supports populated productId.name and variantName fallback). */
+function resolveOrderLineNameNorm(line: ShopifyOrderProduct): string {
+    const raw = line.productId;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'name' in raw) {
+        const n = String((raw as { name?: unknown }).name ?? '').trim().toLowerCase();
+        if (n) return n;
+    }
+    const variantName = String(line.variantName ?? '').trim().toLowerCase();
+    if (!variantName) return '';
+    // Variant labels are often "Milk - 1 Ltr"; match base product token first.
+    return variantName.split('-')[0].trim();
 }
 
 type ShopifyProps = {
@@ -392,6 +421,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     ]);
 
     /** GET /api/orders with date range + pagination + selected dropdown filters. */
+    const shippedQueryParam = categoryTab === 'milk' ? undefined : shippedTab === 'shipped';
     const ordersListQuery = useMemo(
         () => ({
             from: dateRangeForApi.from,
@@ -402,7 +432,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             platform: platformFilter ? String(platformFilter).toLowerCase() : undefined,
             paymentMode: paymentStatusFilter || undefined,
             trackingStatus: toBackendTrackingStatus(deliveryStatusFilter),
-            shipped: shippedTab === 'shipped' ? true : false,
+            shipped: shippedQueryParam,
         }),
         [
             dateRangeForApi.from,
@@ -413,7 +443,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             platformFilter,
             paymentStatusFilter,
             deliveryStatusFilter,
-            shippedTab,
+            shippedQueryParam,
         ],
     );
 
@@ -427,6 +457,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         paymentStatusFilter,
         deliveryStatusFilter,
         shippedTab,
+        categoryTab,
     ]);
 
     const loadOrdersPage = async (query = ordersListQuery) => {
@@ -628,7 +659,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             const matchesType = !typeFilter || mapOrderType(o.type) === typeFilter;
             const matchesState = !stateFilter || o.state === stateFilter;
             const matchesShipped =
-                shippedTab === 'shipped' ? o.is_shipped === true : o.is_shipped === false;
+                categoryTab === 'milk'
+                    ? true
+                    : shippedTab === 'shipped'
+                    ? o.is_shipped === true
+                    : o.is_shipped !== true;
             const matchesCategory = (() => {
                 if (categoryTab === 'all') return true;
                 const lines = o.products || [];
@@ -636,10 +671,10 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
                 for (const line of lines) {
                     const catNorm = resolveOrderLineCategoryNorm(line, productCategoryMap, catalogLoaded);
-                    if (!catNorm) continue;
-                    if (categoryTab === 'milk' && catNorm === 'milk') return true;
-                    if (categoryTab === 'ghee' && catNorm === 'ghee') return true;
-                    if (categoryTab === 'oils' && catNorm.includes('oil')) return true;
+                    const nameNorm = resolveOrderLineNameNorm(line);
+                    if (categoryTab === 'milk' && (catNorm === 'milk' || nameNorm === 'milk')) return true;
+                    if (categoryTab === 'ghee' && (catNorm === 'ghee' || nameNorm === 'ghee')) return true;
+                    if (categoryTab === 'oils' && (catNorm.includes('oil') || nameNorm.includes('oil'))) return true;
                 }
                 return false;
             })();
@@ -667,6 +702,23 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         categoryTab,
         productCategoryMap,
     ]);
+
+    const milkMetrics = useMemo(() => {
+        if (categoryTab !== 'milk') {
+            return { totalAmount: 0, totalLitres: 0, deliveredLitres: 0 };
+        }
+        let totalAmount = 0;
+        let totalLitres = 0;
+        let deliveredLitres = 0;
+        for (const o of filtered) {
+            const amount = Number(o.totalAmount) || 0;
+            const liters = orderLiters(o);
+            totalAmount += amount;
+            totalLitres += liters;
+            if (o.is_shipped === true) deliveredLitres += liters;
+        }
+        return { totalAmount, totalLitres, deliveredLitres };
+    }, [categoryTab, filtered]);
 
     useEffect(() => {
         function onDocClick(e: MouseEvent) {
@@ -793,7 +845,10 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         </FilterButton>
                         <FilterButton
                             active={categoryTab === 'milk'}
-                            onClick={() => setCategoryTab('milk')}
+                            onClick={() => {
+                                setCategoryTab('milk');
+                                setShippedTab('notShipped');
+                            }}
                         >
                             Milk
                         </FilterButton>
@@ -1076,6 +1131,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                         salesEbita={analyticsSalesEbita}
                                         loading={analyticsOverviewLoading}
                                         isMilkSelected={categoryTab === 'milk'}
+                                        milkTotalSales={milkMetrics.totalAmount}
                                         deliveredSalesAmount={analyticsShippingPipeline?.delivered.amount ?? 0}
                                         inTransitSalesAmount={analyticsShippingPipeline?.inTransit.amount ?? 0}
                                     />
@@ -1083,6 +1139,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                         volume={analyticsVolume}
                                         loading={analyticsOverviewLoading}
                                         isMilkSelected={categoryTab === 'milk'}
+                                        milkTotalLitres={milkMetrics.totalLitres}
+                                        milkDeliveredLitres={milkMetrics.deliveredLitres}
                                     />
                                     <ModernDeliveryStatusMetric
                                         pipeline={analyticsShippingPipeline}
@@ -1140,20 +1198,22 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 ) : null}
             </div>
 
-            <div className="shopify-category-tabs">
-                <FilterButton
-                    active={shippedTab === 'shipped'}
-                    onClick={() => setShippedTab('shipped')}
-                >
-                    Shipped
-                </FilterButton>
-                <FilterButton
-                    active={shippedTab === 'notShipped'}
-                    onClick={() => setShippedTab('notShipped')}
-                >
-                    Not Shipped
-                </FilterButton>
-            </div>
+            {categoryTab !== 'milk' ? (
+                <div className="shopify-category-tabs">
+                    <FilterButton
+                        active={shippedTab === 'shipped'}
+                        onClick={() => setShippedTab('shipped')}
+                    >
+                        Shipped
+                    </FilterButton>
+                    <FilterButton
+                        active={shippedTab === 'notShipped'}
+                        onClick={() => setShippedTab('notShipped')}
+                    >
+                        Not Shipped
+                    </FilterButton>
+                </div>
+            ) : null}
 
             <ShopifyOrdersTable
                 key={shopifyOrdersTableKey}
@@ -1161,6 +1221,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 marketingSpend={[]}
                 loading={false}
                 orderCount={filtered.length}
+                summaryCategoryTab={categoryTab}
                 onCustomerClick={(customerId, phone) => {
                     setCustomerProfileLoading(true);
                     setSelectedCustomerId(customerId);
@@ -1353,6 +1414,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
                                 const platformBackend = (o.platform ?? 'Shopify').toLowerCase();
 
+                                const toShipDateYmd = (s?: string) =>
+                                    typeof s === 'string' && s.trim() ? s.trim().split('T')[0] : '';
+                                const pickedUpDateYmd = toShipDateYmd(o.pickedUpDate);
+                                const deliveredAtYmd = toShipDateYmd(o.deliveredAt);
+                                const returnedAtYmd = toShipDateYmd(o.returnedAt);
+
                                 const payload = {
                                     customerData: {
                                         name: o.customer,
@@ -1367,6 +1434,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     platform: platformBackend,
                                     paymentMode: o.paymentStatus,
                                     fulfillmentStatus: fulfillmentStatusBackend,
+                                    pickedUpDate: pickedUpDateYmd,
+                                    deliveredAt: deliveredAtYmd,
+                                    returnedAt: returnedAtYmd,
                                     shippingDetails: {
                                         trackingNumber: o.awbNumber ?? '',
                                         trackingStatus: shippingStatusBackend ?? '',
@@ -1375,6 +1445,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                             o.shippingTrackingCompany ?? '',
                                         ),
                                         trackingCompany: o.shippingTrackingCompany ?? '',
+                                        pickedUpDate: pickedUpDateYmd,
+                                        deliveredAt: deliveredAtYmd,
+                                        returnedAt: returnedAtYmd,
                                     },
                                     totalAmount: o.amount,
                                     codCharges: o.codCharges ?? 0,
@@ -1656,12 +1729,14 @@ function ModernSalesWithEBITAMetric({
     salesEbita,
     loading,
     isMilkSelected,
+    milkTotalSales,
     deliveredSalesAmount,
     inTransitSalesAmount,
 }: {
     salesEbita: AnalyticsOverviewSalesEbita | null;
     loading: boolean;
     isMilkSelected: boolean;
+    milkTotalSales?: number;
     deliveredSalesAmount: number;
     inTransitSalesAmount: number;
 }) {
@@ -1675,7 +1750,7 @@ function ModernSalesWithEBITAMetric({
         },
     };
     const platform = costs.marketingSpendByPlatform;
-    const totalSales = Number(se.totalSales) || 0;
+    const totalSales = isMilkSelected ? Math.max(0, Number(milkTotalSales) || 0) : Number(se.totalSales) || 0;
     const spend = Math.max(0, Number(costs.marketingSpendTotal) || 0);
     const delivered = Math.max(0, Number(deliveredSalesAmount) || 0);
     const inTransit = Math.max(0, Number(inTransitSalesAmount) || 0);
@@ -1982,18 +2057,24 @@ function ModernQuantityMetric({
     volume,
     loading,
     isMilkSelected,
+    milkTotalLitres,
+    milkDeliveredLitres,
 }: {
     volume: AnalyticsOverviewVolume | null;
     loading: boolean;
     isMilkSelected: boolean;
+    milkTotalLitres?: number;
+    milkDeliveredLitres?: number;
 }) {
     const v = volume ?? EMPTY_VOLUME;
-    const totalLitres = Number(v.totalLitres) || 0;
+    const totalLitres = isMilkSelected ? Math.max(0, Number(milkTotalLitres) || 0) : Number(v.totalLitres) || 0;
     const lt = v.litresByType;
-    const totalDeliveredLitres = VOLUME_SIZE_ROW_DEFS.reduce((sum, row) => {
-        const b = bucketForVolumeRowKeys(v.quantityBySize, row.apiKeys);
-        return sum + b.delivered * row.litersPerUnit;
-    }, 0);
+    const totalDeliveredLitres = isMilkSelected
+        ? Math.max(0, Number(milkDeliveredLitres) || 0)
+        : VOLUME_SIZE_ROW_DEFS.reduce((sum, row) => {
+              const b = bucketForVolumeRowKeys(v.quantityBySize, row.apiKeys);
+              return sum + b.delivered * row.litersPerUnit;
+          }, 0);
     const hasAnySizeRow = VOLUME_SIZE_ROW_DEFS.some(
         (row) => bucketForVolumeRowKeys(v.quantityBySize, row.apiKeys).ordered > 0,
     );
@@ -2022,10 +2103,12 @@ function ModernQuantityMetric({
                     <p className="shopify-dash-card__figure shopify-dash-card__figure--qty">{formatLiters(totalLitres)}</p>
                     <p className="shopify-dash-card__caption">Total liters</p>
                 </div>
-                <div className="shopify-dash-card__pill shopify-dash-card__pill--ok">
-                    <span className="shopify-dash-card__pill-k">Delivered</span>
-                    <span className="shopify-dash-card__pill-v">{formatLiters(totalDeliveredLitres)}</span>
-                </div>
+                {!isMilkSelected ? (
+                    <div className="shopify-dash-card__pill shopify-dash-card__pill--ok">
+                        <span className="shopify-dash-card__pill-k">Delivered</span>
+                        <span className="shopify-dash-card__pill-v">{formatLiters(totalDeliveredLitres)}</span>
+                    </div>
+                ) : null}
             </div>
             <div className={isMilkSelected ? 'shopify-milk-blocked-area shopify-milk-blocked-area--active' : 'shopify-milk-blocked-area'}>
                 {isMilkSelected ? (

@@ -6,6 +6,9 @@ export interface ShopifyShippingDetails {
     trackingStatus?: string;
     trackingUrl?: string;
     trackingCompany?: string;
+    pickedUpDate?: string;
+    deliveredAt?: string;
+    returnedAt?: string;
 }
 
 /**
@@ -128,6 +131,10 @@ export interface ShopifyOrderApi {
     notes: string;
     updatedBy?: ShopifyOrderUserRef;
     shippingDetails?: ShopifyShippingDetails;
+    /** Some APIs expose these on the order root as well as under `shippingDetails`. */
+    pickedUpDate?: string;
+    deliveredAt?: string;
+    returnedAt?: string;
     createdAt?: string;
     updatedAt?: string;
     __v?: number;

@@ -6,11 +6,13 @@ export function DatePicker({
     onChange,
     required,
     placeholder,
+    disabled,
 }: {
     value: string;
     onChange: (value: string) => void;
     required?: boolean;
     placeholder?: string;
+    disabled?: boolean;
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(() => {
@@ -33,16 +35,22 @@ export function DatePicker({
         : '';
 
     useEffect(() => {
+        if (disabled) {
+            setIsOpen(false);
+        }
+    }, [disabled]);
+
+    useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
             if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
                 setIsOpen(false);
             }
         }
-        if (isOpen) {
+        if (isOpen && !disabled) {
             document.addEventListener('mousedown', handleClickOutside);
             return () => document.removeEventListener('mousedown', handleClickOutside);
         }
-    }, [isOpen]);
+    }, [isOpen, disabled]);
 
     useEffect(() => {
         if (isOpen && inputRef.current && popupRef.current) {
@@ -69,6 +77,7 @@ export function DatePicker({
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     function handleDateSelect(day: number) {
+        if (disabled) return;
         const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
         onChange(toInputDate(newDate));
         setIsOpen(false);
@@ -83,6 +92,7 @@ export function DatePicker({
     }
 
     function handleToday() {
+        if (disabled) return;
         const today = new Date();
         onChange(toInputDate(today));
         setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -90,11 +100,20 @@ export function DatePicker({
     }
 
     return (
-        <div ref={containerRef} className="shopify-dp-root">
+        <div ref={containerRef} className={`shopify-dp-root${disabled ? ' shopify-dp-root--disabled' : ''}`}>
             <div
                 ref={inputRef}
-                onClick={() => setIsOpen(!isOpen)}
-                className="input shopify-dp-trigger shopify-dp-trigger--with-prefix"
+                role="button"
+                tabIndex={disabled ? -1 : 0}
+                aria-disabled={disabled ? true : undefined}
+                onClick={() => {
+                    if (disabled) return;
+                    setIsOpen(!isOpen);
+                }}
+                className={
+                    'input shopify-dp-trigger shopify-dp-trigger--with-prefix' +
+                    (disabled ? ' shopify-dp-trigger--disabled' : '')
+                }
             >
                 <span className="shopify-dp-trigger__prefix" aria-hidden>
                     <svg
@@ -127,10 +146,11 @@ export function DatePicker({
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 required={required}
+                disabled={disabled}
                 className="shopify-dp-native"
                 tabIndex={-1}
             />
-            {isOpen && (
+            {isOpen && !disabled && (
                 <div ref={popupRef} className="shopify-dp-popup" onClick={(e) => e.stopPropagation()}>
                     <div className="shopify-dp-popup-header">
                         <button type="button" className="shopify-dp-month-nav-btn" onClick={handlePrevMonth} aria-label="Previous month">‹</button>
