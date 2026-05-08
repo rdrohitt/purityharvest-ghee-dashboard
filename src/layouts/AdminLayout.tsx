@@ -27,7 +27,8 @@ export default function AdminLayout() {
         if (
             location.pathname.startsWith('/admin/shopify') ||
             location.pathname.startsWith('/admin/amazon') ||
-            location.pathname.startsWith('/admin/flipkart')
+            location.pathname.startsWith('/admin/flipkart') ||
+            location.pathname.startsWith('/admin/rto-orders')
         ) {
             setSalesOpen(true);
         }
@@ -184,6 +185,10 @@ export default function AdminLayout() {
                                     <NavLink to="/admin/flipkart" className={({ isActive }) => (isActive ? 'active' : '')}>
                                         <span className="mi-icon">•</span>
                                         <span className="mi-label">Flipkart</span>
+                                    </NavLink>
+                                    <NavLink to="/admin/rto-orders" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                        <span className="mi-icon">•</span>
+                                        <span className="mi-label">RTO Orders</span>
                                     </NavLink>
                                 </div>
                             ) : null}

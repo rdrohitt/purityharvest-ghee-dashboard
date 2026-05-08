@@ -3,6 +3,7 @@ import type { ShopifyOrderApi, ShopifyOrderCustomer } from '../../../types/shopi
 import type { Order } from '../../../utils/orders';
 import type { Platform } from '../../../utils/orders';
 import type { SpendRecord } from '../../../utils/marketing-spend';
+import { updateRtoOrderFields } from '../../../utils/rto-orders';
 import {
     shopifyOrderToOrder,
     getOrderAddress,
@@ -19,6 +20,8 @@ import {
     formatCurrency,
     generateWhatsAppSummary,
     type WhatsAppSummaryCategoryTab,
+    ModernSelect,
+    type ModernSelectOption,
     Th,
     Td,
     StatusTag,
@@ -27,6 +30,24 @@ import {
 } from './ShopifyShared';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+
+function ConditionOptionIcon({ children }: { children: React.ReactNode }) {
+    return (
+        <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+        >
+            {children}
+        </svg>
+    );
+}
 
 export type GroupedOrdersByDate = {
     label: string;
@@ -509,6 +530,7 @@ export function ShopifyOrdersTable({
     onCustomerClick,
     onEdit,
     onDelete,
+    viewMode = 'default',
 }: {
     groupedByDate: GroupedOrdersByDate[];
     marketingSpend: SpendRecord[];
@@ -521,7 +543,77 @@ export function ShopifyOrdersTable({
     onCustomerClick: (customerId: string, phone: string) => void;
     onEdit: (order: Order) => void;
     onDelete: (order: Order) => void;
+    viewMode?: 'default' | 'rto';
 }) {
+    const isRtoView = viewMode === 'rto';
+    const columnCount = isRtoView ? 12 : 14;
+    const rtoConditionOptions = useMemo<ModernSelectOption<string>[]>(
+        () => [
+            {
+                value: '',
+                label: 'Select condition',
+                icon: (
+                    <ConditionOptionIcon>
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4M12 8h.01" />
+                    </ConditionOptionIcon>
+                ),
+            },
+            {
+                value: 'Different Item Received',
+                label: 'Different Item Received',
+                icon: (
+                    <ConditionOptionIcon>
+                        <path d="M4 7h9" />
+                        <path d="M4 12h6" />
+                        <path d="M4 17h8" />
+                        <path d="m15 9 2 2 4-4" />
+                    </ConditionOptionIcon>
+                ),
+            },
+            {
+                value: 'Less Quantity Received',
+                label: 'Less Quantity Received',
+                icon: (
+                    <ConditionOptionIcon>
+                        <path d="M4 12h9" />
+                        <rect x="15" y="7" width="5" height="10" rx="1" />
+                    </ConditionOptionIcon>
+                ),
+            },
+            {
+                value: 'Empty Package Received',
+                label: 'Empty Package Received',
+                icon: (
+                    <ConditionOptionIcon>
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        <line x1="8" y1="12" x2="16" y2="12" />
+                    </ConditionOptionIcon>
+                ),
+            },
+            {
+                value: 'Damaged / Leaked',
+                label: 'Damaged / Leaked',
+                icon: (
+                    <ConditionOptionIcon>
+                        <path d="M12 2 6 8v5c0 3.31 2.69 6 6 6s6-2.69 6-6V8z" />
+                        <path d="M9 13h6" />
+                    </ConditionOptionIcon>
+                ),
+            },
+            {
+                value: 'Original Return',
+                label: 'Original Return',
+                icon: (
+                    <ConditionOptionIcon>
+                        <path d="M7 7h10v10H7z" />
+                        <path d="M7 11h10" />
+                    </ConditionOptionIcon>
+                ),
+            },
+        ],
+        []
+    );
     const flatRows = useMemo(() => flattenGroupedOrders(groupedByDate), [groupedByDate]);
     const totalFlatRows = flatRows.length;
     const useProgressive = totalFlatRows > PROGRESSIVE_ROW_THRESHOLD;
@@ -576,6 +668,10 @@ export function ShopifyOrdersTable({
 
     const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
     const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [rtoDraftById, setRtoDraftById] = useState<
+        Record<string, { condition: string; remarks: string }>
+    >({});
+    const [savingRtoById, setSavingRtoById] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         return () => {
@@ -591,6 +687,22 @@ export function ShopifyOrdersTable({
             copiedTimerRef.current = null;
         }, 2000);
     }, []);
+
+    useEffect(() => {
+        if (!isRtoView) return;
+        setRtoDraftById((prev) => {
+            const next: Record<string, { condition: string; remarks: string }> = {};
+            for (const g of displayGroups) {
+                for (const o of g.items) {
+                    next[o._id] = prev[o._id] ?? {
+                        condition: o.condition ?? '',
+                        remarks: o.remarks ?? '',
+                    };
+                }
+            }
+            return next;
+        });
+    }, [displayGroups, isRtoView]);
 
     return (
         <div className="card shopify-orders-card">
@@ -620,7 +732,9 @@ export function ShopifyOrdersTable({
                 <div className="table-scroll-wrapper">
                     <table className="orders-table shopify-orders-table">
                         <colgroup>
-                            <col /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /><col />
+                            {Array.from({ length: columnCount }).map((_, idx) => (
+                                <col key={idx} />
+                            ))}
                         </colgroup>
                         <thead>
                             <tr className="shopify-orders-header-row">
@@ -629,21 +743,24 @@ export function ShopifyOrdersTable({
                                 <Th>Variant</Th>
                                 <Th>Amount</Th>
                                 <Th>Payment Mode</Th>
-                                <Th>Platform</Th>
+                                {isRtoView ? <Th>Condition</Th> : null}
+                                {isRtoView ? <Th>Remarks</Th> : null}
+                                {!isRtoView ? <Th>Platform</Th> : null}
                                 <Th>Shipping Status</Th>
-                                <Th>Shipped</Th>
-                                <Th>Type</Th>
+                                {!isRtoView ? <Th>Shipped</Th> : null}
+                                {!isRtoView ? <Th>Type</Th> : null}
                                 <Th>Updated by</Th>
                                 <Th>Pickup Date</Th>
-                                <Th>Delivered On</Th>
+                                {!isRtoView ? <Th>Delivered On</Th> : null}
                                 <Th>Returned On</Th>
-                                <Th>Actions</Th>
+                                {isRtoView ? <Th>Action</Th> : null}
+                                {!isRtoView ? <Th>Actions</Th> : null}
                             </tr>
                         </thead>
                         <tbody>
                             {displayGroups.length === 0 ? (
                                 <tr>
-                                    <td colSpan={14} className="shopify-orders-empty-cell shopify-orders-empty-cell--panel">
+                                    <td colSpan={columnCount} className="shopify-orders-empty-cell shopify-orders-empty-cell--panel">
                                         <div className="shopify-orders-empty-panel">
                                             <div className="shopify-orders-empty-panel__icon-wrap">
                                                 <ShopifyOrdersEmptyIcon />
@@ -665,61 +782,65 @@ export function ShopifyOrdersTable({
                                             >
                                             {idx === 0 ? (
                                                 <td rowSpan={group.items.length} className="shopify-orders-date-cell">
-                                                    <div className="shopify-orders-date-wrapper">
-                                                        <div className="shopify-orders-date-header">
-                                                            {group.items.length > 0 && (
-                                                                <a
-                                                                    href={`https://wa.me/918685045943?text=${encodeURIComponent(
-                                                                        generateWhatsAppSummary(
-                                                                            group.label,
-                                                                            group.items.map(shopifyOrderToOrder),
-                                                                            marketingSpend,
-                                                                            summaryCategoryTab,
-                                                                        ),
-                                                                    )}`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="shopify-whatsapp-summary-link"
-                                                                    title="Send summary on WhatsApp"
-                                                                >
-                                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="shopify-wa-svg">
-                                                                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                                                                    </svg>
-                                                                </a>
-                                                            )}
-                                                            <span className="shopify-orders-date-title">{group.label}</span>
+                                                    {isRtoView ? (
+                                                        <span className="shopify-orders-date-title">{group.label}</span>
+                                                    ) : (
+                                                        <div className="shopify-orders-date-wrapper">
+                                                            <div className="shopify-orders-date-header">
+                                                                {group.items.length > 0 && (
+                                                                    <a
+                                                                        href={`https://wa.me/918685045943?text=${encodeURIComponent(
+                                                                            generateWhatsAppSummary(
+                                                                                group.label,
+                                                                                group.items.map(shopifyOrderToOrder),
+                                                                                marketingSpend,
+                                                                                summaryCategoryTab,
+                                                                            ),
+                                                                        )}`}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="shopify-whatsapp-summary-link"
+                                                                        title="Send summary on WhatsApp"
+                                                                    >
+                                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="shopify-wa-svg">
+                                                                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                                                                        </svg>
+                                                                    </a>
+                                                                )}
+                                                                <span className="shopify-orders-date-title">{group.label}</span>
+                                                            </div>
+                                                            <div className="shopify-orders-date-badges">
+                                                                <span className="shopify-badge shopify-badge--amount">
+                                                                    <span className="shopify-badge__key">Amount</span>
+                                                                    <span className="shopify-badge__value">{formatCurrency(group.totalAmount)}</span>
+                                                                </span>
+                                                                <span className="shopify-badge shopify-badge--shopify-orders">
+                                                                    <span className="shopify-badge__key">Shopify Orders</span>
+                                                                    <span className="shopify-badge__value">{group.shopifyOrderCount}</span>
+                                                                </span>
+                                                                <span className="shopify-badge shopify-badge--shopify-amount">
+                                                                    <span className="shopify-badge__key">Shopify Amount</span>
+                                                                    <span className="shopify-badge__value">{formatCurrency(group.shopifyAmount)}</span>
+                                                                </span>
+                                                                <span className="shopify-badge shopify-badge--compact shopify-badge--orders">
+                                                                    <span className="shopify-badge__key">Orders</span>
+                                                                    <span className="shopify-badge__value">{group.items.length}</span>
+                                                                </span>
+                                                                <span className="shopify-badge shopify-badge--compact shopify-badge--cod">
+                                                                    <span className="shopify-badge__key">COD</span>
+                                                                    <span className="shopify-badge__value">{group.codCount}</span>
+                                                                </span>
+                                                                <span className="shopify-badge shopify-badge--compact shopify-badge--paid">
+                                                                    <span className="shopify-badge__key">Paid</span>
+                                                                    <span className="shopify-badge__value">{group.paidCount}</span>
+                                                                </span>
+                                                                <span className="shopify-badge shopify-badge--compact shopify-badge--rto">
+                                                                    <span className="shopify-badge__key">RTO</span>
+                                                                    <span className="shopify-badge__value">{group.rtoCount}</span>
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                        <div className="shopify-orders-date-badges">
-                                                            <span className="shopify-badge shopify-badge--amount">
-                                                                <span className="shopify-badge__key">Amount</span>
-                                                                <span className="shopify-badge__value">{formatCurrency(group.totalAmount)}</span>
-                                                            </span>
-                                                            <span className="shopify-badge shopify-badge--shopify-orders">
-                                                                <span className="shopify-badge__key">Shopify Orders</span>
-                                                                <span className="shopify-badge__value">{group.shopifyOrderCount}</span>
-                                                            </span>
-                                                            <span className="shopify-badge shopify-badge--shopify-amount">
-                                                                <span className="shopify-badge__key">Shopify Amount</span>
-                                                                <span className="shopify-badge__value">{formatCurrency(group.shopifyAmount)}</span>
-                                                            </span>
-                                                            <span className="shopify-badge shopify-badge--compact shopify-badge--orders">
-                                                                <span className="shopify-badge__key">Orders</span>
-                                                                <span className="shopify-badge__value">{group.items.length}</span>
-                                                            </span>
-                                                            <span className="shopify-badge shopify-badge--compact shopify-badge--cod">
-                                                                <span className="shopify-badge__key">COD</span>
-                                                                <span className="shopify-badge__value">{group.codCount}</span>
-                                                            </span>
-                                                            <span className="shopify-badge shopify-badge--compact shopify-badge--paid">
-                                                                <span className="shopify-badge__key">Paid</span>
-                                                                <span className="shopify-badge__value">{group.paidCount}</span>
-                                                            </span>
-                                                            <span className="shopify-badge shopify-badge--compact shopify-badge--rto">
-                                                                <span className="shopify-badge__key">RTO</span>
-                                                                <span className="shopify-badge__value">{group.rtoCount}</span>
-                                                            </span>
-                                                        </div>
-                                                    </div>
+                                                    )}
                                                 </td>
                                             ) : null}
                                             <Td>
@@ -749,31 +870,33 @@ export function ShopifyOrdersTable({
                                                         >
                                                             {getOrderCustomerName(o)}
                                                         </span>
-                                                        <button
-                                                            type="button"
-                                                            className="icon-btn shopify-customer-edit-btn"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                onEdit(shopifyOrderToOrder(o));
-                                                            }}
-                                                            title="Edit order"
-                                                            aria-label="Edit order"
-                                                        >
-                                                            <svg
-                                                                width="14"
-                                                                height="14"
-                                                                viewBox="0 0 24 24"
-                                                                fill="none"
-                                                                stroke="currentColor"
-                                                                strokeWidth="2"
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                aria-hidden
+                                                        {!isRtoView ? (
+                                                            <button
+                                                                type="button"
+                                                                className="icon-btn shopify-customer-edit-btn"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    onEdit(shopifyOrderToOrder(o));
+                                                                }}
+                                                                title="Edit order"
+                                                                aria-label="Edit order"
                                                             >
-                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                                            </svg>
-                                                        </button>
+                                                                <svg
+                                                                    width="14"
+                                                                    height="14"
+                                                                    viewBox="0 0 24 24"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    strokeWidth="2"
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    aria-hidden
+                                                                >
+                                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                                </svg>
+                                                            </button>
+                                                        ) : null}
                                                     </div>
                                                     {customerPhone ? (
                                                         copiedOrderId === o._id ? (
@@ -849,9 +972,53 @@ export function ShopifyOrdersTable({
                                             <Td>
                                                 <StatusTag kind={o.paymentMode === 'PAID' ? 'PAID' : 'COD'} type="payment" />
                                             </Td>
-                                            <Td>
-                                                <PlatformTag platform={(o.platform as Platform) || 'Shopify'} />
-                                            </Td>
+                                            {isRtoView ? (
+                                                <Td>
+                                                    <ModernSelect<string>
+                                                        variant="default"
+                                                        className="shopify-rto-condition-select"
+                                                        value={rtoDraftById[o._id]?.condition ?? ''}
+                                                        options={rtoConditionOptions}
+                                                        placeholder="Select condition"
+                                                        aria-label="Condition"
+                                                        onChange={(e) => {
+                                                            const value = e as string;
+                                                            setRtoDraftById((prev) => ({
+                                                                ...prev,
+                                                                [o._id]: {
+                                                                    condition: value,
+                                                                    remarks: prev[o._id]?.remarks ?? o.remarks ?? '',
+                                                                },
+                                                            }));
+                                                        }}
+                                                    />
+                                                </Td>
+                                            ) : null}
+                                            {isRtoView ? (
+                                                <Td>
+                                                    <input
+                                                        className="input"
+                                                        type="text"
+                                                        placeholder="Enter remarks"
+                                                        value={rtoDraftById[o._id]?.remarks ?? ''}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value;
+                                                            setRtoDraftById((prev) => ({
+                                                                ...prev,
+                                                                [o._id]: {
+                                                                    condition: prev[o._id]?.condition ?? o.condition ?? '',
+                                                                    remarks: value,
+                                                                },
+                                                            }));
+                                                        }}
+                                                    />
+                                                </Td>
+                                            ) : null}
+                                            {!isRtoView ? (
+                                                <Td>
+                                                    <PlatformTag platform={(o.platform as Platform) || 'Shopify'} />
+                                                </Td>
+                                            ) : null}
                                             <Td>
                                                 <div className="shopify-shipping-status-cell">
                                                     <StatusTag
@@ -883,20 +1050,24 @@ export function ShopifyOrdersTable({
                                                     })()}
                                                 </div>
                                             </Td>
-                                            <Td>
-                                                <span
-                                                    className={
-                                                        o.is_shipped
-                                                            ? 'shopify-shipped-badge shopify-shipped-badge--yes'
-                                                            : 'shopify-shipped-badge shopify-shipped-badge--no'
-                                                    }
-                                                >
-                                                    {o.is_shipped ? '✓ Yes' : '— No'}
-                                                </span>
-                                            </Td>
-                                            <Td>
-                                                <TypeTag type={mapOrderType(o.type)} />
-                                            </Td>
+                                            {!isRtoView ? (
+                                                <Td>
+                                                    <span
+                                                        className={
+                                                            o.is_shipped
+                                                                ? 'shopify-shipped-badge shopify-shipped-badge--yes'
+                                                                : 'shopify-shipped-badge shopify-shipped-badge--no'
+                                                        }
+                                                    >
+                                                        {o.is_shipped ? '✓ Yes' : '— No'}
+                                                    </span>
+                                                </Td>
+                                            ) : null}
+                                            {!isRtoView ? (
+                                                <Td>
+                                                    <TypeTag type={mapOrderType(o.type)} />
+                                                </Td>
+                                            ) : null}
                                             <Td>
                                                 <span className="shopify-updated-by">
                                                     {o.updatedBy &&
@@ -911,48 +1082,84 @@ export function ShopifyOrdersTable({
                                                     {formatOrderTimelineDate(o.shippingDetails?.pickedUpDate || o.pickedUpDate)}
                                                 </span>
                                             </Td>
-                                            <Td>
-                                                <span className="shopify-order-timeline-date shopify-order-timeline-date--delivered">
-                                                    {formatOrderTimelineDate(o.shippingDetails?.deliveredAt || o.deliveredAt)}
-                                                </span>
-                                            </Td>
+                                            {!isRtoView ? (
+                                                <Td>
+                                                    <span className="shopify-order-timeline-date shopify-order-timeline-date--delivered">
+                                                        {formatOrderTimelineDate(o.shippingDetails?.deliveredAt || o.deliveredAt)}
+                                                    </span>
+                                                </Td>
+                                            ) : null}
                                             <Td>
                                                 <span className="shopify-order-timeline-date shopify-order-timeline-date--returned">
                                                     {formatOrderTimelineDate(o.shippingDetails?.returnedAt || o.returnedAt)}
                                                 </span>
                                             </Td>
-                                            <Td>
-                                                <div className="shopify-row-actions">
-                                                    <a
-                                                        href={`https://wa.me/${customerPhone}?text=${encodeURIComponent(
-                                                            buildOrderWhatsAppMessage(o),
-                                                        )}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="icon-btn"
-                                                        title="Send WhatsApp message"
-                                                    >
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="shopify-wa-svg">
-                                                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                                                        </svg>
-                                                    </a>
+                                            {isRtoView ? (
+                                                <Td>
                                                     <button
                                                         type="button"
-                                                        className="icon-btn"
-                                                        onClick={() => generateOrderInvoicePDF(o)}
-                                                        title="Open invoice PDF"
-                                                        aria-label="Open invoice PDF"
-                                                        style={{ color: '#8b0000' }}
+                                                        className="button"
+                                                        disabled={savingRtoById[o._id]}
+                                                        onClick={async () => {
+                                                            const draft = rtoDraftById[o._id] ?? {
+                                                                condition: o.condition ?? '',
+                                                                remarks: o.remarks ?? '',
+                                                            };
+                                                            try {
+                                                                setSavingRtoById((prev) => ({ ...prev, [o._id]: true }));
+                                                                await updateRtoOrderFields(
+                                                                    o,
+                                                                    draft.condition,
+                                                                    draft.remarks,
+                                                                );
+                                                            } catch (err) {
+                                                                console.error('Failed to update RTO fields', err);
+                                                            } finally {
+                                                                setSavingRtoById((prev) => ({
+                                                                    ...prev,
+                                                                    [o._id]: false,
+                                                                }));
+                                                            }
+                                                        }}
                                                     >
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm0 2.5L18.5 9H14zM8 13h8v1.5H8zm0 3h8v1.5H8zm0-6h4v1.5H8z" />
-                                                        </svg>
+                                                        {savingRtoById[o._id] ? 'Saving...' : 'Save'}
                                                     </button>
-                                                    <button type="button" className="icon-btn icon-btn--danger" onClick={() => onDelete(shopifyOrderToOrder(o))}>
-                                                        Delete
-                                                    </button>
-                                                </div>
-                                            </Td>
+                                                </Td>
+                                            ) : null}
+                                            {!isRtoView ? (
+                                                <Td>
+                                                    <div className="shopify-row-actions">
+                                                        <a
+                                                            href={`https://wa.me/${customerPhone}?text=${encodeURIComponent(
+                                                                buildOrderWhatsAppMessage(o),
+                                                            )}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="icon-btn"
+                                                            title="Send WhatsApp message"
+                                                        >
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="shopify-wa-svg">
+                                                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                                                            </svg>
+                                                        </a>
+                                                        <button
+                                                            type="button"
+                                                            className="icon-btn"
+                                                            onClick={() => generateOrderInvoicePDF(o)}
+                                                            title="Open invoice PDF"
+                                                            aria-label="Open invoice PDF"
+                                                            style={{ color: '#8b0000' }}
+                                                        >
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm0 2.5L18.5 9H14zM8 13h8v1.5H8zm0 3h8v1.5H8zm0-6h4v1.5H8z" />
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" className="icon-btn icon-btn--danger" onClick={() => onDelete(shopifyOrderToOrder(o))}>
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                </Td>
+                                            ) : null}
                                         </tr>
                                         );
                                     }),

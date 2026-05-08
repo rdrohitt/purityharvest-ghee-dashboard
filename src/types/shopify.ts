@@ -119,6 +119,10 @@ export interface ShopifyOrderApi {
     products: ShopifyOrderProduct[];
     platform: string;
     paymentMode: string;
+    /** Order condition/status note from API root payload. */
+    condition?: string;
+    /** Free-form remarks from API root payload. */
+    remarks?: string;
     fulfillmentStatus: string;
     returnStatus: boolean;
     /** Whether the order has been shipped (from API / backend). */

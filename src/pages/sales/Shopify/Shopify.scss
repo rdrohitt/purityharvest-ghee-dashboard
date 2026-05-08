@@ -4955,6 +4955,12 @@
 .shopify-orders-table col:nth-child(13) { width: 120px; min-width: 120px; }
 .shopify-orders-table col:nth-child(14) { width: 120px; min-width: 120px; }
 
+/* Keep RTO condition dropdown height aligned with remarks input field. */
+.shopify-rto-condition-select.shopify-modern-select--default .shopify-modern-select__trigger {
+  min-height: 38px;
+  height: 38px;
+}
+
 .shopify-shipped-badge {
   display: inline-flex;
   align-items: center;

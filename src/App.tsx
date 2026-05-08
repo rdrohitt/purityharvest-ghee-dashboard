@@ -9,6 +9,7 @@ import Settings from './pages/Settings/index';
 import Shopify from './pages/sales/Shopify/index';
 import Amazon from './pages/sales/Amazon/index';
 import Flipkart from './pages/sales/Flipkart/index';
+import RTOOrders from './pages/sales/RTOOrders/index';
 import WALeads from './pages/WALeads/index';
 import Followups from './pages/Followups/index';
 import Scripts from './pages/Scripts/index';
@@ -121,6 +122,7 @@ export default function App() {
 						<Route path="wa-leads" element={<WALeads />} />
 						<Route path="amazon" element={<Amazon />} />
 						<Route path="flipkart" element={<Flipkart />} />
+						<Route path="rto-orders" element={<RTOOrders />} />
 						<Route path="users-and-roles" element={<Users />} />
 						<Route path="modules" element={<Modules />} />
 						<Route path="products" element={<Products />} />
