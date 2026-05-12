@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { apiFetch } from '../../../api';
 import type { ShopifyOrderApi, ShopifyOrderCustomer } from '../../../types/shopify';
 import type { Order } from '../../../utils/orders';
 import type { Platform } from '../../../utils/orders';
@@ -530,6 +531,8 @@ export function ShopifyOrdersTable({
     onCustomerClick,
     onEdit,
     onDelete,
+    onOrdersRefresh,
+    onWaybillSyncError,
     viewMode = 'default',
 }: {
     groupedByDate: GroupedOrdersByDate[];
@@ -543,6 +546,8 @@ export function ShopifyOrdersTable({
     onCustomerClick: (customerId: string, phone: string) => void;
     onEdit: (order: Order) => void;
     onDelete: (order: Order) => void;
+    onOrdersRefresh?: () => Promise<void> | void;
+    onWaybillSyncError?: () => void;
     viewMode?: 'default' | 'rto';
 }) {
     const isRtoView = viewMode === 'rto';
@@ -672,6 +677,7 @@ export function ShopifyOrdersTable({
         Record<string, { condition: string; remarks: string }>
     >({});
     const [savingRtoById, setSavingRtoById] = useState<Record<string, boolean>>({});
+    const [syncingWaybillById, setSyncingWaybillById] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         return () => {
@@ -1129,6 +1135,53 @@ export function ShopifyOrdersTable({
                                             {!isRtoView ? (
                                                 <Td>
                                                     <div className="shopify-row-actions">
+                                                        <button
+                                                            type="button"
+                                                            className="icon-btn"
+                                                            title="Update waybill status"
+                                                            aria-label="Update waybill status"
+                                                            disabled={
+                                                                syncingWaybillById[o._id] ||
+                                                                !(o.shippingDetails?.trackingNumber || '').trim()
+                                                            }
+                                                            onClick={async () => {
+                                                                const waybill = (o.shippingDetails?.trackingNumber || '').trim();
+                                                                if (!waybill) return;
+                                                                try {
+                                                                    setSyncingWaybillById((prev) => ({ ...prev, [o._id]: true }));
+                                                                    const response = await apiFetch('/api/orders/sync-delhivery-waybill', {
+                                                                        method: 'POST',
+                                                                        headers: {
+                                                                            'Content-Type': 'application/json',
+                                                                        },
+                                                                        body: JSON.stringify({
+                                                                            waybill,
+                                                                        }),
+                                                                    });
+                                                                    if (!response.ok) {
+                                                                        throw new Error('Failed to sync waybill');
+                                                                    }
+                                                                } catch (err) {
+                                                                    console.error('Failed to sync Delhivery waybill', err);
+                                                                    onWaybillSyncError?.();
+                                                                    return;
+                                                                }
+                                                                try {
+                                                                    await onOrdersRefresh?.();
+                                                                } catch (err) {
+                                                                    console.error('Failed to refresh orders after Delhivery waybill sync', err);
+                                                                } finally {
+                                                                    setSyncingWaybillById((prev) => ({
+                                                                        ...prev,
+                                                                        [o._id]: false,
+                                                                    }));
+                                                                }
+                                                            }}
+                                                        >
+                                                            <svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                <path d="M12 6V3L8 7l4 4V8c2.76 0 5 2.24 5 5a5 5 0 0 1-8.66 3.54l-1.42 1.42A7 7 0 1 0 12 6z" />
+                                                            </svg>
+                                                        </button>
                                                         <a
                                                             href={`https://wa.me/${customerPhone}?text=${encodeURIComponent(
                                                                 buildOrderWhatsAppMessage(o),

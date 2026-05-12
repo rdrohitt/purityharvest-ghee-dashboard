@@ -811,6 +811,30 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return groups;
     }, [filtered]);
 
+    const refreshOrdersAfterWaybillSync = async () => {
+        setLoading(true);
+        if (isPhoneSearch) {
+            setPhoneSearchLoading(true);
+        }
+        try {
+            await loadOrdersPage(ordersListQuery);
+            if (isPhoneSearch) {
+                try {
+                    const rows = await searchOrdersByPhone(phoneDigits, dateRangeForApi.from, dateRangeForApi.to);
+                    setPhoneSearchOrders(rows);
+                } catch (err) {
+                    console.error('Failed to refresh phone search orders after waybill sync', err);
+                }
+            }
+            await refreshAnalyticsOverview();
+        } finally {
+            if (isPhoneSearch) {
+                setPhoneSearchLoading(false);
+            }
+            setLoading(false);
+        }
+    };
+
     /** Remount orders table when a new API page loads so progressive row state resets cleanly. */
     const shopifyOrdersTableKey = useMemo(() => {
         if (isPhoneSearch) {
@@ -1230,6 +1254,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 }}
                 onEdit={(order) => setEditingOrderId(order.id)}
                 onDelete={setOrderToDelete}
+                onOrdersRefresh={refreshOrdersAfterWaybillSync}
+                onWaybillSyncError={() => showToast('No record found', 'error')}
             />
             <footer className="shopify-pagination" aria-label="Orders pagination">
                 <div className="shopify-pagination__range">
