@@ -10,6 +10,29 @@ const ACTIONS = [
     { key: 'modify', label: 'Modify' },
 ] as const;
 
+const ORDERS_EXTRA_ACTIONS = [{ key: 'viewrto', label: 'RTO' }] as const;
+
+function getModuleActions(moduleKey: string) {
+    if (moduleKey === 'orders') {
+        return [...ACTIONS, ...ORDERS_EXTRA_ACTIONS];
+    }
+    return ACTIONS;
+}
+
+/** RTO lives under orders only — drop legacy viewrto:* module permissions. */
+function normalizePermissionsForUi(perms: string[]): string[] {
+    const hasLegacyRto = perms.some((p) => p === 'viewrto:view' || p === 'viewrto:modify');
+    const next = perms.filter((p) => !p.startsWith('viewrto:'));
+    if (hasLegacyRto && !next.includes('orders:viewrto')) {
+        next.push('orders:viewrto');
+    }
+    return next;
+}
+
+function sanitizePermissionsForApi(perms: string[]): string[] {
+    return normalizePermissionsForUi(perms).sort();
+}
+
 type Props = {
     mode: 'create' | 'edit';
     initialUser: UserRecord | null;
@@ -31,8 +54,8 @@ export function CreateUserModal({ mode, initialUser, roles, onClose, onSubmit, o
     const [role, setRole] = useState(
         initialUser?.role ?? roles[0] ?? ''
     );
-    const [selectedPermissions, setSelectedPermissions] = useState<string[]>(
-        initialUser?.permissions ?? []
+    const [selectedPermissions, setSelectedPermissions] = useState<string[]>(() =>
+        normalizePermissionsForUi(initialUser?.permissions ?? [])
     );
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -62,7 +85,7 @@ export function CreateUserModal({ mode, initialUser, roles, onClose, onSubmit, o
             password,
             phoneNumber: phoneNumber.trim(),
             role: role.trim().toLowerCase(),
-            permissions: selectedPermissions.slice().sort(),
+            permissions: sanitizePermissionsForApi(selectedPermissions),
         };
 
         if (isCreate) {
@@ -212,7 +235,7 @@ export function CreateUserModal({ mode, initialUser, roles, onClose, onSubmit, o
                                 const anyMod = mod as any;
                                 const moduleKey: string | undefined = anyMod.key || anyMod.name;
                                 const moduleLabel: string = anyMod.label || anyMod.name || anyMod.key;
-                                if (!moduleKey) return null;
+                                if (!moduleKey || moduleKey === 'viewrto') return null;
                                 return (
                                 <div
                                     key={mod.id ?? moduleKey}
@@ -222,7 +245,7 @@ export function CreateUserModal({ mode, initialUser, roles, onClose, onSubmit, o
                                         {moduleLabel}
                                     </div>
                                     <div className="users-permissions-actions">
-                                        {ACTIONS.map((action) => {
+                                        {getModuleActions(moduleKey).map((action) => {
                                             const permKey = `${moduleKey}:${action.key}`;
                                             return (
                                                 <label

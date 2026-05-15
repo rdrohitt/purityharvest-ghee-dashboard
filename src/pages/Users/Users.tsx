@@ -41,6 +41,7 @@ const ACTIONS = [
     { key: 'add', label: 'Add' },
     { key: 'modify', label: 'Modify' },
     { key: 'delete', label: 'Delete' },
+    { key: 'viewrto', label: 'RTO' },
 ] as const;
 
 type UsersDashboardMeta = {

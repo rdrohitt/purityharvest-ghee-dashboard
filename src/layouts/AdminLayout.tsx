@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAppSelector } from '../store';
 import { applyTheme, getInitialTheme, type Theme } from '../theme';
 import { API_FORBIDDEN_EVENT, API_UNAUTHORIZED_EVENT } from '../api';
+import { canViewRtoOrders, canViewSalesChannels } from '../utils/permissions';
 import './AdminLayout.scss';
 
 export default function AdminLayout() {
@@ -18,10 +19,37 @@ export default function AdminLayout() {
     const [forbiddenSection, setForbiddenSection] = useState(false);
     const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
 
+    const enabledLabels = useMemo(() => {
+        const set = new Set<string>();
+        menu.forEach((m) => {
+            if (m.label) set.add(m.label);
+        });
+        return set;
+    }, [menu]);
+
+    const hasMenuLabel = (label: string) => enabledLabels.has(label);
+
+    const permissions = meUser?.permissions;
+    const canSalesChannels = canViewSalesChannels(permissions);
+    const canRto = canViewRtoOrders(permissions);
+    const showSalesGroup = (hasMenuLabel('Sales') && canSalesChannels) || canRto;
+
     useEffect(() => {
         // close drawer on route change (mobile)
         setDrawerOpen(false);
-        setForbiddenSection(false);
+
+        const path = location.pathname;
+        let blocked = false;
+        if (
+            path.startsWith('/admin/shopify') ||
+            path.startsWith('/admin/amazon') ||
+            path.startsWith('/admin/flipkart')
+        ) {
+            blocked = !canSalesChannels;
+        } else if (path.startsWith('/admin/rto-orders')) {
+            blocked = !canRto;
+        }
+        setForbiddenSection(blocked);
 
         // ensure sales group is expanded when a sales route is active
         if (
@@ -40,7 +68,7 @@ export default function AdminLayout() {
         ) {
             setMartsOpen(true);
         }
-    }, [location.pathname]);
+    }, [location.pathname, canSalesChannels, canRto]);
 
     useEffect(() => {
         const onForbidden = () => setForbiddenSection(true);
@@ -68,16 +96,6 @@ export default function AdminLayout() {
             document.body.classList.remove('permission-blocked-active');
         };
     }, [forbiddenSection]);
-
-    const enabledLabels = useMemo(() => {
-        const set = new Set<string>();
-        menu.forEach((m) => {
-            if (m.label) set.add(m.label);
-        });
-        return set;
-    }, [menu]);
-
-    const hasMenuLabel = (label: string) => enabledLabels.has(label);
 
     const topbarGreeting = useMemo(() => {
         const name = meUser?.name?.trim();
@@ -158,7 +176,7 @@ export default function AdminLayout() {
                     )}
 
                     {/* Sales group */}
-                    {hasMenuLabel('Sales') && (
+                    {showSalesGroup && (
                         <div className="menu-group">
                             <button
                                 type="button"
@@ -174,22 +192,28 @@ export default function AdminLayout() {
                             </button>
                             {salesOpen ? (
                                 <div className="menu-group-items">
-                                    <NavLink to="/admin/shopify" className={({ isActive }) => (isActive ? 'active' : '')}>
-                                        <span className="mi-icon">•</span>
-                                        <span className="mi-label">Shopify</span>
-                                    </NavLink>
-                                    <NavLink to="/admin/amazon" className={({ isActive }) => (isActive ? 'active' : '')}>
-                                        <span className="mi-icon">•</span>
-                                        <span className="mi-label">Amazon</span>
-                                    </NavLink>
-                                    <NavLink to="/admin/flipkart" className={({ isActive }) => (isActive ? 'active' : '')}>
-                                        <span className="mi-icon">•</span>
-                                        <span className="mi-label">Flipkart</span>
-                                    </NavLink>
-                                    <NavLink to="/admin/rto-orders" className={({ isActive }) => (isActive ? 'active' : '')}>
-                                        <span className="mi-icon">•</span>
-                                        <span className="mi-label">RTO Orders</span>
-                                    </NavLink>
+                                    {canSalesChannels ? (
+                                        <>
+                                            <NavLink to="/admin/shopify" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                                <span className="mi-icon">•</span>
+                                                <span className="mi-label">Shopify</span>
+                                            </NavLink>
+                                            <NavLink to="/admin/amazon" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                                <span className="mi-icon">•</span>
+                                                <span className="mi-label">Amazon</span>
+                                            </NavLink>
+                                            <NavLink to="/admin/flipkart" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                                <span className="mi-icon">•</span>
+                                                <span className="mi-label">Flipkart</span>
+                                            </NavLink>
+                                        </>
+                                    ) : null}
+                                    {canRto ? (
+                                        <NavLink to="/admin/rto-orders" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                            <span className="mi-icon">•</span>
+                                            <span className="mi-label">RTO Orders</span>
+                                        </NavLink>
+                                    ) : null}
                                 </div>
                             ) : null}
                         </div>
