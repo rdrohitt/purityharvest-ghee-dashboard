@@ -4,6 +4,7 @@ import type { SpendRecord, MiscRecord } from '../../utils/marketing-spend';
 
 type Platform =
     | 'Meta'
+    | 'meta-milk'
     | 'Amazon'
     | 'Amazon Shipping'
     | 'Flipkart'

@@ -349,6 +349,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return { from: '2024-01-01', to: todayStr };
     }, [range, appliedCustomStart, appliedCustomEnd]);
 
+    const ordersCategoryQueryParam = categoryTab === 'all' ? undefined : categoryTab;
+
     const applyAnalyticsOverviewData = useCallback((data: AnalyticsOverviewResponse) => {
         setAnalyticsShippingPipeline(data.shippingPipeline ?? null);
         setAnalyticsVolume(data.volume ?? null);
@@ -360,6 +362,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         setAnalyticsOverviewLoading(true);
         try {
             const data = await fetchAnalyticsOverview(dateRangeForApi.from, dateRangeForApi.to, {
+                category: ordersCategoryQueryParam,
                 paymentMode: paymentStatusFilter || undefined,
                 status: deliveryStatusFilter || undefined,
                 platform: platformFilter || undefined,
@@ -374,6 +377,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     }, [
         dateRangeForApi.from,
         dateRangeForApi.to,
+        ordersCategoryQueryParam,
         paymentStatusFilter,
         deliveryStatusFilter,
         platformFilter,
@@ -385,6 +389,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         let cancelled = false;
         setAnalyticsOverviewLoading(true);
         fetchAnalyticsOverview(dateRangeForApi.from, dateRangeForApi.to, {
+            category: ordersCategoryQueryParam,
             paymentMode: paymentStatusFilter || undefined,
             status: deliveryStatusFilter || undefined,
             platform: platformFilter || undefined,
@@ -413,6 +418,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     }, [
         dateRangeForApi.from,
         dateRangeForApi.to,
+        ordersCategoryQueryParam,
         paymentStatusFilter,
         deliveryStatusFilter,
         platformFilter,
@@ -424,6 +430,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const shippedQueryParam = categoryTab === 'milk' ? undefined : shippedTab === 'shipped';
     const ordersListQuery = useMemo(
         () => ({
+            category: ordersCategoryQueryParam,
             from: dateRangeForApi.from,
             to: dateRangeForApi.to,
             page,
@@ -435,6 +442,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             shipped: shippedQueryParam,
         }),
         [
+            ordersCategoryQueryParam,
             dateRangeForApi.from,
             dateRangeForApi.to,
             page,
@@ -648,6 +656,16 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 if (phoneSearchLoading) return false;
                 return true;
             })();
+            const matchesState = !stateFilter || o.state === stateFilter;
+            if (!matchesCustomer || !matchesState) {
+                return false;
+            }
+
+            if (!isPhoneSearch) {
+                // For the main paginated list, trust the backend query params instead of re-filtering rows here.
+                return true;
+            }
+
             const paymentStatus = o.paymentMode === 'PAID' ? 'PAID' : 'COD';
             const matchesPayment = !paymentStatusFilter || paymentStatus === paymentStatusFilter;
             const deliveryStatus = mapDeliveryStatusFromTracking(
@@ -657,7 +675,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             const matchesDelivery = !deliveryStatusFilter || deliveryStatus === deliveryStatusFilter;
             const matchesPlatform = !platformFilter || (o.platform && o.platform.toLowerCase() === platformFilter.toLowerCase());
             const matchesType = !typeFilter || mapOrderType(o.type) === typeFilter;
-            const matchesState = !stateFilter || o.state === stateFilter;
             const matchesShipped =
                 categoryTab === 'milk'
                     ? true
@@ -678,14 +695,13 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 }
                 return false;
             })();
+
             return (
-                matchesCustomer &&
                 matchesPayment &&
                 matchesDelivery &&
                 matchesPlatform &&
                 matchesType &&
                 matchesShipped &&
-                matchesState &&
                 matchesCategory
             );
         });

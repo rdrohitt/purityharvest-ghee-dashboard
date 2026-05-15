@@ -95,6 +95,7 @@ export async function createMarketingSpend(payload: CreateMarketingSpendPayload)
 export async function addMarketingSpend(
     endpoint:
         | 'meta-spend'
+        | 'meta-milk-spend'
         | 'amazon-spend'
         | 'amazon-shipping-spend'
         | 'flipkart-spend'
@@ -126,6 +127,7 @@ export async function addMarketingSpend(
 export async function updateMarketingSpend(
     endpoint:
         | 'meta-spend'
+        | 'meta-milk-spend'
         | 'amazon-spend'
         | 'amazon-shipping-spend'
         | 'flipkart-spend'
@@ -157,6 +159,7 @@ export async function updateMarketingSpend(
 export async function deleteMarketingSpend(
     endpoint:
         | 'meta-spend'
+        | 'meta-milk-spend'
         | 'amazon-spend'
         | 'amazon-shipping-spend'
         | 'flipkart-spend'

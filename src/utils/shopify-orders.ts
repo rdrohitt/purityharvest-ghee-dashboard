@@ -317,6 +317,7 @@ export type LoadOrdersOptions = {
     to?: string;
     page?: number;
     limit?: number;
+    category?: string;
     type?: string;
     platform?: string;
     paymentMode?: string;
@@ -348,6 +349,7 @@ export async function loadOrdersDashboardFromApi(options?: LoadOrdersOptions): P
     if (typeof options?.limit === 'number' && Number.isFinite(options.limit)) {
         params.set('limit', String(Math.max(1, Math.min(1000, Math.trunc(options.limit)))));
     }
+    if (options?.category) params.set('category', options.category);
     if (options?.type) params.set('type', options.type);
     if (options?.platform) params.set('platform', options.platform);
     if (options?.paymentMode) params.set('paymentMode', options.paymentMode);

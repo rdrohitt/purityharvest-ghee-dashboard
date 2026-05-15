@@ -19,6 +19,7 @@ import { DatePicker, toInputDate } from './DatePicker';
 export type DateFilterMode = 'all' | 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
 export type Platform =
     | 'Meta'
+    | 'meta-milk'
     | 'Amazon'
     | 'Amazon Shipping'
     | 'Flipkart'
@@ -30,6 +31,7 @@ export type Platform =
 
 const MARKETING_PLATFORM_OPTIONS: { value: Platform; label: string; icon: string }[] = [
     { value: 'Meta', label: 'Meta', icon: '📱' },
+    { value: 'meta-milk', label: 'meta-milk', icon: '🥛' },
     { value: 'Amazon', label: 'Amazon', icon: '📦' },
     { value: 'Amazon Shipping', label: 'Amazon Shipping', icon: '📮' },
     { value: 'Flipkart', label: 'Flipkart', icon: '🛒' },
@@ -160,6 +162,7 @@ export default function MarketingSpend() {
     const dispatch = useAppDispatch();
 
     const [meta, setMeta] = useState<SpendRecord[]>([]);
+    const [metaMilk, setMetaMilk] = useState<SpendRecord[]>([]);
     const [amazon, setAmazon] = useState<SpendRecord[]>([]);
     const [amazonShipping, setAmazonShipping] = useState<SpendRecord[]>([]);
     const [flipkart, setFlipkart] = useState<SpendRecord[]>([]);
@@ -201,6 +204,7 @@ export default function MarketingSpend() {
             String(item.platform ?? '').trim().toLowerCase();
 
         const metaItems = all.filter((i) => platformOf(i) === 'meta1').map(toSpendRecord);
+        const metaMilkItems = all.filter((i) => platformOf(i) === 'meta-milk').map(toSpendRecord);
         const amazonItems = all.filter((i) => platformOf(i) === 'amazon').map(toSpendRecord);
         const amazonShippingItems = all
             .filter((i) => platformOf(i) === 'amazon_shipping' || platformOf(i) === 'amazon-shipping')
@@ -223,6 +227,7 @@ export default function MarketingSpend() {
             );
 
         setMeta(metaItems);
+        setMetaMilk(metaMilkItems);
         setAmazon(amazonItems);
         setAmazonShipping(amazonShippingItems);
         setFlipkart(flipkartItems);
@@ -278,6 +283,7 @@ export default function MarketingSpend() {
     const totals = useMemo(
         () => ({
             meta: meta.reduce((s, r) => s + r.amount, 0),
+            metaMilk: metaMilk.reduce((s, r) => s + r.amount, 0),
             amazon: amazon.reduce((s, r) => s + r.amount, 0),
             amazonShipping: amazonShipping.reduce((s, r) => s + r.amount, 0),
             flipkart: flipkart.reduce((s, r) => s + r.amount, 0),
@@ -288,6 +294,7 @@ export default function MarketingSpend() {
             misc: misc.reduce((s, r) => s + r.amount, 0),
             totalExpense:
                 meta.reduce((s, r) => s + r.amount, 0) +
+                metaMilk.reduce((s, r) => s + r.amount, 0) +
                 amazon.reduce((s, r) => s + r.amount, 0) +
                 amazonShipping.reduce((s, r) => s + r.amount, 0) +
                 flipkart.reduce((s, r) => s + r.amount, 0) +
@@ -297,7 +304,7 @@ export default function MarketingSpend() {
                 delhivery.reduce((s, r) => s + r.amount, 0) +
                 misc.reduce((s, r) => s + r.amount, 0),
         }),
-        [meta, amazon, amazonShipping, flipkart, checkout, engage, dolchi, delhivery, misc],
+        [meta, metaMilk, amazon, amazonShipping, flipkart, checkout, engage, dolchi, delhivery, misc],
     );
 
     return (
@@ -331,13 +338,21 @@ export default function MarketingSpend() {
                         isLast={false}
                         isEven={true}
                     />
+                    <ModernMetricItem
+                        icon="🥛"
+                        label="meta-milk"
+                        value={formatCurrency(totals.metaMilk)}
+                        iconColor="#0ea5e9"
+                        isLast={false}
+                        isEven={false}
+                    />
                     <ModernMetricItem 
                         icon="📦" 
                         label="Amazon Wallet" 
                         value={formatCurrency(totals.amazon)} 
                         iconColor="#ff9900"
                         isLast={false}
-                        isEven={false}
+                        isEven={true}
                     />
                     <ModernMetricItem
                         icon="📮"
@@ -345,7 +360,7 @@ export default function MarketingSpend() {
                         value={formatCurrency(totals.amazonShipping)}
                         iconColor="#e47911"
                         isLast={false}
-                        isEven={true}
+                        isEven={false}
                     />
                     <ModernMetricItem 
                         icon="💳" 
@@ -353,7 +368,7 @@ export default function MarketingSpend() {
                         value={formatCurrency(totals.checkout)} 
                         iconColor="#0f766e"
                         isLast={false}
-                        isEven={false}
+                        isEven={true}
                     />
                     <ModernMetricItem 
                         icon="💬" 
@@ -361,7 +376,7 @@ export default function MarketingSpend() {
                         value={formatCurrency(totals.engage)} 
                         iconColor="#7c3aed"
                         isLast={false}
-                        isEven={true}
+                        isEven={false}
                     />
                     <ModernMetricItem 
                         icon="🍫" 
@@ -369,7 +384,7 @@ export default function MarketingSpend() {
                         value={formatCurrency(totals.dolchi)} 
                         iconColor="#b45309"
                         isLast={false}
-                        isEven={false}
+                        isEven={true}
                     />
                     <ModernMetricItem 
                         icon="🚚" 
@@ -377,7 +392,7 @@ export default function MarketingSpend() {
                         value={formatCurrency(totals.delhivery)} 
                         iconColor="#2563eb"
                         isLast={false}
-                        isEven={true}
+                        isEven={false}
                     />
                     <ModernMetricItem 
                         icon="💰" 
@@ -385,13 +400,14 @@ export default function MarketingSpend() {
                         value={formatCurrency(totals.misc)} 
                         iconColor="#8b5cf6"
                         isLast={true}
-                        isEven={false}
+                        isEven={true}
                     />
                 </div>
             </div>
 
             <UnifiedSpendSection
                     meta={meta}
+                    metaMilk={metaMilk}
                     amazon={amazon}
                     amazonShipping={amazonShipping}
                     flipkart={flipkart}
@@ -412,6 +428,9 @@ export default function MarketingSpend() {
                             switch (platform) {
                                 case 'Meta':
                                     apiPlatform = 'meta1';
+                                    break;
+                                case 'meta-milk':
+                                    apiPlatform = 'meta-milk';
                                     break;
                                 case 'Amazon':
                                     apiPlatform = 'amazon';
@@ -462,6 +481,7 @@ export default function MarketingSpend() {
                             } else {
                                 let endpoint:
                                     | 'meta-spend'
+                                    | 'meta-milk-spend'
                                     | 'amazon-spend'
                                     | 'amazon-shipping-spend'
                                     | 'flipkart-spend'
@@ -472,6 +492,9 @@ export default function MarketingSpend() {
                                 switch (platform) {
                                     case 'Meta':
                                         endpoint = 'meta-spend';
+                                        break;
+                                    case 'meta-milk':
+                                        endpoint = 'meta-milk-spend';
                                         break;
                                     case 'Amazon':
                                         endpoint = 'amazon-spend';
@@ -513,6 +536,7 @@ export default function MarketingSpend() {
                             } else {
                                 let endpoint:
                                     | 'meta-spend'
+                                    | 'meta-milk-spend'
                                     | 'amazon-spend'
                                     | 'amazon-shipping-spend'
                                     | 'flipkart-spend'
@@ -523,6 +547,9 @@ export default function MarketingSpend() {
                                 switch (platform) {
                                     case 'Meta':
                                         endpoint = 'meta-spend';
+                                        break;
+                                    case 'meta-milk':
+                                        endpoint = 'meta-milk-spend';
                                         break;
                                     case 'Amazon':
                                         endpoint = 'amazon-spend';
@@ -593,6 +620,7 @@ export type UnifiedRecord =
 
 function UnifiedSpendSection({
     meta,
+    metaMilk,
     amazon,
     amazonShipping,
     flipkart,
@@ -611,6 +639,7 @@ function UnifiedSpendSection({
     loading,
 }: {
     meta: SpendRecord[];
+    metaMilk: SpendRecord[];
     amazon: SpendRecord[];
     amazonShipping: SpendRecord[];
     flipkart: SpendRecord[];
@@ -663,6 +692,7 @@ function UnifiedSpendSection({
 
     const combined = useMemo(() => {
         const m = meta.map(r => ({ ...r, _source: 'Meta' as const, _type: 'spend' as const }));
+        const mm = metaMilk.map(r => ({ ...r, _source: 'meta-milk' as const, _type: 'spend' as const }));
         const a = amazon.map(r => ({ ...r, _source: 'Amazon' as const, _type: 'spend' as const }));
         const aship = amazonShipping.map(r => ({ ...r, _source: 'Amazon Shipping' as const, _type: 'spend' as const }));
         const f = flipkart.map(r => ({ ...r, _source: 'Flipkart' as const, _type: 'spend' as const }));
@@ -671,8 +701,8 @@ function UnifiedSpendSection({
         const d = dolchi.map(r => ({ ...r, _source: 'Dolchi' as const, _type: 'spend' as const }));
         const dl = delhivery.map(r => ({ ...r, _source: 'Delhivery' as const, _type: 'spend' as const }));
         const miscRecords = misc.map(r => ({ ...r, _source: 'Miscellaneous' as const, _type: 'misc' as const }));
-        return [...m, ...a, ...aship, ...f, ...c, ...e, ...d, ...dl, ...miscRecords].sort((p, q) => new Date(q.date).getTime() - new Date(p.date).getTime());
-    }, [meta, amazon, amazonShipping, flipkart, checkout, engage, dolchi, delhivery, misc]);
+        return [...m, ...mm, ...a, ...aship, ...f, ...c, ...e, ...d, ...dl, ...miscRecords].sort((p, q) => new Date(q.date).getTime() - new Date(p.date).getTime());
+    }, [meta, metaMilk, amazon, amazonShipping, flipkart, checkout, engage, dolchi, delhivery, misc]);
 
     const filtered = useFilterRows(
         combined,
@@ -760,6 +790,9 @@ function PlatformTag({ platform }: { platform: Platform }) {
     switch (platform) {
         case 'Meta':
             variantClass = 'platform-tag--meta';
+            break;
+        case 'meta-milk':
+            variantClass = 'platform-tag--meta-milk';
             break;
         case 'Amazon':
             variantClass = 'platform-tag--amazon';

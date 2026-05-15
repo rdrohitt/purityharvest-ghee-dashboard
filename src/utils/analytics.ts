@@ -3,6 +3,7 @@ import type { AnalyticsOrderReportingResponse } from '../types/analytics-order-r
 import type { AnalyticsOverviewResponse } from '../types/analytics-overview';
 
 type AnalyticsOverviewFilters = {
+    category?: string;
     paymentMode?: string;
     status?: string;
     platform?: string;
@@ -19,6 +20,7 @@ type AnalyticsOverviewFilters = {
  * - /api/analytics/overview?from=2024-01-01&to=2024-01-31&status=Delivered
  * - /api/analytics/overview?from=2024-01-01&to=2024-01-31&platform=Shopify
  * - /api/analytics/overview?from=2024-01-01&to=2024-01-31&type=New
+ * - /api/analytics/overview?from=2024-01-01&to=2024-01-31&category=ghee
  */
 export async function fetchAnalyticsOverview(
     from: string,
@@ -27,6 +29,7 @@ export async function fetchAnalyticsOverview(
 ): Promise<AnalyticsOverviewResponse> {
     const params = new URLSearchParams({ from, to });
 
+    if (filters?.category) params.set('category', filters.category);
     if (filters?.paymentMode) params.set('paymentMode', filters.paymentMode);
     if (filters?.status) params.set('status', filters.status);
     if (filters?.platform) params.set('platform', filters.platform);
