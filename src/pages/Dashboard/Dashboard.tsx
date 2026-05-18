@@ -3,7 +3,7 @@ import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import type { ChartOptions, Plugin } from 'chart.js';
 import type { AnalyticsOrderReportingResponse } from '../../types/analytics-order-reporting';
-import { DateRange, RangeKey, generateMockData, getPresetRange, sum, getMonthRange, monthLabel } from '../../utils/metrics';
+import { DateRange, RangeKey, getPresetRange } from '../../utils/metrics';
 import { fetchAnalyticsOrderReporting } from '../../utils/analytics';
 import { mergeStateCountsForDisplay } from '../../utils/orderReportingStateMerge';
 import { DatePicker } from '../sales/Shopify/DatePicker';
@@ -162,9 +162,6 @@ export default function Dashboard() {
 	const [orderReportError, setOrderReportError] = useState<string | null>(null);
 	const [orderReport, setOrderReport] = useState<AnalyticsOrderReportingResponse | null>(null);
 
-	const data = useMemo(() => generateMockData(range), [range]);
-	const totals = useMemo(() => sum(data), [data]);
-
 	const mergedStateCounts = useMemo(
 		() => mergeStateCountsForDisplay(orderReport?.stateCounts ?? []),
 		[orderReport],
@@ -255,42 +252,6 @@ export default function Dashboard() {
 			cancelled = true;
 		};
 	}, [dateRangeForApi.from, dateRangeForApi.to]);
-
-	const labels = data.map((d) => d.date);
-	// Build last 6 months sales totals
-	const months = Array.from({ length: 6 }, (_, i) => 5 - i);
-	const monthLabels = months.map((m) => monthLabel(m));
-	const monthAgg = months.map((m) => sum(generateMockData(getMonthRange(m))));
-	const monthSales = monthAgg.map((t) => t.salesAmount);
-	const monthDelivered = monthAgg.map((t) => t.deliveredAmount);
-	const monthRto = monthAgg.map((t) => t.rtoAmount);
-	const lastSixMonthsBar = {
-		labels: monthLabels,
-		datasets: [
-			{ label: 'Sales', data: monthSales, backgroundColor: '#3b82f6', hoverBackgroundColor: '#2563eb', borderRadius: 6 },
-			{ label: 'Delivered', data: monthDelivered, backgroundColor: '#2563eb', hoverBackgroundColor: '#1d4ed8', borderRadius: 6 },
-			{ label: 'RTO', data: monthRto, backgroundColor: '#f59e0b', hoverBackgroundColor: '#d97706', borderRadius: 6 },
-		],
-	};
-
-	// Build Top 10 performing customers (mock) responsive to date range
-	const topCustomers = useMemo(() => {
-		const seedBase = labels.join('|').length + data.length;
-		function seeded(n: number) { return (Math.sin(seedBase + n) + 1) / 2; }
-		const names = [
-			'Aarav Sharma', 'Isha Gupta', 'Rohit Verma', 'Neha Singh', 'Karan Mehta',
-			'Pooja Rao', 'Aarav Patel', 'Sana Khan', 'Vikram Joshi', 'Anita Desai',
-			'Harsh Malhotra', 'Divya Nair', 'Ritika Kapoor', 'Aman Soni', 'Meera Jain'
-		];
-		const customers = names.map((name, i) => {
-			const orders = Math.max(1, Math.round(seeded(i + 1) * (data.length * 1.2)));
-			const avg = 499 + Math.round(seeded(i + 2) * 1500);
-			const revenue = orders * avg;
-			const phone = `9${String(Math.floor(seeded(i + 3) * 1000000000)).padStart(9, '0')}`;
-			return { name, phone, orders, revenue };
-		});
-		return customers.sort((a, b) => b.revenue - a.revenue).slice(0, 10);
-	}, [labels, data]);
 
 	useEffect(() => {
 		function onDocClick(e: MouseEvent) {
@@ -387,40 +348,6 @@ export default function Dashboard() {
 		};
 		return { topOrders, topRevenue, topAov, potentialRows, getPotentialRead };
 	}, [mergedStateCounts]);
-
-	const lastSixMonthsBarOptions = useMemo(
-		(): ChartOptions<'bar'> => ({
-			responsive: true,
-			maintainAspectRatio: true,
-			aspectRatio: 1.85,
-			animation: {
-				duration: 780,
-				easing: 'easeOutQuart',
-			},
-			interaction: { intersect: false, mode: 'index' },
-			plugins: {
-				legend: {
-					display: true,
-					position: 'bottom',
-					labels: { usePointStyle: true, padding: 18, font: { size: 12, weight: 500 } },
-				},
-				tooltip: { animation: { duration: 120 } },
-			},
-			scales: {
-				x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-				y: {
-					beginAtZero: true,
-					ticks: {
-						callback: (v) => formatCurrency(Number(v)).replace('₹', ''),
-						font: { size: 11 },
-					},
-					grid: { color: 'rgba(148, 163, 184, 0.2)' },
-					border: { dash: [4, 4] },
-				},
-			},
-		}),
-		[],
-	);
 
 	return (
 		<div className="dashboard">
@@ -655,132 +582,6 @@ export default function Dashboard() {
 				</section>
 			) : null}
 
-			<section className="card dashboard-section" aria-labelledby="dashboard-products-heading">
-				<div className="dashboard-section__head">
-					<h2 id="dashboard-products-heading" className="dashboard-section__title">Sales from delivered orders</h2>
-					<p className="dashboard-section__lead">All channels — mock breakdown for the selected date range.</p>
-				</div>
-				<div className="dashboard-product-grid">
-					{Object.entries(totals.productSales).map(([productName, data]) => (
-						<ProductKPI key={productName} productName={productName} count={data.count} amount={data.amount} />
-					))}
-				</div>
-			</section>
-
-			<section className="card dashboard-section" aria-label="Summary metrics">
-				<div className="dashboard-stat-grid">
-				<CompactMetricCard title="Total Sales" count={totals.salesCount} amount={totals.salesAmount} color="var(--primary)" />
-				<CompactMetricCard title="Delivered" count={totals.deliveredCount} amount={totals.deliveredAmount} color="#2563eb" />
-				<CompactMetricCard title="In Transit" count={totals.inTransitCount} amount={totals.inTransitAmount} color="#60a5fa" />
-				<CompactMetricCard title="RTO" count={totals.rtoCount} amount={totals.rtoAmount} color="#f59e0b" />
-				<CompactMetricCard title="Shipping" count={0} amount={Math.round(totals.salesAmount * 0.05)} color="#60a5fa" />
-				<CompactMetricCard title="aSpend" count={0} amount={Math.round(totals.salesAmount * 0.22)} color="#ef4444" />
-				</div>
-			</section>
-
-			<section className="card dashboard-section dashboard-chart-card" aria-labelledby="dashboard-sixmo-heading">
-				<div className="dashboard-section__head">
-					<h2 id="dashboard-sixmo-heading" className="dashboard-section__title">Last 6 months</h2>
-					<p className="dashboard-section__lead">Mock trend — sales, delivered, and RTO amounts by month.</p>
-				</div>
-				<Bar data={lastSixMonthsBar} options={lastSixMonthsBarOptions} />
-			</section>
-
-			<section className="card dashboard-section dashboard-table-card" aria-labelledby="dashboard-customers-heading">
-				<div className="dashboard-section__head">
-					<h2 id="dashboard-customers-heading" className="dashboard-section__title">Top performing customers</h2>
-					<p className="dashboard-section__lead">Sample leaderboard for the range (demo data).</p>
-				</div>
-				<div className="dashboard-table-scroll">
-					<table className="dashboard-table">
-						<thead>
-							<tr>
-								<th scope="col">Name</th>
-								<th scope="col">Phone</th>
-								<th scope="col">Total revenue</th>
-								<th scope="col">Total orders</th>
-							</tr>
-						</thead>
-						<tbody>
-							{topCustomers.map((c) => (
-								<tr key={c.phone}>
-									<td>{c.name}</td>
-									<td><a className="link" href={`tel:${c.phone}`}>{c.phone}</a></td>
-									<td>{formatCurrency(c.revenue)}</td>
-									<td>{c.orders.toLocaleString()}</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			</section>
-		</div>
-	);
-}
-
-function MetricCard({ title, count, amount, color }: { title: string; count: number; amount: number; color: string }) {
-	const showLtr = title !== 'Shipping' && title !== 'Marketing Spend';
-	return (
-		<div className="card" style={{ borderColor: 'var(--border)' }}>
-			<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-				<div style={{ fontSize: 14, color: 'var(--muted)' }}>{title}</div>
-				<div style={{ fontWeight: 700, color }}>
-					{count.toLocaleString()}
-					{showLtr ? <em style={{ fontSize: '0.85em', color: 'var(--muted)', fontWeight: 400, marginLeft: '4px' }}>ltr</em> : ''}
-				</div>
-			</div>
-			<div style={{ marginTop: 6, fontSize: 18, fontWeight: 800 }}>{formatCurrency(amount)}</div>
-		</div>
-	);
-}
-
-function CompactMetricCard({ title, count, amount, color }: { title: string; count: number; amount: number; color: string }) {
-	const hideCount = title === 'Shipping' || title === 'aSpend';
-	return (
-		<div
-			className="dashboard-stat"
-			style={{ ['--dashboard-stat-accent' as string]: color } as React.CSSProperties}
-		>
-			<div className="dashboard-stat__label">{title}</div>
-			{!hideCount ? (
-				<div className="dashboard-stat__count">{count.toLocaleString()}</div>
-			) : null}
-			<div className="dashboard-stat__amount">{formatCurrency(amount)}</div>
-		</div>
-	);
-}
-
-function getProductIcon(productName: string): string {
-	const icons: Record<string, string> = {
-		'Ghee': '🧈',
-		'Honey': '🍯',
-		'Grocery': '🛒',
-		'Oils': '🫒',
-		'Vermicompost': '🌱',
-	};
-	return icons[productName] || '📦';
-}
-
-function ProductKPI({ productName, count, amount }: { productName: string; count: number; amount: number }) {
-	const unit = productName === 'Grocery' ? 'pcs' : 'ltr';
-	return (
-		<div className="dashboard-product-kpi">
-			<div className="dashboard-product-kpi__row">
-				<span className="dashboard-product-kpi__icon" aria-hidden>{getProductIcon(productName)}</span>
-				<span>{productName}</span>
-			</div>
-			<div className="dashboard-product-kpi__stats">
-				<div>
-					<div className="dashboard-product-kpi__metric-label">Qty</div>
-					<div className="dashboard-product-kpi__metric-value">
-						{count.toLocaleString()}<em>{unit}</em>
-					</div>
-				</div>
-				<div className="dashboard-product-kpi__revenue">
-					<div className="dashboard-product-kpi__metric-label">Revenue</div>
-					<div className="dashboard-product-kpi__metric-value">{formatCurrency(amount)}</div>
-				</div>
-			</div>
 		</div>
 	);
 }
