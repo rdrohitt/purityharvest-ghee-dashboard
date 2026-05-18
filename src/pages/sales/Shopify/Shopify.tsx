@@ -61,22 +61,6 @@ function digitsOnly(s: string): string {
     return s.replace(/\D/g, '');
 }
 
-function lineLitersFromVariant(variantName: string, quantity: number): number {
-    const sizeMatch = (variantName || '').match(/-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|l)\b/i);
-    if (!sizeMatch) return 0;
-    const sizeValue = parseFloat(sizeMatch[1]);
-    const unit = sizeMatch[2].toLowerCase();
-    const litersPerUnit = unit === 'ml' ? sizeValue / 1000 : sizeValue;
-    return litersPerUnit * (Number(quantity) || 0);
-}
-
-function orderLiters(order: ShopifyOrderApi): number {
-    return (order.products || []).reduce(
-        (sum, p) => sum + lineLitersFromVariant(String(p.variantName || ''), Number(p.quantity) || 0),
-        0,
-    );
-}
-
 function toBackendTrackingStatus(status: DeliveryStatus | ''): string | undefined {
     if (!status) return undefined;
     return status;
@@ -353,7 +337,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
 
     const applyAnalyticsOverviewData = useCallback((data: AnalyticsOverviewResponse) => {
         setAnalyticsShippingPipeline(data.shippingPipeline ?? null);
-        setAnalyticsVolume(data.volume ?? null);
+        setAnalyticsVolume(normalizeAnalyticsVolume(data.volume));
         setAnalyticsPaymentSplit(data.paymentSplit ?? null);
         setAnalyticsSalesEbita(data.salesEbita ?? null);
     }, []);
@@ -719,22 +703,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         productCategoryMap,
     ]);
 
-    const milkMetrics = useMemo(() => {
-        if (categoryTab !== 'milk') {
-            return { totalAmount: 0, totalLitres: 0, deliveredLitres: 0 };
-        }
-        let totalAmount = 0;
-        let totalLitres = 0;
-        let deliveredLitres = 0;
-        for (const o of filtered) {
-            const amount = Number(o.totalAmount) || 0;
-            const liters = orderLiters(o);
-            totalAmount += amount;
-            totalLitres += liters;
-            if (o.is_shipped === true) deliveredLitres += liters;
-        }
-        return { totalAmount, totalLitres, deliveredLitres };
-    }, [categoryTab, filtered]);
+    const milkOverviewRoas = useMemo(() => {
+        if (categoryTab !== 'milk') return null;
+        const spend = Number(analyticsSalesEbita?.costs?.marketingSpendTotal) || 0;
+        const sales = Number(analyticsSalesEbita?.totalSales) || 0;
+        return sales > 0 ? spend / sales : 0;
+    }, [categoryTab, analyticsSalesEbita]);
 
     useEffect(() => {
         function onDocClick(e: MouseEvent) {
@@ -1171,7 +1145,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                         salesEbita={analyticsSalesEbita}
                                         loading={analyticsOverviewLoading}
                                         isMilkSelected={categoryTab === 'milk'}
-                                        milkTotalSales={milkMetrics.totalAmount}
                                         deliveredSalesAmount={analyticsShippingPipeline?.delivered.amount ?? 0}
                                         inTransitSalesAmount={analyticsShippingPipeline?.inTransit.amount ?? 0}
                                     />
@@ -1179,8 +1152,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                         volume={analyticsVolume}
                                         loading={analyticsOverviewLoading}
                                         isMilkSelected={categoryTab === 'milk'}
-                                        milkTotalLitres={milkMetrics.totalLitres}
-                                        milkDeliveredLitres={milkMetrics.deliveredLitres}
                                     />
                                     <ModernDeliveryStatusMetric
                                         pipeline={analyticsShippingPipeline}
@@ -1190,9 +1161,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     <ModernRoasMetric
                                         paymentSplit={analyticsPaymentSplit}
                                         loading={analyticsOverviewLoading}
+                                        categoryTab={categoryTab}
+                                        salesEbita={analyticsSalesEbita}
+                                        milkOverviewRoas={milkOverviewRoas}
                                         deliveredSalesAmount={analyticsShippingPipeline?.delivered.amount ?? 0}
                                         inTransitSalesAmount={analyticsShippingPipeline?.inTransit.amount ?? 0}
-                                        marketingSpendTotal={analyticsSalesEbita?.costs?.marketingSpendTotal ?? 0}
                                     />
                                 </div>
                             </div>
@@ -1623,48 +1596,71 @@ function formatPctLabel(n: number): string {
 }
 
 /**
- * Current ROAS = delivered sales amount ÷ marketing spend total.
- * Expected ROAS = (delivered + in-transit) sales amount ÷ marketing spend total.
- * Payment mix donut still uses `paymentSplit`.
+ * Milk: current ROAS = marketingSpendTotal ÷ totalSales (no target).
+ * Ghee / all / oils: current ROAS = delivered ÷ marketingSpendTotal; target = (delivered + in-transit) ÷ spend.
  */
 function ModernRoasMetric({
     paymentSplit,
     loading,
+    categoryTab,
+    salesEbita,
+    milkOverviewRoas,
     deliveredSalesAmount,
     inTransitSalesAmount,
-    marketingSpendTotal,
 }: {
     paymentSplit: AnalyticsOverviewPaymentSplit | null;
     loading: boolean;
+    categoryTab: CategoryTab;
+    salesEbita: AnalyticsOverviewSalesEbita | null;
+    milkOverviewRoas: number | null;
     deliveredSalesAmount: number;
     inTransitSalesAmount: number;
-    marketingSpendTotal: number;
 }) {
+    const isMilkTab = categoryTab === 'milk';
     const ps = paymentSplit ?? EMPTY_PAYMENT_SPLIT;
     const prepaidPct = Math.max(0, Math.min(100, Number(ps.prepaid?.percentage) || 0));
     const codPct = Math.max(0, Math.min(100, Number(ps.cod?.percentage) || 0));
     const hasOrderPaymentMix = (ps.totalOrders ?? 0) > 0 && (prepaidPct > 0 || codPct > 0);
 
-    const spend = Math.max(0, Number(marketingSpendTotal) || 0);
+    const se = salesEbita ?? EMPTY_SALES_EBITA;
+    const costs: AnalyticsOverviewSalesEbitaCosts = {
+        ...EMPTY_SALES_EBITA_COSTS,
+        ...se.costs,
+        marketingSpendByPlatform: {
+            ...EMPTY_SALES_EBITA_COSTS.marketingSpendByPlatform,
+            ...(se.costs?.marketingSpendByPlatform ?? {}),
+        },
+    };
+    const marketingSpendTotal = Number(costs.marketingSpendTotal) || 0;
     const delivered = Math.max(0, Number(deliveredSalesAmount) || 0);
     const inTransit = Math.max(0, Number(inTransitSalesAmount) || 0);
-    const currentRoas = spend > 0 ? delivered / spend : 0;
-    const expectedRoas = spend > 0 ? (delivered + inTransit) / spend : 0;
+
+    // Milk: marketingSpendTotal ÷ totalSales. Ghee: delivered ÷ marketingSpendTotal.
+    const currentRoas = isMilkTab
+        ? milkOverviewRoas ?? 0
+        : marketingSpendTotal > 0
+          ? delivered / marketingSpendTotal
+          : 0;
+    const expectedRoas =
+        marketingSpendTotal > 0 ? (delivered + inTransit) / marketingSpendTotal : 0;
 
     const formatRoas = (v: number): string => {
         if (!Number.isFinite(v) || v <= 0) return '0.00';
         return v.toFixed(2);
     };
 
-    const gaugeDeg =
-        Number.isFinite(currentRoas) &&
+    const gaugeDeg = isMilkTab
+        ? Number.isFinite(currentRoas) && currentRoas > 0
+            ? Math.min(360, (currentRoas / 5) * 360)
+            : 0
+        : Number.isFinite(currentRoas) &&
             currentRoas > 0 &&
             Number.isFinite(expectedRoas) &&
             expectedRoas > 0
-            ? Math.min(360, (currentRoas / expectedRoas) * 360)
-            : Number.isFinite(currentRoas) && currentRoas > 0
-                ? Math.min(360, (currentRoas / 5) * 360)
-                : 0;
+          ? Math.min(360, (currentRoas / expectedRoas) * 360)
+          : Number.isFinite(currentRoas) && currentRoas > 0
+            ? Math.min(360, (currentRoas / 5) * 360)
+            : 0;
 
     const paymentSplitDeg =
         prepaidPct > 0 || codPct > 0 ? Math.min(360, Math.max(0, (prepaidPct / 100) * 360)) : 0;
@@ -1691,18 +1687,24 @@ function ModernRoasMetric({
                         className="shopify-dash-card__gauge"
                         style={{ '--shopify-gauge-deg': `${gaugeDeg}deg` } as CSSProperties}
                         role="img"
-                        aria-label={`ROAS ${formatRoas(currentRoas)}, expected ${formatRoas(expectedRoas)}`}
+                        aria-label={
+                            isMilkTab
+                                ? `ROAS ${formatRoas(currentRoas)}`
+                                : `ROAS ${formatRoas(currentRoas)}, expected ${formatRoas(expectedRoas)}`
+                        }
                     >
                         <div className="shopify-dash-card__gauge-cutout">
                             <span className="shopify-dash-card__gauge-value">{formatRoas(currentRoas)}</span>
                             <span className="shopify-dash-card__gauge-label">current</span>
                         </div>
                     </div>
-                    <div className="shopify-dash-card__roas-side">
-                        <p className="shopify-dash-card__compare-label">Target</p>
-                        <p className="shopify-dash-card__compare-value">{formatRoas(expectedRoas)}</p>
-                        <p className="shopify-dash-card__compare-hint">expected ROAS</p>
-                    </div>
+                    {!isMilkTab ? (
+                        <div className="shopify-dash-card__roas-side">
+                            <p className="shopify-dash-card__compare-label">Target</p>
+                            <p className="shopify-dash-card__compare-value">{formatRoas(expectedRoas)}</p>
+                            <p className="shopify-dash-card__compare-hint">expected ROAS</p>
+                        </div>
+                    ) : null}
                 </div>
                 <div className="shopify-dash-card__roas-payment-row">
                     <div
@@ -1771,14 +1773,12 @@ function ModernSalesWithEBITAMetric({
     salesEbita,
     loading,
     isMilkSelected,
-    milkTotalSales,
     deliveredSalesAmount,
     inTransitSalesAmount,
 }: {
     salesEbita: AnalyticsOverviewSalesEbita | null;
     loading: boolean;
     isMilkSelected: boolean;
-    milkTotalSales?: number;
     deliveredSalesAmount: number;
     inTransitSalesAmount: number;
 }) {
@@ -1792,7 +1792,8 @@ function ModernSalesWithEBITAMetric({
         },
     };
     const platform = costs.marketingSpendByPlatform;
-    const totalSales = isMilkSelected ? Math.max(0, Number(milkTotalSales) || 0) : Number(se.totalSales) || 0;
+    /** Overview is fetched with category filter — totalSales is correct for Milk and other tabs. */
+    const totalSales = Number(se.totalSales) || 0;
     const spend = Math.max(0, Number(costs.marketingSpendTotal) || 0);
     const delivered = Math.max(0, Number(deliveredSalesAmount) || 0);
     const inTransit = Math.max(0, Number(inTransitSalesAmount) || 0);
@@ -1826,12 +1827,17 @@ function ModernSalesWithEBITAMetric({
                 <p className="shopify-dash-card__figure">{formatCurrency(totalSales)}</p>
                 <p className="shopify-dash-card__caption">Total sales in range</p>
             </div>
-            <div className={isMilkSelected ? 'shopify-milk-blocked-area shopify-milk-blocked-area--active' : 'shopify-milk-blocked-area'}>
-                {isMilkSelected ? (
-                    <div className="shopify-dash-card__disabled-overlay" aria-live="polite">
-                        Not For Milk
-                    </div>
-                ) : null}
+            {isMilkSelected ? (
+                <section className="shopify-dash-card__panel shopify-dash-card__panel--milk" aria-label="Meta expense">
+                    <ul className="shopify-dash-card__cost-list">
+                        <li>
+                            <span>Meta Exp</span>
+                            <span>{formatCurrency(spend)}</span>
+                        </li>
+                    </ul>
+                </section>
+            ) : (
+                <>
                 <div className="shopify-dash-card__stat-row">
                     <div className={`shopify-dash-card__stat ${ebita >= 0 ? 'shopify-dash-card__stat--pos' : 'shopify-dash-card__stat--neg'}`}>
                         <span className="shopify-dash-card__stat-k">EBITA</span>
@@ -1872,7 +1878,8 @@ function ModernSalesWithEBITAMetric({
                         </li>
                     </ul>
                 </section>
-            </div>
+                </>
+            )}
         </article>
     );
 }
@@ -2069,6 +2076,22 @@ const EMPTY_VOLUME: AnalyticsOverviewVolume = {
     quantityBySize: {},
 };
 
+function normalizeAnalyticsVolume(
+    vol: AnalyticsOverviewVolume | null | undefined,
+): AnalyticsOverviewVolume | null {
+    if (!vol) return null;
+    const lt = vol.litresByType;
+    return {
+        totalLitres: Number(vol.totalLitres) || 0,
+        litresByType: {
+            girCow: Number(lt?.girCow) || 0,
+            desiCow: Number(lt?.desiCow) || 0,
+            buffalo: Number(lt?.buffalo) || 0,
+        },
+        quantityBySize: vol.quantityBySize ?? {},
+    };
+}
+
 const VOLUME_SIZE_ROW_DEFS: { apiKeys: string[]; label: string; litersPerUnit: number }[] = [
     { apiKeys: ['500ml'], label: '500 ml', litersPerUnit: 0.5 },
     { apiKeys: ['1litre', '1ltr'], label: '1 L', litersPerUnit: 1 },
@@ -2077,12 +2100,13 @@ const VOLUME_SIZE_ROW_DEFS: { apiKeys: string[]; label: string; litersPerUnit: n
 ];
 
 function bucketForVolumeRowKeys(
-    qbs: AnalyticsOverviewVolume['quantityBySize'],
+    qbs: AnalyticsOverviewVolume['quantityBySize'] | null | undefined,
     apiKeys: string[],
 ): AnalyticsOverviewQuantityBySizeBucket {
     const empty: AnalyticsOverviewQuantityBySizeBucket = { ordered: 0, delivered: 0, rto: 0, inTransit: 0 };
+    const map = qbs ?? {};
     for (const k of apiKeys) {
-        const b = qbs[k];
+        const b = map[k];
         if (b) {
             return {
                 ordered: Number(b.ordered) || 0,
@@ -2099,26 +2123,22 @@ function ModernQuantityMetric({
     volume,
     loading,
     isMilkSelected,
-    milkTotalLitres,
-    milkDeliveredLitres,
 }: {
     volume: AnalyticsOverviewVolume | null;
     loading: boolean;
     isMilkSelected: boolean;
-    milkTotalLitres?: number;
-    milkDeliveredLitres?: number;
 }) {
     const v = volume ?? EMPTY_VOLUME;
-    const totalLitres = isMilkSelected ? Math.max(0, Number(milkTotalLitres) || 0) : Number(v.totalLitres) || 0;
-    const lt = v.litresByType;
-    const totalDeliveredLitres = isMilkSelected
-        ? Math.max(0, Number(milkDeliveredLitres) || 0)
-        : VOLUME_SIZE_ROW_DEFS.reduce((sum, row) => {
-              const b = bucketForVolumeRowKeys(v.quantityBySize, row.apiKeys);
-              return sum + b.delivered * row.litersPerUnit;
-          }, 0);
+    const quantityBySize = v.quantityBySize ?? EMPTY_VOLUME.quantityBySize;
+    /** Overview is fetched with category filter — totalLitres is correct for Milk and other tabs. */
+    const totalLitres = Number(v.totalLitres) || 0;
+    const lt = v.litresByType ?? EMPTY_VOLUME.litresByType;
+    const totalDeliveredLitres = VOLUME_SIZE_ROW_DEFS.reduce((sum, row) => {
+        const b = bucketForVolumeRowKeys(quantityBySize, row.apiKeys);
+        return sum + b.delivered * row.litersPerUnit;
+    }, 0);
     const hasAnySizeRow = VOLUME_SIZE_ROW_DEFS.some(
-        (row) => bucketForVolumeRowKeys(v.quantityBySize, row.apiKeys).ordered > 0,
+        (row) => bucketForVolumeRowKeys(quantityBySize, row.apiKeys).ordered > 0,
     );
     const showVolumeDetail = totalLitres > 0 || hasAnySizeRow;
     const formatLiters = (liters: number): string =>
@@ -2186,7 +2206,7 @@ function ModernQuantityMetric({
                                 <span role="columnheader" title="In transit">Trn</span>
                             </div>
                             {VOLUME_SIZE_ROW_DEFS.map(({ apiKeys, label }) => {
-                                const b = bucketForVolumeRowKeys(v.quantityBySize, apiKeys);
+                                const b = bucketForVolumeRowKeys(quantityBySize, apiKeys);
                                 if (b.ordered <= 0) return null;
                                 const rowKey = apiKeys[0] ?? label;
                                 return (
