@@ -3,11 +3,22 @@ import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import type { ChartOptions, Plugin } from 'chart.js';
 import type { AnalyticsOrderReportingResponse } from '../../types/analytics-order-reporting';
-import { DateRange, RangeKey, getPresetRange } from '../../utils/metrics';
-import { fetchAnalyticsOrderReporting } from '../../utils/analytics';
+import type {
+	TopPerformingCustomersResponse,
+	TopPerformingCustomersType,
+} from '../../types/analytics-top-performing-customers';
+import {
+	DateRange,
+	RangeKey,
+	TopCustomersRangeKey,
+	getPresetRange,
+	getTopCustomersPresetRange,
+} from '../../utils/metrics';
+import { fetchAnalyticsOrderReporting, fetchTopPerformingCustomers } from '../../utils/analytics';
 import { mergeStateCountsForDisplay } from '../../utils/orderReportingStateMerge';
 import { DatePicker } from '../sales/Shopify/DatePicker';
-import { toInputDate } from '../sales/Shopify/ShopifyShared';
+import { FilterButton, PlatformTag, StatusTag, toInputDate } from '../sales/Shopify/ShopifyShared';
+import { mapDeliveryStatusFromTracking } from '../../utils/shopify-orders';
 import '../sales/Shopify/Shopify.scss';
 import './Dashboard.scss';
 
@@ -84,6 +95,17 @@ const ORDER_REPORTING_GEO_BAR_OPTIONS = ((): ChartOptions<'bar'> => {
 })();
 
 function formatCurrency(n: number): string { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n); }
+function formatPhone(countryCode: string, phoneNumber: string): string {
+	const code = countryCode?.trim() || '';
+	const phone = phoneNumber?.trim() || '';
+	if (!phone) return '—';
+	return code ? `${code} ${phone}` : phone;
+}
+function formatLastOrderDate(iso: string): string {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return '—';
+	return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 function formatCompactCurrency(n: number): string {
 	return new Intl.NumberFormat('en-IN', {
 		style: 'currency',
@@ -161,6 +183,33 @@ export default function Dashboard() {
 	const [orderReportLoading, setOrderReportLoading] = useState(false);
 	const [orderReportError, setOrderReportError] = useState<string | null>(null);
 	const [orderReport, setOrderReport] = useState<AnalyticsOrderReportingResponse | null>(null);
+
+	const [topCustomersType, setTopCustomersType] = useState<TopPerformingCustomersType>('amount');
+	const [topCustomersRangeKey, setTopCustomersRangeKey] = useState<TopCustomersRangeKey>('currentMonth');
+	const [topCustomersAppliedCustom, setTopCustomersAppliedCustom] = useState<DateRange>(() =>
+		getTopCustomersPresetRange('currentMonth'),
+	);
+	const [topCustomersCustomDraft, setTopCustomersCustomDraft] = useState<DateRange>(() =>
+		getTopCustomersPresetRange('currentMonth'),
+	);
+	const [topCustomersShowCustom, setTopCustomersShowCustom] = useState(false);
+	const topCustomersCustomBtnRef = useRef<HTMLButtonElement | null>(null);
+	const topCustomersPopoverRef = useRef<HTMLDivElement | null>(null);
+	const [topCustomersLoading, setTopCustomersLoading] = useState(false);
+	const [topCustomersError, setTopCustomersError] = useState<string | null>(null);
+	const [topCustomersData, setTopCustomersData] = useState<TopPerformingCustomersResponse | null>(null);
+
+	const topCustomersRange = useMemo(
+		() =>
+			topCustomersRangeKey === 'custom'
+				? topCustomersAppliedCustom
+				: getTopCustomersPresetRange(topCustomersRangeKey),
+		[topCustomersRangeKey, topCustomersAppliedCustom],
+	);
+	const topCustomersDateRangeForApi = useMemo(
+		() => ({ from: toInputDate(topCustomersRange.start), to: toInputDate(topCustomersRange.end) }),
+		[topCustomersRange.start, topCustomersRange.end],
+	);
 
 	const mergedStateCounts = useMemo(
 		() => mergeStateCountsForDisplay(orderReport?.stateCounts ?? []),
@@ -252,6 +301,44 @@ export default function Dashboard() {
 			cancelled = true;
 		};
 	}, [dateRangeForApi.from, dateRangeForApi.to]);
+
+	useEffect(() => {
+		let cancelled = false;
+		setTopCustomersLoading(true);
+		setTopCustomersError(null);
+		fetchTopPerformingCustomers(topCustomersDateRangeForApi.from, topCustomersDateRangeForApi.to, topCustomersType)
+			.then((payload) => {
+				if (!cancelled) {
+					setTopCustomersData(payload);
+					setTopCustomersError(null);
+				}
+			})
+			.catch((err) => {
+				console.error('Failed to load top performing customers', err);
+				if (!cancelled) {
+					setTopCustomersData(null);
+					setTopCustomersError('Could not load top performing customers for this range.');
+				}
+			})
+			.finally(() => {
+				if (!cancelled) setTopCustomersLoading(false);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [topCustomersDateRangeForApi.from, topCustomersDateRangeForApi.to, topCustomersType]);
+
+	useEffect(() => {
+		function onTopCustomersDocClick(e: MouseEvent) {
+			if (!topCustomersShowCustom) return;
+			const target = e.target as Node;
+			if (topCustomersPopoverRef.current?.contains(target)) return;
+			if (topCustomersCustomBtnRef.current?.contains(target)) return;
+			setTopCustomersShowCustom(false);
+		}
+		document.addEventListener('click', onTopCustomersDocClick);
+		return () => document.removeEventListener('click', onTopCustomersDocClick);
+	}, [topCustomersShowCustom]);
 
 	useEffect(() => {
 		function onDocClick(e: MouseEvent) {
@@ -527,6 +614,218 @@ export default function Dashboard() {
 							)}
 						</div>
 					</div>
+				) : null}
+			</section>
+
+			<section className="card dashboard-section dashboard-table-card dashboard-top-customers-section" aria-labelledby="dashboard-top-customers-heading">
+				<div className="dashboard-top-customers-toolbar">
+					<div className="dashboard-top-customers-toolbar__left">
+						<div className="dashboard-section__head dashboard-top-customers-head">
+							<h2 id="dashboard-top-customers-heading" className="dashboard-section__title">Top performing customers</h2>
+							<p className="dashboard-section__lead">
+								Ranked by {topCustomersType === 'order' ? 'order count' : 'total spend'}
+								{' '}
+								(
+								{topCustomersData?.filters?.from ?? topCustomersDateRangeForApi.from}
+								{' '}
+								—
+								{' '}
+								{topCustomersData?.filters?.to ?? topCustomersDateRangeForApi.to}
+								).
+							</p>
+						</div>
+						<div className="shopify-category-tabs dashboard-top-customers-tabs">
+							<FilterButton active={topCustomersType === 'order'} onClick={() => setTopCustomersType('order')}>
+								By Order
+							</FilterButton>
+							<FilterButton active={topCustomersType === 'amount'} onClick={() => setTopCustomersType('amount')}>
+								By Amount
+							</FilterButton>
+						</div>
+					</div>
+					<div className="dashboard-top-customers-toolbar__right">
+						<div className="filter-group shopify-header-filter-group dashboard-top-customers-filters">
+							<FilterButton
+								active={topCustomersRangeKey === 'currentMonth'}
+								onClick={() => {
+									setTopCustomersRangeKey('currentMonth');
+									setTopCustomersShowCustom(false);
+								}}
+							>
+								Current Month
+							</FilterButton>
+							<FilterButton
+								active={topCustomersRangeKey === 'last3Months'}
+								onClick={() => {
+									setTopCustomersRangeKey('last3Months');
+									setTopCustomersShowCustom(false);
+								}}
+							>
+								Last 3 Months
+							</FilterButton>
+							<FilterButton
+								active={topCustomersRangeKey === 'last6Months'}
+								onClick={() => {
+									setTopCustomersRangeKey('last6Months');
+									setTopCustomersShowCustom(false);
+								}}
+							>
+								Last 6 Months
+							</FilterButton>
+							<FilterButton
+								active={topCustomersRangeKey === 'last1Year'}
+								onClick={() => {
+									setTopCustomersRangeKey('last1Year');
+									setTopCustomersShowCustom(false);
+								}}
+							>
+								Last 1 Year
+							</FilterButton>
+							<FilterButton
+								refEl={topCustomersCustomBtnRef}
+								active={topCustomersRangeKey === 'custom' || topCustomersShowCustom}
+								onClick={() => {
+									if (!topCustomersShowCustom) {
+										setTopCustomersCustomDraft(topCustomersAppliedCustom);
+									}
+									setTopCustomersShowCustom((v) => !v);
+								}}
+							>
+								Custom
+							</FilterButton>
+						</div>
+						{topCustomersShowCustom ? (
+							<div
+								ref={topCustomersPopoverRef}
+								className="date-range-popover shopify-date-range-popover dashboard-top-customers-date-popover"
+								style={{ right: 0, left: 'auto' }}
+							>
+								<div className="shopify-date-range-inner">
+									<div className="shopify-date-range-field">
+										<label className="label shopify-date-range-label">Start</label>
+										<div className="shopify-date-range-picker">
+											<DatePicker
+												value={toInputDate(topCustomersCustomDraft.start)}
+												onChange={(v) =>
+													setTopCustomersCustomDraft((prev) => ({
+														...prev,
+														start: dateFromInputString(v),
+													}))
+												}
+												placeholder="Select start date"
+											/>
+										</div>
+									</div>
+									<span className="shopify-date-range-separator" aria-hidden>—</span>
+									<div className="shopify-date-range-field">
+										<label className="label shopify-date-range-label">End</label>
+										<div className="shopify-date-range-picker">
+											<DatePicker
+												value={toInputDate(topCustomersCustomDraft.end)}
+												onChange={(v) =>
+													setTopCustomersCustomDraft((prev) => ({
+														...prev,
+														end: dateFromInputString(v),
+													}))
+												}
+												placeholder="Select end date"
+											/>
+										</div>
+									</div>
+									<button
+										type="button"
+										className="button shopify-date-range-apply"
+										onClick={() => {
+											setTopCustomersAppliedCustom(topCustomersCustomDraft);
+											setTopCustomersRangeKey('custom');
+											setTopCustomersShowCustom(false);
+										}}
+									>
+										Apply
+									</button>
+								</div>
+							</div>
+						) : null}
+					</div>
+				</div>
+				{topCustomersLoading ? (
+					<p className="dashboard-top-customers-status">
+						<span className="dashboard-pill dashboard-pill--loading">
+							<span className="dashboard-pill__dot" aria-hidden />
+							Loading customers…
+						</span>
+					</p>
+				) : null}
+				{topCustomersError ? (
+					<p className="dashboard-top-customers-status dashboard-top-customers-status--error" role="alert">
+						{topCustomersError}
+					</p>
+				) : null}
+				{!topCustomersLoading && !topCustomersError && topCustomersData ? (
+					(topCustomersData.customers?.length ?? 0) === 0 ? (
+						<p className="dashboard-top-customers-empty">No customers in this range.</p>
+					) : (
+						<div className="dashboard-table-scroll">
+							<table className="dashboard-table dashboard-top-customers-table">
+								<thead>
+									<tr>
+										<th scope="col">#</th>
+										<th scope="col">Customer</th>
+										<th scope="col" className="dashboard-table__num">Orders</th>
+										<th scope="col" className="dashboard-table__num">Total amount</th>
+										<th scope="col">Last order</th>
+										<th scope="col">Platform</th>
+										<th scope="col">Payment</th>
+										<th scope="col">Status</th>
+									</tr>
+								</thead>
+								<tbody>
+									{topCustomersData.customers.map((customer, index) => {
+										const phone = formatPhone(customer.countryCode, customer.phoneNumber);
+										const lastOrder = customer.lastOrder;
+										const deliveryStatus = mapDeliveryStatusFromTracking(
+											lastOrder?.trackingStatus,
+											lastOrder?.returnStatus,
+										);
+										return (
+											<tr key={customer.customerId}>
+												<td>{index + 1}</td>
+												<td>
+													<div className="shopify-customer-cell">
+														<div className="shopify-customer-name-row">
+															<span className="shopify-customer-name">{customer.name || '—'}</span>
+														</div>
+														{phone !== '—' ? (
+															<span className="shopify-customer-phone">{phone}</span>
+														) : (
+															<span className="shopify-customer-phone shopify-customer-phone--empty">—</span>
+														)}
+													</div>
+												</td>
+												<td className="dashboard-table__num">{customer.orderCount.toLocaleString()}</td>
+												<td className="dashboard-table__num">{formatCurrency(customer.totalAmount)}</td>
+												<td>{formatLastOrderDate(lastOrder?.date ?? '')}</td>
+												<td>
+													<PlatformTag platform={lastOrder?.platform ?? ''} />
+												</td>
+												<td>
+													<StatusTag kind={lastOrder?.paymentMode ?? ''} type="payment" />
+												</td>
+												<td>
+													<div className="shopify-shipping-status-cell">
+														<StatusTag kind={deliveryStatus} type="delivery" />
+														{lastOrder?.referenceNo ? (
+															<span className="dashboard-top-customers-ref">{lastOrder.referenceNo}</span>
+														) : null}
+													</div>
+												</td>
+											</tr>
+										);
+									})}
+								</tbody>
+							</table>
+						</div>
+					)
 				) : null}
 			</section>
 

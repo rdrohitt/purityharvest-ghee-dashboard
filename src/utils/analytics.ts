@@ -1,6 +1,10 @@
 import { apiFetch } from '../api';
 import type { AnalyticsOrderReportingResponse } from '../types/analytics-order-reporting';
 import type { AnalyticsOverviewResponse } from '../types/analytics-overview';
+import type {
+    TopPerformingCustomersResponse,
+    TopPerformingCustomersType,
+} from '../types/analytics-top-performing-customers';
 
 type AnalyticsOverviewFilters = {
     category?: string;
@@ -50,4 +54,18 @@ export async function fetchAnalyticsOrderReporting(from: string, to: string): Pr
         throw new Error('Failed to load order reporting');
     }
     return (await res.json()) as AnalyticsOrderReportingResponse;
+}
+
+/** GET /api/analytics/top-performing-customers?from=YYYY-MM-DD&to=YYYY-MM-DD&type=order|amount */
+export async function fetchTopPerformingCustomers(
+    from: string,
+    to: string,
+    type: TopPerformingCustomersType,
+): Promise<TopPerformingCustomersResponse> {
+    const params = new URLSearchParams({ from, to, type });
+    const res = await apiFetch(`/api/analytics/top-performing-customers?${params.toString()}`);
+    if (!res.ok) {
+        throw new Error('Failed to load top performing customers');
+    }
+    return (await res.json()) as TopPerformingCustomersResponse;
 }

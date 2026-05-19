@@ -1,6 +1,8 @@
 export type MetricKey = 'sales' | 'rto' | 'delivered' | 'inTransit';
 export type RangeKey = 'today' | 'yesterday' | 'last7' | 'last30' | 'currentMonth' | 'custom';
 
+export type TopCustomersRangeKey = 'currentMonth' | 'last3Months' | 'last6Months' | 'last1Year' | 'custom';
+
 export type DateRange = { start: Date; end: Date };
 
 export function getPresetRange(key: Exclude<RangeKey, 'custom'>, now = new Date()): DateRange {
@@ -30,6 +32,33 @@ export function getPresetRange(key: Exclude<RangeKey, 'custom'>, now = new Date(
 		monthStart.setHours(0, 0, 0, 0);
 		return { start: monthStart, end };
 	}
+	return { start, end };
+}
+
+/** Preset ranges for dashboard top-performing-customers (calendar months, inclusive of current month). */
+export function getTopCustomersPresetRange(
+	key: Exclude<TopCustomersRangeKey, 'custom'>,
+	now = new Date(),
+): DateRange {
+	const end = new Date(now);
+	end.setHours(23, 59, 59, 999);
+	const start = new Date(now);
+	start.setHours(0, 0, 0, 0);
+
+	if (key === 'currentMonth') {
+		start.setDate(1);
+		return { start, end };
+	}
+	if (key === 'last3Months') {
+		start.setMonth(start.getMonth() - 2, 1);
+		return { start, end };
+	}
+	if (key === 'last6Months') {
+		start.setMonth(start.getMonth() - 5, 1);
+		return { start, end };
+	}
+	// last1Year — 12 calendar months including the current month
+	start.setMonth(start.getMonth() - 11, 1);
 	return { start, end };
 }
 
