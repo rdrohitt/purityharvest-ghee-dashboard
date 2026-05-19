@@ -217,6 +217,8 @@ export type ModernSelectOption<T extends string = string> = {
     value: T | '';
     label: string;
     icon?: React.ReactNode;
+    /** Optional visual tone for colored dropdowns (e.g. RTO condition). */
+    tone?: string;
 };
 
 export function ModernSelect<T extends string>({
@@ -252,6 +254,7 @@ export function ModernSelect<T extends string>({
     const selected = options.find((o) => o.value === value);
     const displayLabel = selected?.label ?? placeholder ?? 'Select…';
     const displayIcon = selected?.icon;
+    const selectedTone = selected?.tone;
 
     useLayoutEffect(() => {
         if (!open) {
@@ -348,7 +351,9 @@ export function ModernSelect<T extends string>({
 				<li key={String(opt.value) + opt.label} role="presentation">
 					<button
 						type="button"
-						className={`shopify-modern-select__option${opt.value === value ? ' is-active' : ''}`}
+						className={`shopify-modern-select__option${opt.value === value ? ' is-active' : ''}${
+							opt.tone ? ` shopify-modern-select__option--tone-${opt.tone}` : ''
+						}`}
 						role="option"
 						aria-selected={opt.value === value}
 						onMouseDown={(e) => e.preventDefault()}
@@ -372,12 +377,16 @@ export function ModernSelect<T extends string>({
     return (
 	<div
 		ref={rootRef}
-		className={`shopify-modern-select shopify-modern-select--${variant}${open ? ' is-open' : ''} ${className}`.trim()}
+		className={`shopify-modern-select shopify-modern-select--${variant}${open ? ' is-open' : ''}${
+			selectedTone ? ` shopify-modern-select--tone-${selectedTone}` : ''
+		} ${className}`.trim()}
 	>
 		<button
 			ref={triggerRef}
 			type="button"
-			className="shopify-modern-select__trigger"
+			className={`shopify-modern-select__trigger${
+				selectedTone ? ` shopify-modern-select__trigger--tone-${selectedTone}` : ''
+			}`}
 			aria-haspopup="listbox"
 			aria-expanded={open}
 			aria-controls={listId}

@@ -4961,6 +4961,127 @@
   height: 38px;
 }
 
+/* RTO condition dropdown — missing value: thick red outline + running shine */
+@keyframes rto-missing-border-shine-run {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.shopify-rto-condition-select--missing {
+  --rto-missing-border-width: 4px;
+  position: relative;
+  isolation: isolate;
+  border-radius: 10px;
+  overflow: visible;
+  filter: drop-shadow(0 0 2px rgba(255, 0, 0, 0.18));
+}
+
+.shopify-rto-condition-select--missing::before,
+.shopify-rto-condition-select--missing::after {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--rto-missing-border-width) / 2);
+  border-radius: inherit;
+  padding: var(--rto-missing-border-width);
+  pointer-events: none;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+/* Thick bright-red base ring */
+.shopify-rto-condition-select--missing::before {
+  z-index: 0;
+  background: linear-gradient(180deg, #ff1a1a 0%, #ff0000 45%, #e60000 100%);
+}
+
+/* Shine streak running around the outline (GPU rotate for smooth loop) */
+.shopify-rto-condition-select--missing::after {
+  z-index: 1;
+  transform-origin: center center;
+  will-change: transform;
+  backface-visibility: hidden;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 242deg,
+    rgba(255, 255, 255, 0.08) 250deg,
+    rgba(255, 255, 255, 0.35) 262deg,
+    rgba(255, 255, 255, 0.75) 276deg,
+    #ffffff 284deg,
+    rgba(255, 255, 255, 0.75) 292deg,
+    rgba(255, 255, 255, 0.35) 304deg,
+    rgba(255, 255, 255, 0.08) 316deg,
+    transparent 324deg 360deg
+  );
+  animation: rto-missing-border-shine-run 3.2s linear infinite;
+}
+
+.shopify-rto-condition-select--missing .shopify-modern-select__trigger {
+  position: relative;
+  z-index: 2;
+  border: none !important;
+  box-shadow: none !important;
+  background: #ffffff !important;
+  border-radius: 7px;
+}
+
+.shopify-rto-condition-select--missing.is-open .shopify-modern-select__trigger {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.shopify-rto-condition-select--missing.shopify-modern-select--tone-placeholder
+  .shopify-modern-select__trigger--tone-placeholder {
+  border-color: transparent !important;
+  background: #ffffff !important;
+  color: #64748b !important;
+}
+
+/* RTO condition dropdown — colorful tones */
+@mixin rto-condition-tone($name, $border, $bg, $text, $icon) {
+  .shopify-rto-condition-select.shopify-modern-select--tone-#{$name} .shopify-modern-select__trigger--tone-#{$name} {
+    border-color: $border;
+    background: $bg;
+    color: $text;
+    font-weight: 600;
+  }
+
+  .shopify-rto-condition-select.shopify-modern-select--tone-#{$name} .shopify-modern-select__trigger-icon {
+    color: $icon;
+  }
+
+  .shopify-modern-select__option--tone-#{$name} {
+    border-left: 3px solid $border;
+    color: $text;
+    font-weight: 600;
+  }
+
+  .shopify-modern-select__option--tone-#{$name} .shopify-modern-select__option-icon {
+    color: $icon;
+  }
+
+  .shopify-modern-select__option--tone-#{$name}:hover,
+  .shopify-modern-select__option--tone-#{$name}.is-active {
+    background: $bg;
+  }
+}
+
+@include rto-condition-tone('placeholder', #cbd5e1, #f8fafc, #64748b, #94a3b8);
+@include rto-condition-tone('different', #818cf8, #eef2ff, #4338ca, #6366f1);
+@include rto-condition-tone('less', #fb923c, #fff7ed, #c2410c, #ea580c);
+@include rto-condition-tone('empty', #94a3b8, #f1f5f9, #475569, #64748b);
+@include rto-condition-tone('damaged', #f87171, #fef2f2, #b91c1c, #dc2626);
+@include rto-condition-tone('original', #34d399, #ecfdf5, #047857, #059669);
+
 .shopify-shipped-badge {
   display: inline-flex;
   align-items: center;

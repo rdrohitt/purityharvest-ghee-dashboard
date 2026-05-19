@@ -557,6 +557,7 @@ export function ShopifyOrdersTable({
             {
                 value: '',
                 label: 'Select condition',
+                tone: 'placeholder',
                 icon: (
                     <ConditionOptionIcon>
                         <circle cx="12" cy="12" r="10" />
@@ -567,6 +568,7 @@ export function ShopifyOrdersTable({
             {
                 value: 'Different Item Received',
                 label: 'Different Item Received',
+                tone: 'different',
                 icon: (
                     <ConditionOptionIcon>
                         <path d="M4 7h9" />
@@ -579,6 +581,7 @@ export function ShopifyOrdersTable({
             {
                 value: 'Less Quantity Received',
                 label: 'Less Quantity Received',
+                tone: 'less',
                 icon: (
                     <ConditionOptionIcon>
                         <path d="M4 12h9" />
@@ -589,6 +592,7 @@ export function ShopifyOrdersTable({
             {
                 value: 'Empty Package Received',
                 label: 'Empty Package Received',
+                tone: 'empty',
                 icon: (
                     <ConditionOptionIcon>
                         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -599,6 +603,7 @@ export function ShopifyOrdersTable({
             {
                 value: 'Damaged / Leaked',
                 label: 'Damaged / Leaked',
+                tone: 'damaged',
                 icon: (
                     <ConditionOptionIcon>
                         <path d="M12 2 6 8v5c0 3.31 2.69 6 6 6s6-2.69 6-6V8z" />
@@ -609,6 +614,7 @@ export function ShopifyOrdersTable({
             {
                 value: 'Original Return',
                 label: 'Original Return',
+                tone: 'original',
                 icon: (
                     <ConditionOptionIcon>
                         <path d="M7 7h10v10H7z" />
@@ -779,6 +785,13 @@ export function ShopifyOrdersTable({
                                 displayGroups.map((group) =>
                                     group.items.map((o, idx) => {
                                         const customerPhone = getOrderCustomerPhone(o);
+                                        const rtoConditionValue = (
+                                            rtoDraftById[o._id]?.condition ??
+                                            o.condition ??
+                                            ''
+                                        ).trim();
+                                        const isRtoMissingCondition =
+                                            isRtoView && rtoConditionValue.length === 0;
                                         return (
                                             <tr
                                             key={o._id}
@@ -982,7 +995,11 @@ export function ShopifyOrdersTable({
                                                 <Td>
                                                     <ModernSelect<string>
                                                         variant="default"
-                                                        className="shopify-rto-condition-select"
+                                                        className={`shopify-rto-condition-select${
+                                                            isRtoMissingCondition
+                                                                ? ' shopify-rto-condition-select--missing'
+                                                                : ''
+                                                        }`}
                                                         value={rtoDraftById[o._id]?.condition ?? ''}
                                                         options={rtoConditionOptions}
                                                         placeholder="Select condition"
