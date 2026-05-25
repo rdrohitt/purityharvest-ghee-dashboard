@@ -22,6 +22,8 @@ export type Platform =
     | 'meta-milk'
     | 'Amazon'
     | 'Amazon Shipping'
+    | 'Google Ads'
+    | 'Agency Fee'
     | 'Flipkart'
     | 'Checkout'
     | 'Engage'
@@ -32,8 +34,10 @@ export type Platform =
 const MARKETING_PLATFORM_OPTIONS: { value: Platform; label: string; icon: string }[] = [
     { value: 'Meta', label: 'Meta', icon: '📱' },
     { value: 'meta-milk', label: 'meta-milk', icon: '🥛' },
-    { value: 'Amazon', label: 'Amazon', icon: '📦' },
+    { value: 'Amazon', label: 'Amazon Wallet', icon: '📦' },
     { value: 'Amazon Shipping', label: 'Amazon Shipping', icon: '📮' },
+    { value: 'Google Ads', label: 'Google Ads Wallet', icon: '🔍' },
+    { value: 'Agency Fee', label: 'Agency Fee', icon: '🏢' },
     { value: 'Flipkart', label: 'Flipkart', icon: '🛒' },
     { value: 'Checkout', label: 'Checkout', icon: '💳' },
     { value: 'Engage', label: 'Engage', icon: '💬' },
@@ -165,6 +169,8 @@ export default function MarketingSpend() {
     const [metaMilk, setMetaMilk] = useState<SpendRecord[]>([]);
     const [amazon, setAmazon] = useState<SpendRecord[]>([]);
     const [amazonShipping, setAmazonShipping] = useState<SpendRecord[]>([]);
+    const [googleAds, setGoogleAds] = useState<SpendRecord[]>([]);
+    const [agencyFee, setAgencyFee] = useState<SpendRecord[]>([]);
     const [flipkart, setFlipkart] = useState<SpendRecord[]>([]);
     const [checkout, setCheckout] = useState<SpendRecord[]>([]);
     const [engage, setEngage] = useState<SpendRecord[]>([]);
@@ -209,6 +215,22 @@ export default function MarketingSpend() {
         const amazonShippingItems = all
             .filter((i) => platformOf(i) === 'amazon_shipping' || platformOf(i) === 'amazon-shipping')
             .map(toSpendRecord);
+        const googleAdsItems = all
+            .filter(
+                (i) =>
+                    platformOf(i) === 'google_ads' ||
+                    platformOf(i) === 'google-ads' ||
+                    platformOf(i) === 'google ads',
+            )
+            .map(toSpendRecord);
+        const agencyFeeItems = all
+            .filter(
+                (i) =>
+                    platformOf(i) === 'agency_fee' ||
+                    platformOf(i) === 'agency-fee' ||
+                    platformOf(i) === 'agency fee',
+            )
+            .map(toSpendRecord);
         const flipkartItems = all.filter((i) => platformOf(i) === 'flipkart').map(toSpendRecord);
         const checkoutItems = all.filter((i) => platformOf(i) === 'checkout').map(toSpendRecord);
         const engageItems = all.filter((i) => platformOf(i) === 'engage').map(toSpendRecord);
@@ -230,6 +252,8 @@ export default function MarketingSpend() {
         setMetaMilk(metaMilkItems);
         setAmazon(amazonItems);
         setAmazonShipping(amazonShippingItems);
+        setGoogleAds(googleAdsItems);
+        setAgencyFee(agencyFeeItems);
         setFlipkart(flipkartItems);
         setCheckout(checkoutItems);
         setEngage(engageItems);
@@ -286,6 +310,8 @@ export default function MarketingSpend() {
             metaMilk: metaMilk.reduce((s, r) => s + r.amount, 0),
             amazon: amazon.reduce((s, r) => s + r.amount, 0),
             amazonShipping: amazonShipping.reduce((s, r) => s + r.amount, 0),
+            googleAds: googleAds.reduce((s, r) => s + r.amount, 0),
+            agencyFee: agencyFee.reduce((s, r) => s + r.amount, 0),
             flipkart: flipkart.reduce((s, r) => s + r.amount, 0),
             checkout: checkout.reduce((s, r) => s + r.amount, 0),
             engage: engage.reduce((s, r) => s + r.amount, 0),
@@ -297,6 +323,8 @@ export default function MarketingSpend() {
                 metaMilk.reduce((s, r) => s + r.amount, 0) +
                 amazon.reduce((s, r) => s + r.amount, 0) +
                 amazonShipping.reduce((s, r) => s + r.amount, 0) +
+                googleAds.reduce((s, r) => s + r.amount, 0) +
+                agencyFee.reduce((s, r) => s + r.amount, 0) +
                 flipkart.reduce((s, r) => s + r.amount, 0) +
                 checkout.reduce((s, r) => s + r.amount, 0) +
                 engage.reduce((s, r) => s + r.amount, 0) +
@@ -304,7 +332,7 @@ export default function MarketingSpend() {
                 delhivery.reduce((s, r) => s + r.amount, 0) +
                 misc.reduce((s, r) => s + r.amount, 0),
         }),
-        [meta, metaMilk, amazon, amazonShipping, flipkart, checkout, engage, dolchi, delhivery, misc],
+        [meta, metaMilk, amazon, amazonShipping, googleAds, agencyFee, flipkart, checkout, engage, dolchi, delhivery, misc],
     );
 
     return (
@@ -355,10 +383,18 @@ export default function MarketingSpend() {
                         isEven={true}
                     />
                     <ModernMetricItem
-                        icon="📮"
-                        label="Amazon Shipping"
-                        value={formatCurrency(totals.amazonShipping)}
-                        iconColor="#e47911"
+                        icon="🔍"
+                        label="Google Ads Wallet"
+                        value={formatCurrency(totals.googleAds)}
+                        iconColor="#4285f4"
+                        isLast={false}
+                        isEven={true}
+                    />
+                    <ModernMetricItem
+                        icon="🏢"
+                        label="Agency Fee"
+                        value={formatCurrency(totals.agencyFee)}
+                        iconColor="#7c3aed"
                         isLast={false}
                         isEven={false}
                     />
@@ -410,6 +446,8 @@ export default function MarketingSpend() {
                     metaMilk={metaMilk}
                     amazon={amazon}
                     amazonShipping={amazonShipping}
+                    googleAds={googleAds}
+                    agencyFee={agencyFee}
                     flipkart={flipkart}
                     checkout={checkout}
                     engage={engage}
@@ -437,6 +475,12 @@ export default function MarketingSpend() {
                                     break;
                                 case 'Amazon Shipping':
                                     apiPlatform = 'amazon_shipping';
+                                    break;
+                                case 'Google Ads':
+                                    apiPlatform = 'google_ads';
+                                    break;
+                                case 'Agency Fee':
+                                    apiPlatform = 'agency_fee';
                                     break;
                                 case 'Flipkart':
                                     apiPlatform = 'flipkart';
@@ -484,6 +528,8 @@ export default function MarketingSpend() {
                                     | 'meta-milk-spend'
                                     | 'amazon-spend'
                                     | 'amazon-shipping-spend'
+                                    | 'google-ads-spend'
+                                    | 'agency-fee-spend'
                                     | 'flipkart-spend'
                                     | 'checkout-spend'
                                     | 'engage-spend'
@@ -501,6 +547,12 @@ export default function MarketingSpend() {
                                         break;
                                     case 'Amazon Shipping':
                                         endpoint = 'amazon-shipping-spend';
+                                        break;
+                                    case 'Google Ads':
+                                        endpoint = 'google-ads-spend';
+                                        break;
+                                    case 'Agency Fee':
+                                        endpoint = 'agency-fee-spend';
                                         break;
                                     case 'Flipkart':
                                         endpoint = 'flipkart-spend';
@@ -539,6 +591,8 @@ export default function MarketingSpend() {
                                     | 'meta-milk-spend'
                                     | 'amazon-spend'
                                     | 'amazon-shipping-spend'
+                                    | 'google-ads-spend'
+                                    | 'agency-fee-spend'
                                     | 'flipkart-spend'
                                     | 'checkout-spend'
                                     | 'engage-spend'
@@ -556,6 +610,12 @@ export default function MarketingSpend() {
                                         break;
                                     case 'Amazon Shipping':
                                         endpoint = 'amazon-shipping-spend';
+                                        break;
+                                    case 'Google Ads':
+                                        endpoint = 'google-ads-spend';
+                                        break;
+                                    case 'Agency Fee':
+                                        endpoint = 'agency-fee-spend';
                                         break;
                                     case 'Flipkart':
                                         endpoint = 'flipkart-spend';
@@ -623,6 +683,8 @@ function UnifiedSpendSection({
     metaMilk,
     amazon,
     amazonShipping,
+    googleAds,
+    agencyFee,
     flipkart,
     checkout,
     engage,
@@ -642,6 +704,8 @@ function UnifiedSpendSection({
     metaMilk: SpendRecord[];
     amazon: SpendRecord[];
     amazonShipping: SpendRecord[];
+    googleAds: SpendRecord[];
+    agencyFee: SpendRecord[];
     flipkart: SpendRecord[];
     checkout: SpendRecord[];
     engage: SpendRecord[];
@@ -695,14 +759,16 @@ function UnifiedSpendSection({
         const mm = metaMilk.map(r => ({ ...r, _source: 'meta-milk' as const, _type: 'spend' as const }));
         const a = amazon.map(r => ({ ...r, _source: 'Amazon' as const, _type: 'spend' as const }));
         const aship = amazonShipping.map(r => ({ ...r, _source: 'Amazon Shipping' as const, _type: 'spend' as const }));
+        const g = googleAds.map(r => ({ ...r, _source: 'Google Ads' as const, _type: 'spend' as const }));
+        const af = agencyFee.map(r => ({ ...r, _source: 'Agency Fee' as const, _type: 'spend' as const }));
         const f = flipkart.map(r => ({ ...r, _source: 'Flipkart' as const, _type: 'spend' as const }));
         const c = checkout.map(r => ({ ...r, _source: 'Checkout' as const, _type: 'spend' as const }));
         const e = engage.map(r => ({ ...r, _source: 'Engage' as const, _type: 'spend' as const }));
         const d = dolchi.map(r => ({ ...r, _source: 'Dolchi' as const, _type: 'spend' as const }));
         const dl = delhivery.map(r => ({ ...r, _source: 'Delhivery' as const, _type: 'spend' as const }));
         const miscRecords = misc.map(r => ({ ...r, _source: 'Miscellaneous' as const, _type: 'misc' as const }));
-        return [...m, ...mm, ...a, ...aship, ...f, ...c, ...e, ...d, ...dl, ...miscRecords].sort((p, q) => new Date(q.date).getTime() - new Date(p.date).getTime());
-    }, [meta, metaMilk, amazon, amazonShipping, flipkart, checkout, engage, dolchi, delhivery, misc]);
+        return [...m, ...mm, ...a, ...aship, ...g, ...af, ...f, ...c, ...e, ...d, ...dl, ...miscRecords].sort((p, q) => new Date(q.date).getTime() - new Date(p.date).getTime());
+    }, [meta, metaMilk, amazon, amazonShipping, googleAds, agencyFee, flipkart, checkout, engage, dolchi, delhivery, misc]);
 
     const filtered = useFilterRows(
         combined,
@@ -785,6 +851,12 @@ function UnifiedSpendSection({
     );
 }
 
+function getPlatformDisplayLabel(platform: Platform): string {
+    if (platform === 'Amazon') return 'Amazon Wallet';
+    if (platform === 'Google Ads') return 'Google Ads Wallet';
+    return platform;
+}
+
 function PlatformTag({ platform }: { platform: Platform }) {
     let variantClass = '';
     switch (platform) {
@@ -799,6 +871,12 @@ function PlatformTag({ platform }: { platform: Platform }) {
             break;
         case 'Amazon Shipping':
             variantClass = 'platform-tag--amazon-shipping';
+            break;
+        case 'Google Ads':
+            variantClass = 'platform-tag--google-ads';
+            break;
+        case 'Agency Fee':
+            variantClass = 'platform-tag--agency-fee';
             break;
         case 'Flipkart':
             variantClass = 'platform-tag--flipkart';
@@ -822,7 +900,7 @@ function PlatformTag({ platform }: { platform: Platform }) {
             variantClass = 'platform-tag--default';
     }
 
-    return <span className={`platform-tag ${variantClass}`}>{platform}</span>;
+    return <span className={`platform-tag ${variantClass}`}>{getPlatformDisplayLabel(platform)}</span>;
 }
 
 function UnifiedTable({ rows, onEdit, onDelete, loading }: { 

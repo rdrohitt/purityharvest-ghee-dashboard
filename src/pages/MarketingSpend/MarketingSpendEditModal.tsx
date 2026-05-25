@@ -7,6 +7,8 @@ type Platform =
     | 'meta-milk'
     | 'Amazon'
     | 'Amazon Shipping'
+    | 'Google Ads'
+    | 'Agency Fee'
     | 'Flipkart'
     | 'Checkout'
     | 'Engage'
@@ -91,7 +93,13 @@ export function MarketingSpendEditModal({ platform, record, onClose, onSubmit }:
                   <label className="label">Platform</label>
                   <input
                     className="input marketing-spend-modal__input"
-                    value={platform}
+                    value={
+                        platform === 'Amazon'
+                            ? 'Amazon Wallet'
+                            : platform === 'Google Ads'
+                              ? 'Google Ads Wallet'
+                              : platform
+                    }
                     readOnly
                     disabled
                   />

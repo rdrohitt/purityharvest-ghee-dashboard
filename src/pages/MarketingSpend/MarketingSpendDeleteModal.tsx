@@ -23,7 +23,16 @@ export function MarketingSpendDeleteModal({
             description={
                 <>
                     Are you sure you want to delete this marketing spend entry for{' '}
-                    {platform ? <strong>{platform}</strong> : null}? This action cannot be undone.
+                    {platform ? (
+                        <strong>
+                            {platform === 'Amazon'
+                                ? 'Amazon Wallet'
+                                : platform === 'Google Ads'
+                                  ? 'Google Ads Wallet'
+                                  : platform}
+                        </strong>
+                    ) : null}
+                    ? This action cannot be undone.
                 </>
             }
             confirmLabel="Delete"

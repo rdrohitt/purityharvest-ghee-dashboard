@@ -136,21 +136,27 @@
 .marketing-spend-metrics {
   width: 100%;
   display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
   border-radius: 4px;
-  overflow: hidden;
   border: 1px solid var(--border);
   margin-top: 12px;
   background: var(--bg-elev);
 }
 
 .marketing-spend-metric {
-  flex: 1;
-  padding: 12px 10px;
+  flex: 0 0 auto;
+  min-width: 132px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   border-right: 1px solid var(--border);
-  transition: all 0.2s;
+  transition: background 0.2s;
+  scroll-snap-align: start;
 }
 
 .marketing-spend-metric--last {
@@ -158,31 +164,9 @@
 }
 
 @media (max-width: 640px) {
-  .marketing-spend-metrics {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .marketing-spend-metric {
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .marketing-spend-metric:nth-child(2n) {
-    border-right: none;
-  }
-
-  .marketing-spend-metric:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
-    border-right: none;
-  }
-
-  .marketing-spend-metric--last {
-    border-bottom: 1px solid var(--border);
-  }
-
-  .marketing-spend-metric:last-child {
-    border-bottom: none;
+    min-width: 120px;
+    padding: 10px 12px;
   }
 
   .marketing-spend-page {
@@ -523,6 +507,18 @@
   background: #ffedd5;
   color: #9a3412;
   border-color: #fdba74;
+}
+
+.platform-tag--google-ads {
+  background: #e8f0fe;
+  color: #1a56db;
+  border-color: #93b4f4;
+}
+
+.platform-tag--agency-fee {
+  background: #f3e8ff;
+  color: #6b21a8;
+  border-color: #d8b4fe;
 }
 
 .platform-tag--flipkart {
