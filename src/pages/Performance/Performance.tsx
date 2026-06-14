@@ -1,5 +1,14 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { PlatformTag } from '../sales/Shopify/ShopifyShared';
+import { useEffect, useMemo, useState } from 'react';
+import { Spinner } from '../../components/Spinner';
+import { fetchDailySalesRanking, fetchPlatformSalesComparison } from '../../utils/analytics';
+import type { DailySalesRankingDateEntry, DailySalesRankingResponse } from '../../types/analytics-daily-sales-ranking';
+import type {
+    PlatformSalesComparisonPeriod,
+    PlatformSalesComparisonPeriodKey,
+    PlatformSalesComparisonResponse,
+} from '../../types/analytics-platform-sales-comparison';
+import { DatePicker } from '../sales/Shopify/DatePicker';
+import { ModernSelect, PlatformTag, toInputDate, type ModernSelectOption } from '../sales/Shopify/ShopifyShared';
 import '../sales/Shopify/Shopify.scss';
 import '../Modules/Modules.scss';
 import './Performance.scss';
@@ -11,130 +20,556 @@ const PERFORMANCE_VIEW_TABS: { id: PerformanceViewTab; label: string }[] = [
     { id: 'month', label: 'Month Wise' },
 ];
 
-type PlatformPerformanceRow = {
-    platform: string;
-    orders: number;
-    sales: number;
-    ebitda: number;
-    marketingSpend: number;
+const PERIOD_ORDER: PlatformSalesComparisonPeriodKey[] = ['currentMonth', 'lastMonth', 'twoMonthsAgo'];
+
+const PERIOD_LABELS: Record<PlatformSalesComparisonPeriodKey, string> = {
+    currentMonth: 'Current Month',
+    lastMonth: 'Last Month',
+    twoMonthsAgo: '2 Months Ago',
 };
 
-type MonthPerformanceRow = {
-    month: string;
-    orders: number;
-    sales: number;
-    ebitda: number;
-    marketingSpend: number;
+const MONTH_OPTIONS: ModernSelectOption<string>[] = [
+    { value: '01', label: 'January' },
+    { value: '02', label: 'February' },
+    { value: '03', label: 'March' },
+    { value: '04', label: 'April' },
+    { value: '05', label: 'May' },
+    { value: '06', label: 'June' },
+    { value: '07', label: 'July' },
+    { value: '08', label: 'August' },
+    { value: '09', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' },
+];
+
+function buildYearOptions(): ModernSelectOption<string>[] {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: 6 }, (_, index) => {
+        const year = String(currentYear - index);
+        return { value: year, label: year };
+    });
+}
+
+type DeltaDirection = 'up' | 'down' | 'flat';
+
+type DeltaInfo = {
+    text: string;
+    direction: DeltaDirection;
 };
 
 function formatCurrency(value: number): string {
-    return `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+    return `₹${Math.round(value).toLocaleString('en-IN')}`;
 }
 
-function PerformanceTh({ children }: { children: string }) {
-    return <th className="modules-th">{children}</th>;
+function formatMonthLabel(month: string): string {
+    const [year, monthNum] = month.split('-');
+    if (!year || !monthNum) return month;
+    const date = new Date(Number(year), Number(monthNum) - 1, 1);
+    if (Number.isNaN(date.getTime())) return month;
+    return date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
 }
 
-function PerformanceTd({ children, className }: { children: ReactNode; className?: string }) {
-    const cls = className ? `modules-td ${className}` : 'modules-td';
-    return <td className={cls}>{children}</td>;
+function formatShortDate(iso: string): string {
+    const date = new Date(`${iso}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return iso;
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-function PlatformWiseTable({ rows }: { rows: PlatformPerformanceRow[] }) {
+function formatPeriodRange(from: string, to: string): string {
+    return `${formatShortDate(from)} – ${formatShortDate(to)}`;
+}
+
+function normalizePlatformKey(platform: string): string {
+    return platform.toLowerCase() === 'callling' ? 'calling' : platform;
+}
+
+function formatDayLabel(date: string): string {
+    const parsed = new Date(`${date}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return date;
+    return parsed.toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
+}
+
+function getDelta(current: number, previous: number): DeltaInfo {
+    if (previous === 0) {
+        if (current === 0) return { text: '0%', direction: 'flat' };
+        return { text: 'New', direction: 'up' };
+    }
+    const pct = ((current - previous) / previous) * 100;
+    if (Math.abs(pct) < 0.05) return { text: '0%', direction: 'flat' };
+    const direction: DeltaDirection = pct > 0 ? 'up' : 'down';
+    const sign = pct > 0 ? '+' : '';
+    return { text: `${sign}${pct.toFixed(1)}%`, direction };
+}
+
+function getPeriodByKey(
+    periods: PlatformSalesComparisonPeriod[],
+    key: PlatformSalesComparisonPeriodKey,
+): PlatformSalesComparisonPeriod | undefined {
+    return periods.find((period) => period.key === key);
+}
+
+function formatMonthYearLabel(month: string, year: string): string {
+    const date = new Date(Number(year), Number(month) - 1, 1);
+    if (Number.isNaN(date.getTime())) return `${month}-${year}`;
+    return date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+}
+
+function formatMonthYearFromApiMonth(monthParam: string): string {
+    const [month, year] = monthParam.split('-');
+    return formatMonthYearLabel(month ?? '', year ?? '');
+}
+
+function formatMonthYearFromAppliedMonth(appliedMonth: string): string {
+    const [year, month] = appliedMonth.split('-');
+    return formatMonthYearLabel(month ?? '', year ?? '');
+}
+
+function averageSales(entries: DailySalesRankingDateEntry[]): number {
+    if (entries.length === 0) return 0;
+    return entries.reduce((sum, entry) => sum + entry.totalSales, 0) / entries.length;
+}
+
+function DeltaBadge({ delta }: { delta: DeltaInfo }) {
     return (
-        <div className="table-scroll-wrapper">
-            <table className="modules-table performance-table">
-                <thead>
-                    <tr className="modules-row-header">
-                        <PerformanceTh>Platform</PerformanceTh>
-                        <PerformanceTh>Orders</PerformanceTh>
-                        <PerformanceTh>Sales</PerformanceTh>
-                        <PerformanceTh>EBITDA</PerformanceTh>
-                        <PerformanceTh>Marketing Spend</PerformanceTh>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.map((row) => (
-                        <tr key={row.platform} className="modules-row">
-                            <PerformanceTd>
-                                <PlatformTag platform={row.platform} />
-                            </PerformanceTd>
-                            <PerformanceTd className="performance-amount">{row.orders.toLocaleString('en-IN')}</PerformanceTd>
-                            <PerformanceTd className="performance-amount">{formatCurrency(row.sales)}</PerformanceTd>
-                            <PerformanceTd className="performance-amount">{formatCurrency(row.ebitda)}</PerformanceTd>
-                            <PerformanceTd className="performance-amount">{formatCurrency(row.marketingSpend)}</PerformanceTd>
-                        </tr>
-                    ))}
-                    {rows.length === 0 ? (
-                        <tr>
-                            <td colSpan={5} className="modules-empty">
-                                No platform performance data yet.
-                            </td>
-                        </tr>
-                    ) : null}
-                </tbody>
-            </table>
+        <span className={`performance-delta performance-delta--${delta.direction}`}>
+            {delta.direction === 'up' ? '▲' : delta.direction === 'down' ? '▼' : '•'} {delta.text}
+        </span>
+    );
+}
+
+function SalesDayRankList({
+    title,
+    subtitle,
+    tone,
+    items,
+    emptyMessage,
+}: {
+    title: string;
+    subtitle: string;
+    tone: 'top' | 'least';
+    items: DailySalesRankingDateEntry[];
+    emptyMessage: string;
+}) {
+    const maxSales = useMemo(
+        () => Math.max(...items.map((item) => item.totalSales), 1),
+        [items],
+    );
+
+    return (
+        <section className={`performance-sales-rank-panel performance-sales-rank-panel--${tone}`}>
+            <header className="performance-sales-rank-panel__head">
+                <div>
+                    <h3 className="performance-sales-rank-panel__title">{title}</h3>
+                    <p className="performance-sales-rank-panel__subtitle">{subtitle}</p>
+                </div>
+                <span className="performance-sales-rank-panel__count">{items.length} days</span>
+            </header>
+
+            {items.length === 0 ? (
+                <div className="performance-sales-rank-panel__empty">{emptyMessage}</div>
+            ) : (
+                <ol className="performance-sales-rank-list">
+                    {items.map((item, index) => {
+                        const width = Math.max(6, (item.totalSales / maxSales) * 100);
+                        return (
+                            <li key={item.date} className="performance-sales-rank-item">
+                                <span className={`performance-sales-rank-item__rank performance-sales-rank-item__rank--${index + 1}`}>
+                                    #{index + 1}
+                                </span>
+                                <div className="performance-sales-rank-item__body">
+                                    <div className="performance-sales-rank-item__top">
+                                        <span className="performance-sales-rank-item__date">{formatDayLabel(item.date)}</span>
+                                        <span className="performance-sales-rank-item__orders">
+                                            {item.orderCount.toLocaleString('en-IN')} orders
+                                        </span>
+                                    </div>
+                                    <div className="performance-sales-rank-item__sales">{formatCurrency(item.totalSales)}</div>
+                                    <div className="performance-sales-rank-item__bar" aria-hidden>
+                                        <span style={{ width: `${width}%` }} />
+                                    </div>
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ol>
+            )}
+        </section>
+    );
+}
+
+function PlatformWiseDailyRanking({
+    data,
+    loading,
+    error,
+}: {
+    data: DailySalesRankingResponse | null;
+    loading: boolean;
+    error: string | null;
+}) {
+    const topDays = data?.topSalesDates ?? [];
+    const leastDays = data?.leastSalesDates ?? [];
+
+    const summary = useMemo(() => {
+        const bestDay = topDays[0];
+        const worstDay = leastDays[0];
+        return {
+            bestDay,
+            worstDay,
+            topAvg: averageSales(topDays),
+            leastAvg: averageSales(leastDays),
+        };
+    }, [topDays, leastDays]);
+
+    if (loading) return null;
+
+    if (error) {
+        return <div className="performance-month-empty">{error}</div>;
+    }
+
+    if (!data || (topDays.length === 0 && leastDays.length === 0)) {
+        return (
+            <div className="performance-month-empty">
+                No daily sales ranking data for the selected month.
+            </div>
+        );
+    }
+
+    const monthLabel = data.filters.appliedMonth
+        ? formatMonthYearFromAppliedMonth(data.filters.appliedMonth)
+        : formatMonthYearFromApiMonth(data.filters.month);
+
+    return (
+        <div className="performance-platform-comparison">
+            <div className="performance-day-summary-grid">
+                <article className="performance-day-summary-card performance-day-summary-card--peak">
+                    <span className="performance-day-summary-card__label">Peak day</span>
+                    <strong className="performance-day-summary-card__value">
+                        {summary.bestDay ? formatCurrency(summary.bestDay.totalSales) : '—'}
+                    </strong>
+                    <span className="performance-day-summary-card__meta">
+                        {summary.bestDay ? formatDayLabel(summary.bestDay.date) : 'No data'}
+                    </span>
+                </article>
+                <article className="performance-day-summary-card performance-day-summary-card--low">
+                    <span className="performance-day-summary-card__label">Lowest day</span>
+                    <strong className="performance-day-summary-card__value">
+                        {summary.worstDay ? formatCurrency(summary.worstDay.totalSales) : '—'}
+                    </strong>
+                    <span className="performance-day-summary-card__meta">
+                        {summary.worstDay ? formatDayLabel(summary.worstDay.date) : 'No data'}
+                    </span>
+                </article>
+                <article className="performance-day-summary-card">
+                    <span className="performance-day-summary-card__label">Top 5 average</span>
+                    <strong className="performance-day-summary-card__value">{formatCurrency(summary.topAvg)}</strong>
+                    <span className="performance-day-summary-card__meta">Best performing days</span>
+                </article>
+                <article className="performance-day-summary-card">
+                    <span className="performance-day-summary-card__label">Bottom 5 average</span>
+                    <strong className="performance-day-summary-card__value">{formatCurrency(summary.leastAvg)}</strong>
+                    <span className="performance-day-summary-card__meta">Least performing days</span>
+                </article>
+            </div>
+
+            <div className="performance-sales-rank-grid">
+                <SalesDayRankList
+                    title="Top 5 performing days"
+                    subtitle={`Highest sales days in ${monthLabel}`}
+                    tone="top"
+                    items={topDays}
+                    emptyMessage="No top performing days for this month."
+                />
+                <SalesDayRankList
+                    title="Least 5 performing days"
+                    subtitle={`Lowest sales days in ${monthLabel}`}
+                    tone="least"
+                    items={leastDays}
+                    emptyMessage="No least performing days for this month."
+                />
+            </div>
         </div>
     );
 }
 
-function MonthWiseTable({ rows }: { rows: MonthPerformanceRow[] }) {
+function PeriodSummaryCard({
+    period,
+    previousPeriod,
+}: {
+    period: PlatformSalesComparisonPeriod;
+    previousPeriod?: PlatformSalesComparisonPeriod;
+}) {
+    const delta = previousPeriod ? getDelta(period.totalSales, previousPeriod.totalSales) : null;
+
     return (
-        <div className="table-scroll-wrapper">
-            <table className="modules-table performance-table">
-                <thead>
-                    <tr className="modules-row-header">
-                        <PerformanceTh>Month</PerformanceTh>
-                        <PerformanceTh>Orders</PerformanceTh>
-                        <PerformanceTh>Sales</PerformanceTh>
-                        <PerformanceTh>EBITDA</PerformanceTh>
-                        <PerformanceTh>Marketing Spend</PerformanceTh>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows.map((row) => (
-                        <tr key={row.month} className="modules-row">
-                            <PerformanceTd className="performance-month-cell">{row.month}</PerformanceTd>
-                            <PerformanceTd className="performance-amount">{row.orders.toLocaleString('en-IN')}</PerformanceTd>
-                            <PerformanceTd className="performance-amount">{formatCurrency(row.sales)}</PerformanceTd>
-                            <PerformanceTd className="performance-amount">{formatCurrency(row.ebitda)}</PerformanceTd>
-                            <PerformanceTd className="performance-amount">{formatCurrency(row.marketingSpend)}</PerformanceTd>
-                        </tr>
-                    ))}
-                    {rows.length === 0 ? (
-                        <tr>
-                            <td colSpan={5} className="modules-empty">
-                                No month-wise performance data yet.
-                            </td>
-                        </tr>
-                    ) : null}
-                </tbody>
-            </table>
+        <article className={`performance-period-card performance-period-card--${period.key}`}>
+            <div className="performance-period-card__head">
+                <span className="performance-period-card__eyebrow">{PERIOD_LABELS[period.key]}</span>
+                <h3 className="performance-period-card__title">{formatMonthLabel(period.month)}</h3>
+                <p className="performance-period-card__range">{formatPeriodRange(period.from, period.to)}</p>
+            </div>
+            <div className="performance-period-card__value">{formatCurrency(period.totalSales)}</div>
+            <div className="performance-period-card__footer">
+                <span className="performance-period-card__label">Total sales</span>
+                {delta ? <DeltaBadge delta={delta} /> : <span className="performance-period-card__baseline">Baseline</span>}
+            </div>
+        </article>
+    );
+}
+
+function MonthWiseComparison({
+    data,
+    loading,
+    error,
+}: {
+    data: PlatformSalesComparisonResponse | null;
+    loading: boolean;
+    error: string | null;
+}) {
+    const periods = useMemo(() => {
+        if (!data?.periods?.length) return [];
+        return PERIOD_ORDER.map((key) => getPeriodByKey(data.periods, key)).filter(
+            (period): period is PlatformSalesComparisonPeriod => Boolean(period),
+        );
+    }, [data]);
+
+    const platforms = data?.filters?.platforms ?? [];
+
+    const currentPeriod = getPeriodByKey(periods, 'currentMonth');
+    const lastPeriod = getPeriodByKey(periods, 'lastMonth');
+
+    if (loading) return null;
+
+    if (error) {
+        return <div className="performance-month-empty">{error}</div>;
+    }
+
+    if (!data || periods.length === 0) {
+        return (
+            <div className="performance-month-empty">
+                No month-wise performance data for the selected date.
+            </div>
+        );
+    }
+
+    return (
+        <div className="performance-month-comparison">
+            <div className="performance-period-grid">
+                {periods.map((period, index) => (
+                    <PeriodSummaryCard
+                        key={period.key}
+                        period={period}
+                        previousPeriod={index > 0 ? periods[index - 1] : undefined}
+                    />
+                ))}
+            </div>
+
+            <div className="performance-comparison-panel">
+                <div className="performance-comparison-panel__head">
+                    <div>
+                        <h3 className="performance-comparison-panel__title">Platform sales comparison</h3>
+                        <p className="performance-comparison-panel__subtitle">
+                            Same day-range across three months · as of {data.filters.date}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="table-scroll-wrapper">
+                    <table className="performance-comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Platform</th>
+                                {periods.map((period) => (
+                                    <th key={period.key}>
+                                        <span className="performance-comparison-table__col-title">
+                                            {formatMonthLabel(period.month)}
+                                        </span>
+                                        <span className="performance-comparison-table__col-range">
+                                            {formatPeriodRange(period.from, period.to)}
+                                        </span>
+                                    </th>
+                                ))}
+                                <th>vs Last Month</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {platforms.map((platform) => {
+                                const currentSales = currentPeriod?.platformSales?.[platform] ?? 0;
+                                const lastSales = lastPeriod?.platformSales?.[platform] ?? 0;
+                                const delta = currentPeriod && lastPeriod ? getDelta(currentSales, lastSales) : null;
+
+                                return (
+                                    <tr key={platform}>
+                                        <td className="performance-comparison-table__platform">
+                                            <PlatformTag platform={normalizePlatformKey(platform)} />
+                                        </td>
+                                        {periods.map((period) => {
+                                            const sales = period.platformSales?.[platform] ?? 0;
+                                            const share =
+                                                period.totalSales > 0 ? (sales / period.totalSales) * 100 : 0;
+                                            return (
+                                                <td key={`${platform}-${period.key}`}>
+                                                    <div className="performance-comparison-table__amount">
+                                                        {formatCurrency(sales)}
+                                                    </div>
+                                                    <div className="performance-comparison-table__share">
+                                                        {share.toFixed(1)}% of total
+                                                    </div>
+                                                    <div className="performance-comparison-table__bar" aria-hidden>
+                                                        <span style={{ width: `${Math.min(share, 100)}%` }} />
+                                                    </div>
+                                                </td>
+                                            );
+                                        })}
+                                        <td>
+                                            {delta ? <DeltaBadge delta={delta} /> : <span>—</span>}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            <tr className="performance-comparison-table__total-row">
+                                <td className="performance-comparison-table__platform">Total</td>
+                                {periods.map((period) => (
+                                    <td key={`total-${period.key}`}>
+                                        <div className="performance-comparison-table__amount performance-comparison-table__amount--total">
+                                            {formatCurrency(period.totalSales)}
+                                        </div>
+                                    </td>
+                                ))}
+                                <td>
+                                    {currentPeriod && lastPeriod ? (
+                                        <DeltaBadge delta={getDelta(currentPeriod.totalSales, lastPeriod.totalSales)} />
+                                    ) : (
+                                        <span>—</span>
+                                    )}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     );
 }
 
 export default function Performance() {
+    const now = new Date();
     const [viewTab, setViewTab] = useState<PerformanceViewTab>('platform');
+    const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'));
+    const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
+    const [selectedDate, setSelectedDate] = useState(() => toInputDate(now));
+    const [platformData, setPlatformData] = useState<DailySalesRankingResponse | null>(null);
+    const [platformLoading, setPlatformLoading] = useState(false);
+    const [platformError, setPlatformError] = useState<string | null>(null);
+    const [monthData, setMonthData] = useState<PlatformSalesComparisonResponse | null>(null);
+    const [monthLoading, setMonthLoading] = useState(false);
+    const [monthError, setMonthError] = useState<string | null>(null);
 
-    const platformRows = useMemo<PlatformPerformanceRow[]>(() => [], []);
-    const monthRows = useMemo<MonthPerformanceRow[]>(() => [], []);
+    const yearOptions = useMemo(() => buildYearOptions(), []);
+
+    useEffect(() => {
+        if (viewTab !== 'platform' || !selectedMonth || !selectedYear) return;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                setPlatformLoading(true);
+                setPlatformError(null);
+                const data = await fetchDailySalesRanking(selectedMonth, selectedYear);
+                if (!cancelled) {
+                    setPlatformData(data);
+                }
+            } catch (err) {
+                console.error('Failed to load daily sales ranking', err);
+                if (!cancelled) {
+                    setPlatformData(null);
+                    setPlatformError('Failed to load platform-wise performance. Please try again.');
+                }
+            } finally {
+                if (!cancelled) {
+                    setPlatformLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [viewTab, selectedMonth, selectedYear]);
+
+    useEffect(() => {
+        if (viewTab !== 'month' || !selectedDate) return;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                setMonthLoading(true);
+                setMonthError(null);
+                const data = await fetchPlatformSalesComparison(selectedDate);
+                if (!cancelled) {
+                    setMonthData(data);
+                }
+            } catch (err) {
+                console.error('Failed to load platform sales comparison', err);
+                if (!cancelled) {
+                    setMonthData(null);
+                    setMonthError('Failed to load month-wise performance. Please try again.');
+                }
+            } finally {
+                if (!cancelled) {
+                    setMonthLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [viewTab, selectedDate]);
 
     const countBarLabel = useMemo(() => {
         if (viewTab === 'platform') {
-            const count = platformRows.length;
-            return count === 0
-                ? 'Platform performance overview'
-                : `${count.toLocaleString()} platform${count === 1 ? '' : 's'}`;
+            if (platformLoading) return 'Loading top and least performing days…';
+            if (platformError) return platformError;
+            if (!platformData) return `Daily sales ranking for ${formatMonthYearLabel(selectedMonth, selectedYear)}`;
+            const monthLabel = platformData.filters.appliedMonth
+                ? formatMonthYearFromAppliedMonth(platformData.filters.appliedMonth)
+                : formatMonthYearFromApiMonth(platformData.filters.month);
+            return `Top & least performing days · ${monthLabel}`;
         }
-        const count = monthRows.length;
-        return count === 0
-            ? 'Month-wise performance overview'
-            : `${count.toLocaleString()} month${count === 1 ? '' : 's'}`;
-    }, [viewTab, platformRows.length, monthRows.length]);
+        if (monthLoading) return 'Loading 3-month platform comparison…';
+        if (monthError) return monthError;
+        if (!monthData?.periods?.length) {
+            return `3-month comparison for ${selectedDate}`;
+        }
+        return `3-month platform sales comparison · as of ${monthData.filters.date}`;
+    }, [
+        viewTab,
+        platformLoading,
+        platformError,
+        platformData,
+        selectedMonth,
+        selectedYear,
+        monthLoading,
+        monthError,
+        monthData,
+        selectedDate,
+    ]);
 
     return (
         <section className="modules-page">
+            {viewTab === 'platform' && platformLoading ? (
+                <Spinner overlay fixed message="Loading platform-wise performance…" />
+            ) : null}
+            {viewTab === 'month' && monthLoading ? (
+                <Spinner overlay fixed message="Loading month-wise performance…" />
+            ) : null}
+
             <div className="card modules-header-card">
                 <div className="modules-header-title">Performance</div>
                 <div className="modules-header-row performance-page-header-row">
@@ -155,12 +590,50 @@ export default function Performance() {
                             </button>
                         ))}
                     </div>
+                    {viewTab === 'platform' ? (
+                        <div className="performance-period-filters">
+                            <div className="performance-period-filter">
+                                <label className="label performance-period-filter__label">Month</label>
+                                <ModernSelect
+                                    value={selectedMonth}
+                                    onChange={(value) => value && setSelectedMonth(value)}
+                                    options={MONTH_OPTIONS}
+                                    aria-label="Select month"
+                                />
+                            </div>
+                            <div className="performance-period-filter">
+                                <label className="label performance-period-filter__label">Year</label>
+                                <ModernSelect
+                                    value={selectedYear}
+                                    onChange={(value) => value && setSelectedYear(value)}
+                                    options={yearOptions}
+                                    aria-label="Select year"
+                                />
+                            </div>
+                        </div>
+                    ) : null}
+                    {viewTab === 'month' ? (
+                        <div className="performance-date-field">
+                            <label className="label performance-date-field__label" htmlFor="performance-month-date">
+                                Date
+                            </label>
+                            <DatePicker
+                                value={selectedDate}
+                                onChange={setSelectedDate}
+                                placeholder="Select date"
+                            />
+                        </div>
+                    ) : null}
                 </div>
             </div>
 
-            <div className="card modules-table-card">
+            <div className="performance-month-card">
                 <div className="modules-count-bar">{countBarLabel}</div>
-                {viewTab === 'platform' ? <PlatformWiseTable rows={platformRows} /> : <MonthWiseTable rows={monthRows} />}
+                {viewTab === 'platform' ? (
+                    <PlatformWiseDailyRanking data={platformData} loading={platformLoading} error={platformError} />
+                ) : (
+                    <MonthWiseComparison data={monthData} loading={monthLoading} error={monthError} />
+                )}
             </div>
         </section>
     );

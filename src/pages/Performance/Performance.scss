@@ -68,9 +68,570 @@
   font-weight: 600;
 }
 
-.performance-month-cell {
-  font-weight: 600;
+.performance-date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  margin-left: auto;
+}
+
+.performance-date-field__label {
+  margin: 0;
+}
+
+.performance-date-field .shopify-dp-root {
+  width: 100%;
+}
+
+.performance-date-field .shopify-dp-trigger {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.performance-period-filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.performance-period-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 150px;
+}
+
+.performance-period-filter__label {
+  margin: 0;
+}
+
+.performance-period-filter .shopify-modern-select {
+  width: 100%;
+}
+
+.performance-platform-comparison {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.performance-day-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.performance-day-summary-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 88%, transparent), var(--bg-elev));
+}
+
+.performance-day-summary-card--peak {
+  border-color: color-mix(in srgb, #22c55e 35%, var(--border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #22c55e 12%, var(--bg-elev)),
+    color-mix(in srgb, #22c55e 4%, var(--bg-elev))
+  );
+}
+
+.performance-day-summary-card--low {
+  border-color: color-mix(in srgb, #ef4444 32%, var(--border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #ef4444 10%, var(--bg-elev)),
+    color-mix(in srgb, #ef4444 3%, var(--bg-elev))
+  );
+}
+
+.performance-day-summary-card__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.performance-day-summary-card__value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: var(--text);
+}
+
+.performance-day-summary-card__meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.performance-sales-rank-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.performance-sales-rank-panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--bg-elev);
+}
+
+.performance-sales-rank-panel--top {
+  border-color: color-mix(in srgb, #22c55e 28%, var(--border));
+}
+
+.performance-sales-rank-panel--least {
+  border-color: color-mix(in srgb, #ef4444 26%, var(--border));
+}
+
+.performance-sales-rank-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.02), rgba(15, 23, 42, 0));
+}
+
+.performance-sales-rank-panel--top .performance-sales-rank-panel__head {
+  background: linear-gradient(90deg, color-mix(in srgb, #22c55e 8%, transparent), transparent);
+}
+
+.performance-sales-rank-panel--least .performance-sales-rank-panel__head {
+  background: linear-gradient(90deg, color-mix(in srgb, #ef4444 8%, transparent), transparent);
+}
+
+.performance-sales-rank-panel__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.performance-sales-rank-panel__subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.performance-sales-rank-panel__count {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  border: 1px solid var(--border);
+}
+
+.performance-sales-rank-panel__empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.performance-sales-rank-list {
+  list-style: none;
+  margin: 0;
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.performance-sales-rank-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--bg) 70%, var(--bg-elev));
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.performance-sales-rank-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.performance-sales-rank-item__rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+}
+
+.performance-sales-rank-panel--top .performance-sales-rank-item__rank--1 {
+  color: #b45309;
+  background: color-mix(in srgb, #f59e0b 22%, transparent);
+}
+
+.performance-sales-rank-panel--top .performance-sales-rank-item__rank--2 {
+  color: #475569;
+  background: color-mix(in srgb, #94a3b8 20%, transparent);
+}
+
+.performance-sales-rank-panel--top .performance-sales-rank-item__rank--3 {
+  color: #9a3412;
+  background: color-mix(in srgb, #fb923c 18%, transparent);
+}
+
+.performance-sales-rank-item__body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.performance-sales-rank-item__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.performance-sales-rank-item__date {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.performance-sales-rank-item__orders {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.performance-sales-rank-item__sales {
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.performance-sales-rank-item__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  overflow: hidden;
+}
+
+.performance-sales-rank-panel--top .performance-sales-rank-item__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.performance-sales-rank-panel--least .performance-sales-rank-item__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f87171, #ef4444);
+}
+
+.performance-month-card {
+  background: var(--bg-elev);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+.performance-month-card .modules-count-bar {
+  border-bottom: 1px solid var(--border);
+}
+
+.performance-month-comparison {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.performance-month-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.performance-period-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.performance-period-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 88%, transparent), var(--bg-elev));
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.performance-period-card--currentMonth {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--primary) 10%, var(--bg-elev)),
+    color-mix(in srgb, var(--primary) 4%, var(--bg-elev))
+  );
+}
+
+.performance-period-card--lastMonth {
+  border-color: color-mix(in srgb, #0ea5e9 28%, var(--border));
+}
+
+.performance-period-card--twoMonthsAgo {
+  border-color: color-mix(in srgb, #8b5cf6 24%, var(--border));
+}
+
+.performance-period-card__head {
+  display: grid;
+  gap: 4px;
+}
+
+.performance-period-card__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.performance-period-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.performance-period-card__range {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.performance-period-card__value {
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.performance-period-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.performance-period-card__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.performance-period-card__baseline {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+}
+
+.performance-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.performance-delta--up {
+  color: #15803d;
+  background: color-mix(in srgb, #22c55e 16%, transparent);
+  border: 1px solid color-mix(in srgb, #22c55e 35%, var(--border));
+}
+
+.performance-delta--down {
+  color: #b91c1c;
+  background: color-mix(in srgb, #ef4444 14%, transparent);
+  border: 1px solid color-mix(in srgb, #ef4444 32%, var(--border));
+}
+
+.performance-delta--flat {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  border: 1px solid var(--border);
+}
+
+[data-theme='dark'] .performance-delta--up {
+  color: #86efac;
+}
+
+[data-theme='dark'] .performance-delta--down {
+  color: #fca5a5;
+}
+
+.performance-comparison-panel {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--bg-elev);
+}
+
+.performance-comparison-panel__head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.02), rgba(15, 23, 42, 0));
+}
+
+.performance-comparison-panel__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.performance-comparison-panel__subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.performance-comparison-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.performance-comparison-table thead {
+  background: linear-gradient(90deg, #eff6ff, #dbeafe);
+}
+
+.performance-comparison-table th {
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e40af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  vertical-align: bottom;
+}
+
+.performance-comparison-table td {
+  padding: 14px;
+  border-top: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.performance-comparison-table tbody tr:hover {
+  background: color-mix(in srgb, var(--primary) 4%, transparent);
+}
+
+.performance-comparison-table__col-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #1e40af;
+}
+
+.performance-comparison-table__col-range {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #3b82f6;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.performance-comparison-table__platform {
+  min-width: 130px;
+}
+
+.performance-comparison-table__amount {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.performance-comparison-table__amount--total {
+  font-size: 15px;
+}
+
+.performance-comparison-table__share {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.performance-comparison-table__bar {
+  margin-top: 8px;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  overflow: hidden;
+}
+
+.performance-comparison-table__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.performance-comparison-table__total-row {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.performance-comparison-table__total-row td {
+  border-top-width: 2px;
+}
+
+@media (max-width: 1100px) {
+  .performance-period-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .performance-day-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .performance-sales-rank-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -89,5 +650,34 @@
     min-width: 0;
     justify-content: center;
     text-align: center;
+  }
+
+  .performance-date-field {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .performance-period-filters {
+    width: 100%;
+    margin-left: 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .performance-period-filter {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .performance-month-comparison {
+    padding: 12px;
+  }
+
+  .performance-platform-comparison {
+    padding: 12px;
+  }
+
+  .performance-day-summary-grid {
+    grid-template-columns: 1fr;
   }
 }

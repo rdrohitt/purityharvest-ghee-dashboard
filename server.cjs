@@ -645,6 +645,69 @@ app.get('/api/analytics/overview', async (req, res) => {
   }
 });
 
+/** Placeholder for local dev; production returns full platform-sales-comparison payload. */
+app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
+  try {
+    const date = typeof req.query.date === 'string' ? req.query.date : '';
+    res.json({
+      filters: {
+        date,
+        platforms: ['shopify', 'abandoned', 'callling', 'whatsapp'],
+      },
+      periods: [
+        {
+          key: 'currentMonth',
+          month: '2026-06',
+          from: '2026-06-01',
+          to: '2026-06-14',
+          platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
+          totalSales: 0,
+        },
+        {
+          key: 'lastMonth',
+          month: '2026-05',
+          from: '2026-05-01',
+          to: '2026-05-14',
+          platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
+          totalSales: 0,
+        },
+        {
+          key: 'twoMonthsAgo',
+          month: '2026-04',
+          from: '2026-04-01',
+          to: '2026-04-14',
+          platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
+          totalSales: 0,
+        },
+      ],
+    });
+  } catch (err) {
+    console.error('Error analytics platform-sales-comparison', err);
+    res.status(500).json({ message: 'Failed to load platform sales comparison' });
+  }
+});
+
+/** Placeholder for local dev; production returns full daily-sales-ranking payload. */
+app.get('/api/analytics/daily-sales-ranking', async (req, res) => {
+  try {
+    const month = typeof req.query.month === 'string' ? req.query.month : '';
+    const [mm, yyyy] = month.split('-');
+    const appliedMonth = mm && yyyy ? `${yyyy}-${mm}` : '';
+    res.json({
+      filters: {
+        month,
+        appliedMonth,
+        appliedDateRange: { $gte: '', $lte: '' },
+      },
+      topSalesDates: [],
+      leastSalesDates: [],
+    });
+  } catch (err) {
+    console.error('Error analytics daily-sales-ranking', err);
+    res.status(500).json({ message: 'Failed to load daily sales ranking' });
+  }
+});
+
 /** Placeholder for local dev; production returns full order-reporting payload. */
 app.get('/api/analytics/order-reporting', async (req, res) => {
   try {

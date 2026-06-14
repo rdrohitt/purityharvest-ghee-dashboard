@@ -89,6 +89,7 @@ export default function App() {
 		location.pathname.startsWith('/admin/users');
 	const isModulesRoute = location.pathname.startsWith('/admin/modules');
 	const isProductsRoute = location.pathname.startsWith('/admin/products');
+	const isPerformanceRoute = location.pathname.startsWith('/admin/performance');
 	const showGlobalSpinner =
 		hydratingUser ||
 		(!(isMarketingSpendRoute ||
@@ -96,7 +97,8 @@ export default function App() {
 			isWALeadsRoute ||
 			isUsersRoute ||
 			isModulesRoute ||
-			isProductsRoute) && activeApiRequests > 0);
+			isProductsRoute ||
+			isPerformanceRoute) && activeApiRequests > 0);
 	const spinnerMessage = hydratingUser ? 'Loading dashboard…' : 'Loading…';
 
 	return (
