@@ -411,7 +411,7 @@ export function ModernSelect<T extends string>({
     );
 }
 
-const PLATFORMS: Platform[] = ['Shopify', 'Abandoned', 'Whatsapp', 'Amazon', 'Flipkart', 'Calling'];
+const PLATFORMS: Platform[] = ['Shopify', 'Abandoned', 'Whatsapp', 'Amazon', 'Flipkart', 'Calling', 'Collaboration'];
 
 export const ORDER_MODAL_TYPE_OPTIONS: ModernSelectOption<OrderType | ''>[] = [
     { value: '', label: 'Select Type', icon: iconPlaceholder() },
@@ -705,7 +705,9 @@ export function PlatformTag({ platform }: { platform?: Platform | string }) {
                 ? 'shopify-platform-tag--abandoned'
                 : lower === 'calling'
                   ? 'shopify-platform-tag--calling'
-                  : lower === 'amazon'
+                  : lower === 'collaboration'
+                    ? 'shopify-platform-tag--collaboration'
+                    : lower === 'amazon'
                     ? 'shopify-platform-tag--amazon'
                     : lower === 'flipkart'
                       ? 'shopify-platform-tag--flipkart'
@@ -721,7 +723,9 @@ export function PlatformTag({ platform }: { platform?: Platform | string }) {
                 ? 'Abandoned'
                 : lower === 'calling'
                   ? 'Calling'
-                  : lower === 'amazon'
+                  : lower === 'collaboration'
+                    ? 'Collaboration'
+                    : lower === 'amazon'
                     ? 'Amazon'
                     : lower === 'flipkart'
                       ? 'Flipkart'

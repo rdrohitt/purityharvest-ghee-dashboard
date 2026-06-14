@@ -32,7 +32,7 @@ export function normalizeDeliveryStatus(input: string | undefined, returnStatus?
     if (s === 'pending_pickup' || s === 'pending pickup') return 'pending_pickup';
     return 'pending_pickup';
 }
-export type Platform = 'Shopify' | 'Abandoned' | 'Whatsapp' | 'Amazon' | 'Flipkart' | 'Calling';
+export type Platform = 'Shopify' | 'Abandoned' | 'Whatsapp' | 'Amazon' | 'Flipkart' | 'Calling' | 'Collaboration';
 export type OrderType = 'New' | 'Repeat' | 'Reference';
 
 export type OrderItem = { variant: string; quantity: number; lineAmount: number };

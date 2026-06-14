@@ -19,3 +19,8 @@ export function canViewRtoOrders(permissions: string[] | undefined): boolean {
         hasAnyPermission(permissions, ['viewrto:view', 'viewrto:modify'])
     );
 }
+
+/** Performance analytics page — orders:analyticsview */
+export function canViewPerformanceAnalytics(permissions: string[] | undefined): boolean {
+    return hasPermission(permissions, 'orders:analyticsview');
+}

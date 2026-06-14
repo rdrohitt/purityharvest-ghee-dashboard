@@ -929,7 +929,7 @@ function VariantDropdown({
                             <div className="variant-dropdown-empty">
                                 {options.length === 0
                                     ? 'No products available'
-                                    : 'No matches for “‘ + searchQuery.trim() + ’"'}
+                                    : `No matches for "${searchQuery.trim()}"`}
                             </div>
                         ) : (
                             filteredOptions.map((product) => {
@@ -993,6 +993,7 @@ function AddOrderModal({
         if (lower === 'amazon') return 'Amazon';
         if (lower === 'flipkart') return 'Flipkart';
         if (lower === 'calling') return 'Calling';
+        if (lower === 'collaboration') return 'Collaboration';
         return p;
     };
 

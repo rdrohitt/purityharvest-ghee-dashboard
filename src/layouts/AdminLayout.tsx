@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAppSelector } from '../store';
 import { applyTheme, getInitialTheme, type Theme } from '../theme';
 import { API_FORBIDDEN_EVENT, API_UNAUTHORIZED_EVENT } from '../api';
-import { canViewRtoOrders, canViewSalesChannels } from '../utils/permissions';
+import { canViewPerformanceAnalytics, canViewRtoOrders, canViewSalesChannels } from '../utils/permissions';
 import './AdminLayout.scss';
 
 export default function AdminLayout() {
@@ -32,6 +32,7 @@ export default function AdminLayout() {
     const permissions = meUser?.permissions;
     const canSalesChannels = canViewSalesChannels(permissions);
     const canRto = canViewRtoOrders(permissions);
+    const canPerformance = canViewPerformanceAnalytics(permissions);
     const showSalesGroup = (hasMenuLabel('Sales') && canSalesChannels) || canRto;
 
     useEffect(() => {
@@ -48,6 +49,8 @@ export default function AdminLayout() {
             blocked = !canSalesChannels;
         } else if (path.startsWith('/admin/rto-orders')) {
             blocked = !canRto;
+        } else if (path.startsWith('/admin/performance')) {
+            blocked = !canPerformance;
         }
         setForbiddenSection(blocked);
 
@@ -68,7 +71,7 @@ export default function AdminLayout() {
         ) {
             setMartsOpen(true);
         }
-    }, [location.pathname, canSalesChannels, canRto]);
+    }, [location.pathname, canSalesChannels, canRto, canPerformance]);
 
     useEffect(() => {
         const onForbidden = () => setForbiddenSection(true);
@@ -174,7 +177,12 @@ export default function AdminLayout() {
                             <span className="mi-label">Leads</span>
                         </NavLink>
                     )}
-
+                    {canPerformance && (
+                        <NavLink to="/admin/performance" className={({ isActive }) => (isActive ? 'active' : '')}>
+                            <span className="mi-icon">📈</span>
+                            <span className="mi-label">Performance</span>
+                        </NavLink>
+                    )}
                     {/* Sales group */}
                     {showSalesGroup && (
                         <div className="menu-group">

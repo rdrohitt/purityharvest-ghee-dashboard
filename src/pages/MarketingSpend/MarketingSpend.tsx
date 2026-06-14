@@ -162,6 +162,30 @@ function toYmd(d: Date): string {
     return `${year}-${month}-${day}`;
 }
 
+function normalizeMarketingPlatform(raw: string): string {
+    return String(raw ?? '').trim().toLowerCase().replace(/_/g, '-');
+}
+
+function isMetaMilkPlatform(platform: string): boolean {
+    const p = normalizeMarketingPlatform(platform);
+    return (
+        p === 'meta-milk' ||
+        p === 'metamilk' ||
+        p === 'meta-milk-spend' ||
+        p === 'meta milk' ||
+        (p.includes('meta') && p.includes('milk') && p !== 'meta1')
+    );
+}
+
+function isMetaWalletPlatform(platform: string): boolean {
+    const p = normalizeMarketingPlatform(platform);
+    return (p === 'meta1' || p === 'meta') && !isMetaMilkPlatform(p);
+}
+
+function sumSpendAmount(rows: { amount: number }[]): number {
+    return rows.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+}
+
 export default function MarketingSpend() {
     const dispatch = useAppDispatch();
 
@@ -181,6 +205,8 @@ export default function MarketingSpend() {
     const [customFrom, setCustomFrom] = useState<string>('');
     const [customTo, setCustomTo] = useState<string>('');
     const [loading, setLoading] = useState(true);
+    /** Total Expense roll-up (excludes meta-milk; meta-milk has its own summary card). */
+    const [spendGrandTotal, setSpendGrandTotal] = useState(0);
 
     const marketingLoadOptions: LoadMarketingSpendOptions = useMemo(
         () => marketingSpendApiRange(mode, customFrom, customTo),
@@ -207,10 +233,10 @@ export default function MarketingSpend() {
             updatedByName: item.updatedBy?.name,
         });
         const platformOf = (item: MarketingSpendApiItem): string =>
-            String(item.platform ?? '').trim().toLowerCase();
+            normalizeMarketingPlatform(String(item.platform ?? ''));
 
-        const metaItems = all.filter((i) => platformOf(i) === 'meta1').map(toSpendRecord);
-        const metaMilkItems = all.filter((i) => platformOf(i) === 'meta-milk').map(toSpendRecord);
+        const metaItems = all.filter((i) => isMetaWalletPlatform(platformOf(i))).map(toSpendRecord);
+        const metaMilkItems = all.filter((i) => isMetaMilkPlatform(platformOf(i))).map(toSpendRecord);
         const amazonItems = all.filter((i) => platformOf(i) === 'amazon').map(toSpendRecord);
         const amazonShippingItems = all
             .filter((i) => platformOf(i) === 'amazon_shipping' || platformOf(i) === 'amazon-shipping')
@@ -260,6 +286,12 @@ export default function MarketingSpend() {
         setDolchi(dolchiItems);
         setDelhivery(delhiveryItems);
         setMisc(miscItems);
+        setSpendGrandTotal(
+            all.reduce((sum, item) => {
+                if (isMetaMilkPlatform(platformOf(item))) return sum;
+                return sum + (Number(item.amount) || 0);
+            }, 0),
+        );
     }
 
     const refreshFromServer = useCallback(async () => {
@@ -304,36 +336,36 @@ export default function MarketingSpend() {
         };
     }, [dispatch, marketingLoadOptions]);
 
-    const totals = useMemo(
-        () => ({
-            meta: meta.reduce((s, r) => s + r.amount, 0),
-            metaMilk: metaMilk.reduce((s, r) => s + r.amount, 0),
-            amazon: amazon.reduce((s, r) => s + r.amount, 0),
-            amazonShipping: amazonShipping.reduce((s, r) => s + r.amount, 0),
-            googleAds: googleAds.reduce((s, r) => s + r.amount, 0),
-            agencyFee: agencyFee.reduce((s, r) => s + r.amount, 0),
-            flipkart: flipkart.reduce((s, r) => s + r.amount, 0),
-            checkout: checkout.reduce((s, r) => s + r.amount, 0),
-            engage: engage.reduce((s, r) => s + r.amount, 0),
-            dolchi: dolchi.reduce((s, r) => s + r.amount, 0),
-            delhivery: delhivery.reduce((s, r) => s + r.amount, 0),
-            misc: misc.reduce((s, r) => s + r.amount, 0),
-            totalExpense:
-                meta.reduce((s, r) => s + r.amount, 0) +
-                metaMilk.reduce((s, r) => s + r.amount, 0) +
-                amazon.reduce((s, r) => s + r.amount, 0) +
-                amazonShipping.reduce((s, r) => s + r.amount, 0) +
-                googleAds.reduce((s, r) => s + r.amount, 0) +
-                agencyFee.reduce((s, r) => s + r.amount, 0) +
-                flipkart.reduce((s, r) => s + r.amount, 0) +
-                checkout.reduce((s, r) => s + r.amount, 0) +
-                engage.reduce((s, r) => s + r.amount, 0) +
-                dolchi.reduce((s, r) => s + r.amount, 0) +
-                delhivery.reduce((s, r) => s + r.amount, 0) +
-                misc.reduce((s, r) => s + r.amount, 0),
-        }),
-        [meta, metaMilk, amazon, amazonShipping, googleAds, agencyFee, flipkart, checkout, engage, dolchi, delhivery, misc],
-    );
+    const totals = useMemo(() => {
+        const metaTotal = sumSpendAmount(meta);
+        const metaMilkTotal = sumSpendAmount(metaMilk);
+        const amazonTotal = sumSpendAmount(amazon);
+        const amazonShippingTotal = sumSpendAmount(amazonShipping);
+        const googleAdsTotal = sumSpendAmount(googleAds);
+        const agencyFeeTotal = sumSpendAmount(agencyFee);
+        const flipkartTotal = sumSpendAmount(flipkart);
+        const checkoutTotal = sumSpendAmount(checkout);
+        const engageTotal = sumSpendAmount(engage);
+        const dolchiTotal = sumSpendAmount(dolchi);
+        const delhiveryTotal = sumSpendAmount(delhivery);
+        const miscTotal = sumSpendAmount(misc);
+
+        return {
+            meta: metaTotal,
+            metaMilk: metaMilkTotal,
+            amazon: amazonTotal,
+            amazonShipping: amazonShippingTotal,
+            googleAds: googleAdsTotal,
+            agencyFee: agencyFeeTotal,
+            flipkart: flipkartTotal,
+            checkout: checkoutTotal,
+            engage: engageTotal,
+            dolchi: dolchiTotal,
+            delhivery: delhiveryTotal,
+            misc: miscTotal,
+            totalExpense: spendGrandTotal,
+        };
+    }, [meta, metaMilk, amazon, amazonShipping, googleAds, agencyFee, flipkart, checkout, engage, dolchi, delhivery, misc, spendGrandTotal]);
 
     return (
         <section className="marketing-spend-page">

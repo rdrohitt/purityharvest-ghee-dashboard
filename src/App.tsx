@@ -14,6 +14,7 @@ import WALeads from './pages/WALeads/index';
 import Followups from './pages/Followups/index';
 import Scripts from './pages/Scripts/index';
 import MarketingSpend from './pages/MarketingSpend/index';
+import Performance from './pages/Performance/index';
 import Customers from './pages/Customers/index';
 import Products from './pages/Products/index';
 import GurugramMarts from './pages/Marts/GurugramMarts/index';
@@ -129,6 +130,7 @@ export default function App() {
 						<Route path="followups" element={<Followups />} />
 						<Route path="scripts" element={<Scripts />} />
 						<Route path="marketing-spend" element={<MarketingSpend />} />
+						<Route path="performance" element={<Performance />} />
 						<Route path="gurugram-marts" element={<GurugramMarts />} />
 						<Route path="delhi-marts" element={<DelhiMarts />} />
 						<Route path="customers" element={<Customers />} />
