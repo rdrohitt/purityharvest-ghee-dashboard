@@ -10,7 +10,10 @@ const ACTIONS = [
     { key: 'modify', label: 'Modify' },
 ] as const;
 
-const ORDERS_EXTRA_ACTIONS = [{ key: 'viewrto', label: 'RTO' }] as const;
+const ORDERS_EXTRA_ACTIONS = [
+    { key: 'viewrto', label: 'RTO' },
+    { key: 'analyticsview', label: 'Analytics' },
+] as const;
 
 function getModuleActions(moduleKey: string) {
     if (moduleKey === 'orders') {

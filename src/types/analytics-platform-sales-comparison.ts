@@ -3,8 +3,15 @@
  */
 export type PlatformSalesComparisonPeriodKey = 'currentMonth' | 'lastMonth' | 'twoMonthsAgo';
 
+export type PlatformSalesComparisonPlatformStats = {
+    sales: number;
+    rtoOrderCount: number;
+    rtoAmount: number;
+};
+
 export type PlatformSalesComparisonFilters = {
     date: string;
+    category: string | null;
     platforms: string[];
 };
 
@@ -14,7 +21,10 @@ export type PlatformSalesComparisonPeriod = {
     from: string;
     to: string;
     platformSales: Record<string, number>;
+    platformStats?: Record<string, PlatformSalesComparisonPlatformStats>;
     totalSales: number;
+    totalRtoOrderCount?: number;
+    totalRtoAmount?: number;
 };
 
 export type PlatformSalesComparisonResponse = {

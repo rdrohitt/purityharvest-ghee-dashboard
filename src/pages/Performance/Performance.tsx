@@ -5,6 +5,7 @@ import type { DailySalesRankingDateEntry, DailySalesRankingResponse } from '../.
 import type {
     PlatformSalesComparisonPeriod,
     PlatformSalesComparisonPeriodKey,
+    PlatformSalesComparisonPlatformStats,
     PlatformSalesComparisonResponse,
 } from '../../types/analytics-platform-sales-comparison';
 import { DatePicker } from '../sales/Shopify/DatePicker';
@@ -16,8 +17,8 @@ import './Performance.scss';
 type PerformanceViewTab = 'platform' | 'month';
 
 const PERFORMANCE_VIEW_TABS: { id: PerformanceViewTab; label: string }[] = [
-    { id: 'platform', label: 'Platform Wise' },
-    { id: 'month', label: 'Month Wise' },
+    { id: 'platform', label: 'Month Wise' },
+    { id: 'month', label: 'Platform Wise' },
 ];
 
 const PERIOD_ORDER: PlatformSalesComparisonPeriodKey[] = ['currentMonth', 'lastMonth', 'twoMonthsAgo'];
@@ -84,6 +85,26 @@ function normalizePlatformKey(platform: string): string {
     return platform.toLowerCase() === 'callling' ? 'calling' : platform;
 }
 
+function isCallingPlatform(platform: string): boolean {
+    const key = platform.toLowerCase();
+    return key === 'calling' || key === 'callling';
+}
+
+function sortPlatformsWithCallingLast(platforms: string[]): string[] {
+    const others: string[] = [];
+    let callingPlatform: string | null = null;
+
+    platforms.forEach((platform) => {
+        if (isCallingPlatform(platform)) {
+            callingPlatform = platform;
+        } else {
+            others.push(platform);
+        }
+    });
+
+    return callingPlatform ? [...others, callingPlatform] : platforms;
+}
+
 function formatDayLabel(date: string): string {
     const parsed = new Date(`${date}T00:00:00`);
     if (Number.isNaN(parsed.getTime())) return date;
@@ -112,6 +133,19 @@ function getPeriodByKey(
     key: PlatformSalesComparisonPeriodKey,
 ): PlatformSalesComparisonPeriod | undefined {
     return periods.find((period) => period.key === key);
+}
+
+function getPlatformStats(
+    period: PlatformSalesComparisonPeriod,
+    platform: string,
+): PlatformSalesComparisonPlatformStats {
+    const fromStats = period.platformStats?.[platform];
+    if (fromStats) return fromStats;
+    return {
+        sales: period.platformSales?.[platform] ?? 0,
+        rtoOrderCount: 0,
+        rtoAmount: 0,
+    };
 }
 
 function formatMonthYearLabel(month: string, year: string): string {
@@ -314,6 +348,10 @@ function PeriodSummaryCard({
                 <p className="performance-period-card__range">{formatPeriodRange(period.from, period.to)}</p>
             </div>
             <div className="performance-period-card__value">{formatCurrency(period.totalSales)}</div>
+            <div className="performance-period-card__rto">
+                <span>{(period.totalRtoOrderCount ?? 0).toLocaleString('en-IN')} RTO orders</span>
+                <span>{formatCurrency(period.totalRtoAmount ?? 0)} RTO amount</span>
+            </div>
             <div className="performance-period-card__footer">
                 <span className="performance-period-card__label">Total sales</span>
                 {delta ? <DeltaBadge delta={delta} /> : <span className="performance-period-card__baseline">Baseline</span>}
@@ -338,7 +376,10 @@ function MonthWiseComparison({
         );
     }, [data]);
 
-    const platforms = data?.filters?.platforms ?? [];
+    const platforms = useMemo(
+        () => sortPlatformsWithCallingLast(data?.filters?.platforms ?? []),
+        [data],
+    );
 
     const currentPeriod = getPeriodByKey(periods, 'currentMonth');
     const lastPeriod = getPeriodByKey(periods, 'lastMonth');
@@ -399,9 +440,10 @@ function MonthWiseComparison({
                         </thead>
                         <tbody>
                             {platforms.map((platform) => {
-                                const currentSales = currentPeriod?.platformSales?.[platform] ?? 0;
-                                const lastSales = lastPeriod?.platformSales?.[platform] ?? 0;
-                                const delta = currentPeriod && lastPeriod ? getDelta(currentSales, lastSales) : null;
+                                const currentStats = currentPeriod ? getPlatformStats(currentPeriod, platform) : null;
+                                const lastStats = lastPeriod ? getPlatformStats(lastPeriod, platform) : null;
+                                const delta =
+                                    currentStats && lastStats ? getDelta(currentStats.sales, lastStats.sales) : null;
 
                                 return (
                                     <tr key={platform}>
@@ -409,13 +451,17 @@ function MonthWiseComparison({
                                             <PlatformTag platform={normalizePlatformKey(platform)} />
                                         </td>
                                         {periods.map((period) => {
-                                            const sales = period.platformSales?.[platform] ?? 0;
+                                            const stats = getPlatformStats(period, platform);
                                             const share =
-                                                period.totalSales > 0 ? (sales / period.totalSales) * 100 : 0;
+                                                period.totalSales > 0 ? (stats.sales / period.totalSales) * 100 : 0;
                                             return (
                                                 <td key={`${platform}-${period.key}`}>
                                                     <div className="performance-comparison-table__amount">
-                                                        {formatCurrency(sales)}
+                                                        {formatCurrency(stats.sales)}
+                                                    </div>
+                                                    <div className="performance-comparison-table__rto">
+                                                        {stats.rtoOrderCount.toLocaleString('en-IN')} RTO ·{' '}
+                                                        {formatCurrency(stats.rtoAmount)}
                                                     </div>
                                                     <div className="performance-comparison-table__share">
                                                         {share.toFixed(1)}% of total
@@ -438,6 +484,10 @@ function MonthWiseComparison({
                                     <td key={`total-${period.key}`}>
                                         <div className="performance-comparison-table__amount performance-comparison-table__amount--total">
                                             {formatCurrency(period.totalSales)}
+                                        </div>
+                                        <div className="performance-comparison-table__rto performance-comparison-table__rto--total">
+                                            {(period.totalRtoOrderCount ?? 0).toLocaleString('en-IN')} RTO orders ·{' '}
+                                            {formatCurrency(period.totalRtoAmount ?? 0)}
                                         </div>
                                     </td>
                                 ))}

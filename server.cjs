@@ -652,6 +652,7 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
     res.json({
       filters: {
         date,
+        category: null,
         platforms: ['shopify', 'abandoned', 'callling', 'whatsapp'],
       },
       periods: [
@@ -661,7 +662,15 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
           from: '2026-06-01',
           to: '2026-06-14',
           platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
+          platformStats: {
+            shopify: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+            abandoned: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+            callling: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+            whatsapp: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+          },
           totalSales: 0,
+          totalRtoOrderCount: 0,
+          totalRtoAmount: 0,
         },
         {
           key: 'lastMonth',
@@ -669,7 +678,15 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
           from: '2026-05-01',
           to: '2026-05-14',
           platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
+          platformStats: {
+            shopify: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+            abandoned: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+            callling: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+            whatsapp: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+          },
           totalSales: 0,
+          totalRtoOrderCount: 0,
+          totalRtoAmount: 0,
         },
         {
           key: 'twoMonthsAgo',
@@ -677,7 +694,15 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
           from: '2026-04-01',
           to: '2026-04-14',
           platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
+          platformStats: {
+            shopify: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+            abandoned: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+            callling: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+            whatsapp: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
+          },
           totalSales: 0,
+          totalRtoOrderCount: 0,
+          totalRtoAmount: 0,
         },
       ],
     });
