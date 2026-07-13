@@ -21,6 +21,9 @@ export type PlatformSalesComparisonPeriod = {
     from: string;
     to: string;
     platformSales: Record<string, number>;
+    platformTargets?: Record<string, number>;
+    /** Period-level Shopify marketing spend (shown on the Shopify row). */
+    platformMarketingSpend?: number;
     platformStats?: Record<string, PlatformSalesComparisonPlatformStats>;
     totalSales: number;
     totalRtoOrderCount?: number;

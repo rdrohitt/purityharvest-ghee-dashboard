@@ -85,6 +85,10 @@ function normalizePlatformKey(platform: string): string {
     return platform.toLowerCase() === 'callling' ? 'calling' : platform;
 }
 
+function isShopifyPlatform(platform: string): boolean {
+    return platform.toLowerCase() === 'shopify';
+}
+
 function isCallingPlatform(platform: string): boolean {
     const key = platform.toLowerCase();
     return key === 'calling' || key === 'callling';
@@ -454,11 +458,19 @@ function MonthWiseComparison({
                                             const stats = getPlatformStats(period, platform);
                                             const share =
                                                 period.totalSales > 0 ? (stats.sales / period.totalSales) * 100 : 0;
+                                            const marketingSpend = isShopifyPlatform(platform)
+                                                ? period.platformMarketingSpend
+                                                : undefined;
                                             return (
                                                 <td key={`${platform}-${period.key}`}>
                                                     <div className="performance-comparison-table__amount">
                                                         {formatCurrency(stats.sales)}
                                                     </div>
+                                                    {marketingSpend != null && marketingSpend > 0 ? (
+                                                        <div className="performance-comparison-table__spend">
+                                                            Meta Spend: {formatCurrency(marketingSpend)}
+                                                        </div>
+                                                    ) : null}
                                                     <div className="performance-comparison-table__rto">
                                                         {stats.rtoOrderCount.toLocaleString('en-IN')} RTO ·{' '}
                                                         {formatCurrency(stats.rtoAmount)}

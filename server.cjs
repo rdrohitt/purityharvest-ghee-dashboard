@@ -662,6 +662,8 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
           from: '2026-06-01',
           to: '2026-06-14',
           platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
+          platformTargets: { shopify: 0 },
+          platformMarketingSpend: 0,
           platformStats: {
             shopify: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
             abandoned: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
@@ -678,6 +680,8 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
           from: '2026-05-01',
           to: '2026-05-14',
           platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
+          platformTargets: { shopify: 0 },
+          platformMarketingSpend: 0,
           platformStats: {
             shopify: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
             abandoned: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
@@ -694,6 +698,8 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
           from: '2026-04-01',
           to: '2026-04-14',
           platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
+          platformTargets: { shopify: 0 },
+          platformMarketingSpend: 0,
           platformStats: {
             shopify: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
             abandoned: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
