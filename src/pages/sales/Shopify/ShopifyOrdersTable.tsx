@@ -454,10 +454,17 @@ function generateOrderInvoicePDF(order: ShopifyOrderApi): void {
     const finalY = (doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? y + 50;
     let totalY = finalY + 8;
 
-    const subtotal = Number(order.totalAmount || 0) + Number(order.discount || 0);
+    const itemsSubtotal = (order.products ?? []).reduce(
+        (sum, p) => sum + getShopifyProductLineAmount(p),
+        0,
+    );
+    const codCharges = Number(order.codCharges || 0);
+    const shippingCharges = Number(order.shippingCharges || 0);
+    const subtotal = itemsSubtotal + codCharges + shippingCharges;
     const taxPercent = 0;
     const taxAmount = 0;
     const grandTotal = Number(order.totalAmount || 0);
+    const discount = Math.max(0, subtotal - grandTotal);
 
     doc.setTextColor(...textDark);
     doc.setFont('helvetica', 'normal');
@@ -470,6 +477,12 @@ function generateOrderInvoicePDF(order: ShopifyOrderApi): void {
     doc.text('Sub Total', totalsLabelX, totalY + 3, { align: 'right' });
     doc.text(formatMoneyForPdf(subtotal), totalsValueX, totalY + 3, { align: 'right' });
     totalY += 8;
+
+    if (discount > 0) {
+        doc.text('Discount', totalsLabelX, totalY + 3, { align: 'right' });
+        doc.text(`- ${formatMoneyForPdf(discount)}`, totalsValueX, totalY + 3, { align: 'right' });
+        totalY += 8;
+    }
 
     doc.text(`Sales tax (${taxPercent}%)`, totalsLabelX, totalY + 3, { align: 'right' });
     doc.text(formatMoneyForPdf(taxAmount), totalsValueX, totalY + 3, { align: 'right' });
