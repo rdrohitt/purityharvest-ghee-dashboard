@@ -885,6 +885,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+.performance-comparison-table__roas {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f766e;
+  font-variant-numeric: tabular-nums;
+}
+
 .performance-comparison-table__target-current {
   margin-top: 4px;
   font-size: 11px;
@@ -897,12 +905,80 @@
   margin-top: 6px;
 }
 
+.performance-comparison-table--targets {
+  min-width: 640px;
+  background: var(--bg-elev, #fff);
+}
+
 .performance-comparison-table--targets thead {
-  background: linear-gradient(90deg, #f5f3ff, #ede9fe);
+  background: var(--bg, #fff);
+  border-bottom: 1px solid var(--border);
 }
 
 .performance-comparison-table--targets th {
-  color: #5b21b6;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: none;
+  background: transparent;
+}
+
+.performance-comparison-table--targets td {
+  padding: 14px 16px;
+  border-top: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, #e5e7eb);
+  vertical-align: middle;
+  background: var(--bg-elev, #fff);
+}
+
+.performance-comparison-table--targets tbody tr:hover td {
+  background: #f8fafc;
+}
+
+.performance-comparison-table--targets tbody tr:hover td.performance-targets-table__month {
+  background: #f8fafc;
+}
+
+.performance-targets-table-row--group-start td {
+  border-top: 4px solid color-mix(in srgb, var(--border) 75%, #e5e7eb);
+}
+
+.performance-targets-table-row--group-start td.performance-targets-table__month {
+  border-top: 4px solid color-mix(in srgb, var(--border) 75%, #e5e7eb);
+}
+
+.performance-targets-table-row--group-end td {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, #cbd5e1);
+}
+
+.performance-comparison-table--targets tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.performance-targets-table__month {
+  vertical-align: top;
+  font-weight: 600;
+  border-right: 1px solid color-mix(in srgb, var(--border) 55%, #e5e7eb);
+  background: color-mix(in srgb, var(--bg) 92%, #f8fafc);
+}
+
+.performance-targets-table__target {
+  font-variant-numeric: tabular-nums;
+}
+
+.performance-comparison-panel--targets {
+  border: 1px solid color-mix(in srgb, var(--border) 80%, #e5e7eb);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.performance-comparison-panel--targets .performance-comparison-panel__head {
+  padding: 12px 16px;
+  background: var(--bg, #fff);
+  border-bottom: 1px solid var(--border);
 }
 
 .performance-comparison-table--targets .performance-comparison-table__col-title {

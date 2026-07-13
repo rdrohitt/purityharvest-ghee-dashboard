@@ -163,6 +163,18 @@ function formatTargetDisplayValue(raw: string): string {
     return value.toLocaleString('en-IN');
 }
 
+function formatRoas(value: number): string {
+    if (!Number.isFinite(value) || value <= 0) return '—';
+    return value.toFixed(2);
+}
+
+function getShopifyRoas(sales: number, marketingSpend?: number): number {
+    const spend = Number(marketingSpend) || 0;
+    const revenue = Number(sales) || 0;
+    if (spend <= 0 || revenue <= 0) return 0;
+    return revenue / spend;
+}
+
 function formatTargetMonthLabel(iso: string): string {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
@@ -545,15 +557,26 @@ function MonthWiseComparison({
                                             const marketingSpend = isShopifyPlatform(platform)
                                                 ? period.platformMarketingSpend
                                                 : undefined;
+                                            const shopifyRoas =
+                                                isShopifyPlatform(platform) && marketingSpend && marketingSpend > 0
+                                                    ? getShopifyRoas(stats.sales, marketingSpend)
+                                                    : 0;
                                             return (
                                                 <td key={`${platform}-${period.key}`}>
                                                     <div className="performance-comparison-table__amount">
                                                         {formatCurrency(stats.sales)}
                                                     </div>
-                                                    {marketingSpend != null && marketingSpend > 0 ? (
-                                                        <div className="performance-comparison-table__spend">
-                                                            Meta Spend: {formatCurrency(marketingSpend)}
-                                                        </div>
+                                                    {isShopifyPlatform(platform) &&
+                                                    marketingSpend != null &&
+                                                    marketingSpend > 0 ? (
+                                                        <>
+                                                            <div className="performance-comparison-table__spend">
+                                                                Meta Spend: {formatCurrency(marketingSpend)}
+                                                            </div>
+                                                            <div className="performance-comparison-table__roas">
+                                                                ROAS: {formatRoas(shopifyRoas)}
+                                                            </div>
+                                                        </>
                                                     ) : null}
                                                     <div className="performance-comparison-table__rto">
                                                         {stats.rtoOrderCount.toLocaleString('en-IN')} RTO ·{' '}
@@ -635,7 +658,7 @@ function TargetsList({
 
     return (
         <div className="performance-month-comparison">
-            <div className="performance-comparison-panel">
+            <div className="performance-comparison-panel performance-comparison-panel--targets">
                 <div className="performance-comparison-panel__head">
                     <div>
                         <h3 className="performance-comparison-panel__title">Saved targets</h3>
@@ -655,39 +678,41 @@ function TargetsList({
                             </tr>
                         </thead>
                         <tbody>
-                            {groupedTargets.map((group) => (
-                                <tr key={group.month}>
-                                    <td>
-                                        <div className="performance-comparison-table__amount">
-                                            {group.monthLabel}
-                                        </div>
-                                    </td>
-                                    <td className="performance-comparison-table__platform">
-                                        <div className="performance-targets-cell-stack">
-                                            {group.entries.map((item) => (
-                                                <div
-                                                    key={item._id}
-                                                    className="performance-targets-cell-stack__item"
-                                                >
-                                                    <PlatformTag platform={platformKeyForTargetTag(item.platform)} />
+                            {groupedTargets.map((group, groupIndex) =>
+                                group.entries.map((item, index) => (
+                                    <tr
+                                        key={item._id}
+                                        className={`performance-targets-table-row${
+                                            groupIndex > 0 && index === 0
+                                                ? ' performance-targets-table-row--group-start'
+                                                : ''
+                                        }${
+                                            index === group.entries.length - 1
+                                                ? ' performance-targets-table-row--group-end'
+                                                : ''
+                                        }`}
+                                    >
+                                        {index === 0 ? (
+                                            <td
+                                                rowSpan={group.entries.length}
+                                                className="performance-targets-table__month"
+                                            >
+                                                <div className="performance-comparison-table__amount">
+                                                    {group.monthLabel}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className="performance-targets-cell-stack">
-                                            {group.entries.map((item) => (
-                                                <div
-                                                    key={item._id}
-                                                    className="performance-targets-cell-stack__item performance-comparison-table__amount"
-                                                >
-                                                    {formatTargetDisplayValue(item.target)}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                            </td>
+                                        ) : null}
+                                        <td className="performance-comparison-table__platform">
+                                            <PlatformTag platform={platformKeyForTargetTag(item.platform)} />
+                                        </td>
+                                        <td className="performance-targets-table__target">
+                                            <div className="performance-comparison-table__amount">
+                                                {formatTargetDisplayValue(item.target)}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )),
+                            )}
                         </tbody>
                     </table>
                 </div>
