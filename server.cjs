@@ -791,6 +791,41 @@ app.post('/api/targets/', async (req, res) => {
   }
 });
 
+/** PUT /api/targets/ — update an existing platform target. */
+app.put('/api/targets/', async (req, res) => {
+  try {
+    const body = req.body;
+    if (!body || typeof body !== 'object') {
+      return res.status(400).json({ message: 'Invalid target payload' });
+    }
+    const id = typeof body._id === 'string' ? body._id.trim() : '';
+    const month = typeof body.month === 'string' ? body.month.trim() : '';
+    const target = body.target != null ? String(body.target).trim() : '';
+    const platform = typeof body.platform === 'string' ? body.platform.trim() : '';
+    if (!id || !month || !target || !platform) {
+      return res.status(400).json({ message: '_id, month, target, and platform are required' });
+    }
+    const targets = await readTargets();
+    const index = targets.findIndex((item) => String(item._id) === id);
+    if (index < 0) {
+      return res.status(404).json({ message: 'Target not found' });
+    }
+    const updated = {
+      ...targets[index],
+      month,
+      target,
+      platform,
+      updatedAt: new Date().toISOString(),
+    };
+    targets[index] = updated;
+    await writeTargets(targets);
+    res.json(updated);
+  } catch (err) {
+    console.error('Error updating target', err);
+    res.status(500).json({ message: 'Failed to update target' });
+  }
+});
+
 /** Placeholder for local dev; production returns full daily-sales-ranking payload. */
 app.get('/api/analytics/daily-sales-ranking', async (req, res) => {
   try {

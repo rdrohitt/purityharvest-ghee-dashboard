@@ -6,6 +6,11 @@ export type CreateTargetPayload = {
     platform: string;
 };
 
+/** PUT /api/targets/ */
+export type UpdateTargetPayload = CreateTargetPayload & {
+    _id: string;
+};
+
 export type TargetApiItem = {
     _id: string;
     month: string;

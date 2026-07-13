@@ -630,10 +630,12 @@ function TargetsList({
     data,
     loading,
     error,
+    onEdit,
 }: {
     data: TargetsListResponse | null;
     loading: boolean;
     error: string | null;
+    onEdit: (item: TargetApiItem) => void;
 }) {
     const targets = useMemo(
         () => sortTargetsNewestFirst(data?.items ?? []),
@@ -675,6 +677,7 @@ function TargetsList({
                                 <th>Month</th>
                                 <th>Platform</th>
                                 <th>Target</th>
+                                <th aria-label="Actions" />
                             </tr>
                         </thead>
                         <tbody>
@@ -710,6 +713,16 @@ function TargetsList({
                                                 {formatTargetDisplayValue(item.target)}
                                             </div>
                                         </td>
+                                        <td className="performance-targets-table__actions">
+                                            <button
+                                                type="button"
+                                                className="performance-targets-edit-btn"
+                                                onClick={() => onEdit(item)}
+                                                aria-label={`Edit ${item.platform} target`}
+                                            >
+                                                Edit
+                                            </button>
+                                        </td>
                                     </tr>
                                 )),
                             )}
@@ -737,6 +750,7 @@ export default function Performance() {
     const [targetsLoading, setTargetsLoading] = useState(false);
     const [targetsError, setTargetsError] = useState<string | null>(null);
     const [showAddTarget, setShowAddTarget] = useState(false);
+    const [editingTarget, setEditingTarget] = useState<TargetApiItem | null>(null);
 
     const yearOptions = useMemo(() => buildYearOptions(), []);
 
@@ -954,7 +968,10 @@ export default function Performance() {
                             <button
                                 type="button"
                                 className="button performance-add-target-btn"
-                                onClick={() => setShowAddTarget(true)}
+                                onClick={() => {
+                                    setEditingTarget(null);
+                                    setShowAddTarget(true);
+                                }}
                             >
                                 + Add Target
                             </button>
@@ -970,13 +987,25 @@ export default function Performance() {
                 ) : viewTab === 'month' ? (
                     <MonthWiseComparison data={monthData} loading={monthLoading} error={monthError} />
                 ) : (
-                    <TargetsList data={targetsData} loading={targetsLoading} error={targetsError} />
+                    <TargetsList
+                        data={targetsData}
+                        loading={targetsLoading}
+                        error={targetsError}
+                        onEdit={(item) => {
+                            setEditingTarget(item);
+                            setShowAddTarget(true);
+                        }}
+                    />
                 )}
             </div>
 
             {showAddTarget ? (
                 <AddTargetModal
-                    onClose={() => setShowAddTarget(false)}
+                    editingTarget={editingTarget}
+                    onClose={() => {
+                        setShowAddTarget(false);
+                        setEditingTarget(null);
+                    }}
                     onSaved={() => void refreshTargets()}
                 />
             ) : null}

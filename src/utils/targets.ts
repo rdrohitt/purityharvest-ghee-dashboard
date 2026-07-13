@@ -1,9 +1,25 @@
 import { apiFetch } from '../api';
-import type { CreateTargetPayload, TargetApiItem, TargetsListResponse } from '../types/targets';
+import type { CreateTargetPayload, TargetApiItem, TargetsListResponse, UpdateTargetPayload } from '../types/targets';
 
 /** First day of month at UTC midnight, e.g. 2026-08-01T00:00:00.000Z */
 export function toTargetMonthIso(month: string, year: string): string {
     return new Date(Date.UTC(Number(year), Number(month) - 1, 1)).toISOString();
+}
+
+/** Parse target month ISO into month/year select values. */
+export function parseTargetMonthIso(iso: string): { month: string; year: string } {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+        const now = new Date();
+        return {
+            month: String(now.getUTCMonth() + 1).padStart(2, '0'),
+            year: String(now.getUTCFullYear()),
+        };
+    }
+    return {
+        month: String(d.getUTCMonth() + 1).padStart(2, '0'),
+        year: String(d.getUTCFullYear()),
+    };
 }
 
 function parseTargetsListResponse(json: unknown): TargetsListResponse {
@@ -51,6 +67,21 @@ export async function createTarget(payload: CreateTargetPayload): Promise<Target
     });
     if (!res.ok) {
         throw new Error('Failed to save target');
+    }
+    return (await res.json()) as TargetApiItem;
+}
+
+/** PUT /api/targets/ */
+export async function updateTarget(payload: UpdateTargetPayload): Promise<TargetApiItem> {
+    const res = await apiFetch('/api/targets/', {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        throw new Error('Failed to update target');
     }
     return (await res.json()) as TargetApiItem;
 }

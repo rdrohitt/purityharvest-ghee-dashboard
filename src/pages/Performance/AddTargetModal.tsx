@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ModernSelect, type ModernSelectOption } from '../sales/Shopify/ShopifyShared';
-import { createTarget, toTargetMonthIso } from '../../utils/targets';
+import type { TargetApiItem } from '../../types/targets';
+import { createTarget, parseTargetMonthIso, toTargetMonthIso, updateTarget } from '../../utils/targets';
 import '../Modules/Modules.scss';
 import './Performance.scss';
 
@@ -34,12 +35,29 @@ function buildYearOptions(): ModernSelectOption<string>[] {
     });
 }
 
+function platformValueForForm(platform: string): string {
+    const match = TARGET_PLATFORM_OPTIONS.find(
+        (opt) => opt.value.toLowerCase() === platform.trim().toLowerCase(),
+    );
+    return match?.value ?? platform;
+}
+
+function buildPlatformOptions(platform: string): ModernSelectOption<string>[] {
+    const normalized = platformValueForForm(platform);
+    if (TARGET_PLATFORM_OPTIONS.some((opt) => opt.value === normalized)) {
+        return TARGET_PLATFORM_OPTIONS;
+    }
+    return [{ value: normalized, label: normalized }, ...TARGET_PLATFORM_OPTIONS];
+}
+
 type Props = {
+    editingTarget?: TargetApiItem | null;
     onClose: () => void;
     onSaved: () => void;
 };
 
-export function AddTargetModal({ onClose, onSaved }: Props) {
+export function AddTargetModal({ editingTarget = null, onClose, onSaved }: Props) {
+    const isEdit = Boolean(editingTarget?._id);
     const now = new Date();
     const [month, setMonth] = useState(String(now.getMonth() + 1).padStart(2, '0'));
     const [year, setYear] = useState(String(now.getFullYear()));
@@ -49,6 +67,7 @@ export function AddTargetModal({ onClose, onSaved }: Props) {
     const [submitting, setSubmitting] = useState(false);
 
     const yearOptions = useMemo(() => buildYearOptions(), []);
+    const platformOptions = useMemo(() => buildPlatformOptions(platform), [platform]);
 
     useEffect(() => {
         const prev = document.body.style.overflow;
@@ -57,6 +76,16 @@ export function AddTargetModal({ onClose, onSaved }: Props) {
             document.body.style.overflow = prev;
         };
     }, []);
+
+    useEffect(() => {
+        if (!editingTarget) return;
+        const { month: editMonth, year: editYear } = parseTargetMonthIso(editingTarget.month);
+        setMonth(editMonth);
+        setYear(editYear);
+        setPlatform(platformValueForForm(editingTarget.platform));
+        setTarget(String(editingTarget.target ?? ''));
+        setError(null);
+    }, [editingTarget]);
 
     async function handleSubmit(e: FormEvent) {
         e.preventDefault();
@@ -79,16 +108,26 @@ export function AddTargetModal({ onClose, onSaved }: Props) {
         setSubmitting(true);
         setError(null);
         try {
-            await createTarget({
+            const payload = {
                 month: toTargetMonthIso(month, year),
                 target: trimmedTarget,
                 platform,
-            });
+            };
+            if (isEdit && editingTarget?._id) {
+                await updateTarget({
+                    _id: editingTarget._id,
+                    ...payload,
+                });
+            } else {
+                await createTarget(payload);
+            }
             onSaved();
             onClose();
         } catch (err) {
-            console.error('Failed to create target', err);
-            setError('Failed to save target. Please try again.');
+            console.error(isEdit ? 'Failed to update target' : 'Failed to create target', err);
+            setError(
+                isEdit ? 'Failed to update target. Please try again.' : 'Failed to save target. Please try again.',
+            );
         } finally {
             setSubmitting(false);
         }
@@ -107,10 +146,12 @@ export function AddTargetModal({ onClose, onSaved }: Props) {
                     <div className="performance-add-target-modal__header-main">
                         <span className="performance-add-target-modal__eyebrow">Performance</span>
                         <h3 id="performance-add-target-title" className="performance-add-target-modal__title">
-                            Add Target
+                            {isEdit ? 'Edit Target' : 'Add Target'}
                         </h3>
                         <p className="performance-add-target-modal__subtitle">
-                            Set a monthly ROAS target for a marketing platform.
+                            {isEdit
+                                ? 'Update the monthly target for this platform.'
+                                : 'Set a monthly target for a marketing platform.'}
                         </p>
                     </div>
                     <button
@@ -164,13 +205,13 @@ export function AddTargetModal({ onClose, onSaved }: Props) {
                                     <ModernSelect
                                         value={platform}
                                         onChange={(value) => value && setPlatform(value)}
-                                        options={TARGET_PLATFORM_OPTIONS}
+                                        options={platformOptions}
                                         aria-label="Select platform"
                                     />
                                 </div>
                                 <div className="performance-add-target-modal__field">
                                     <label className="label" htmlFor="add-target-value">
-                                        Target ROAS
+                                        Target
                                     </label>
                                     <input
                                         id="add-target-value"
@@ -182,20 +223,22 @@ export function AddTargetModal({ onClose, onSaved }: Props) {
                                         placeholder="e.g. 250"
                                         required
                                     />
-                                    <span className="performance-add-target-modal__hint">
-                                        Enter as ROAS × 100 (250 = 2.50 ROAS).
-                                    </span>
                                 </div>
                             </div>
                         </section>
                     </div>
 
                     <div className="performance-add-target-modal__footer">
-                        <button type="button" className="button performance-add-target-modal__cancel" onClick={onClose} disabled={submitting}>
+                        <button
+                            type="button"
+                            className="button performance-add-target-modal__cancel"
+                            onClick={onClose}
+                            disabled={submitting}
+                        >
                             Cancel
                         </button>
                         <button type="submit" className="button performance-add-target-modal__submit" disabled={submitting}>
-                            {submitting ? 'Saving…' : 'Save Target'}
+                            {submitting ? (isEdit ? 'Updating…' : 'Saving…') : isEdit ? 'Update Target' : 'Save Target'}
                         </button>
                     </div>
                 </form>

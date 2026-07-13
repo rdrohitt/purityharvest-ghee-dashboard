@@ -969,6 +969,35 @@
   font-variant-numeric: tabular-nums;
 }
 
+.performance-targets-table__actions {
+  width: 88px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.performance-targets-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #7c3aed 28%, var(--border));
+  background: color-mix(in srgb, #8b5cf6 10%, var(--bg-elev, #fff));
+  color: #6d28d9;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.performance-targets-edit-btn:hover {
+  background: color-mix(in srgb, #8b5cf6 16%, var(--bg-elev, #fff));
+  border-color: color-mix(in srgb, #7c3aed 42%, var(--border));
+  color: #5b21b6;
+}
+
 .performance-comparison-panel--targets {
   border: 1px solid color-mix(in srgb, var(--border) 80%, #e5e7eb);
   border-radius: 12px;
