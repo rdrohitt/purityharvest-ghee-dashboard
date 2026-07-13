@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Spinner } from '../../components/Spinner';
 import { fetchDailySalesRanking, fetchPlatformSalesComparison } from '../../utils/analytics';
+import { fetchTargets } from '../../utils/targets';
 import type { DailySalesRankingDateEntry, DailySalesRankingResponse } from '../../types/analytics-daily-sales-ranking';
 import type {
     PlatformSalesComparisonPeriod,
@@ -8,6 +9,7 @@ import type {
     PlatformSalesComparisonPlatformStats,
     PlatformSalesComparisonResponse,
 } from '../../types/analytics-platform-sales-comparison';
+import type { TargetApiItem, TargetsListResponse } from '../../types/targets';
 import { DatePicker } from '../sales/Shopify/DatePicker';
 import { ModernSelect, PlatformTag, toInputDate, type ModernSelectOption } from '../sales/Shopify/ShopifyShared';
 import { AddTargetModal } from './AddTargetModal';
@@ -154,33 +156,84 @@ function getPlatformStats(
     };
 }
 
-function normalizeRoasTarget(raw: number): number {
-    const value = Number(raw) || 0;
-    if (value <= 0) return 0;
-    return value >= 10 ? value / 100 : value;
+function formatTargetDisplayValue(raw: string): string {
+    const value = Number(raw);
+    if (!Number.isFinite(value)) return raw || '—';
+    if (value >= 1000) return formatCurrency(value);
+    return value.toLocaleString('en-IN');
 }
 
-function formatRoas(value: number): string {
-    if (!Number.isFinite(value) || value <= 0) return '—';
-    return value.toFixed(2);
+function formatTargetMonthLabel(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-IN', {
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC',
+    });
 }
 
-function getPlatformTarget(period: PlatformSalesComparisonPeriod, platform: string): number {
-    return Number(period.platformTargets?.[platform] ?? 0) || 0;
+function platformKeyForTargetTag(platform: string): string {
+    const lower = platform.trim().toLowerCase();
+    if (lower === 'meta') return 'meta';
+    if (lower === 'shopify') return 'shopify';
+    if (lower === 'abandoned') return 'abandoned';
+    if (lower === 'whatsapp') return 'whatsapp';
+    if (lower === 'calling' || lower === 'callling') return 'calling';
+    return platform;
 }
 
-function getPlatformsWithTargets(
-    periods: PlatformSalesComparisonPeriod[],
-    platforms: string[],
-): string[] {
-    const withTarget = new Set<string>();
-    periods.forEach((period) => {
-        Object.entries(period.platformTargets ?? {}).forEach(([platform, target]) => {
-            if (Number(target) > 0) withTarget.add(platform);
+function getTargetsCount(data: TargetsListResponse | null | undefined): number {
+    if (!data) return 0;
+    const total = Number(data.total);
+    if (Number.isFinite(total) && total >= 0) return total;
+    return data.items?.length ?? 0;
+}
+
+function sortTargetsNewestFirst(targets: TargetApiItem[]): TargetApiItem[] {
+    return [...targets].sort((a, b) => {
+        const monthDiff = new Date(b.month).getTime() - new Date(a.month).getTime();
+        if (monthDiff !== 0) return monthDiff;
+        return a.platform.localeCompare(b.platform);
+    });
+}
+
+type TargetsByMonthGroup = {
+    month: string;
+    monthLabel: string;
+    entries: TargetApiItem[];
+};
+
+function groupTargetsByMonth(targets: TargetApiItem[]): TargetsByMonthGroup[] {
+    const sorted = sortTargetsNewestFirst(targets);
+    const byMonth = new Map<string, TargetApiItem[]>();
+
+    sorted.forEach((item) => {
+        const existing = byMonth.get(item.month);
+        if (existing) {
+            existing.push(item);
+        } else {
+            byMonth.set(item.month, [item]);
+        }
+    });
+
+    const groups: TargetsByMonthGroup[] = [];
+    const seen = new Set<string>();
+
+    sorted.forEach((item) => {
+        if (seen.has(item.month)) return;
+        seen.add(item.month);
+        const entries = [...(byMonth.get(item.month) ?? [])].sort((a, b) =>
+            a.platform.localeCompare(b.platform),
+        );
+        groups.push({
+            month: item.month,
+            monthLabel: formatTargetMonthLabel(item.month),
+            entries,
         });
     });
-    if (withTarget.size === 0) return [];
-    return sortPlatformsWithCallingLast(platforms.filter((platform) => withTarget.has(platform)));
+
+    return groups;
 }
 
 function formatMonthYearLabel(month: string, year: string): string {
@@ -550,28 +603,21 @@ function MonthWiseComparison({
     );
 }
 
-function TargetsComparison({
+function TargetsList({
     data,
     loading,
     error,
 }: {
-    data: PlatformSalesComparisonResponse | null;
+    data: TargetsListResponse | null;
     loading: boolean;
     error: string | null;
 }) {
-    const periods = useMemo(() => {
-        if (!data?.periods?.length) return [];
-        return PERIOD_ORDER.map((key) => getPeriodByKey(data.periods, key)).filter(
-            (period): period is PlatformSalesComparisonPeriod => Boolean(period),
-        );
-    }, [data]);
-
-    const platforms = useMemo(
-        () => getPlatformsWithTargets(periods, sortPlatformsWithCallingLast(data?.filters?.platforms ?? [])),
-        [periods, data],
+    const targets = useMemo(
+        () => sortTargetsNewestFirst(data?.items ?? []),
+        [data],
     );
-
-    const currentPeriod = getPeriodByKey(periods, 'currentMonth');
+    const groupedTargets = useMemo(() => groupTargetsByMonth(targets), [targets]);
+    const targetsCount = getTargetsCount(data);
 
     if (loading) return null;
 
@@ -579,18 +625,10 @@ function TargetsComparison({
         return <div className="performance-month-empty">{error}</div>;
     }
 
-    if (!data || periods.length === 0) {
+    if (!data || targets.length === 0) {
         return (
             <div className="performance-month-empty">
-                No targets data for the selected date.
-            </div>
-        );
-    }
-
-    if (platforms.length === 0) {
-        return (
-            <div className="performance-month-empty">
-                No platform targets configured for the selected date.
+                No targets saved yet. Use Add Target to create one.
             </div>
         );
     }
@@ -600,9 +638,9 @@ function TargetsComparison({
             <div className="performance-comparison-panel">
                 <div className="performance-comparison-panel__head">
                     <div>
-                        <h3 className="performance-comparison-panel__title">Platform ROAS targets</h3>
+                        <h3 className="performance-comparison-panel__title">Saved targets</h3>
                         <p className="performance-comparison-panel__subtitle">
-                            Target vs current ROAS across three months · as of {data.filters.date}
+                            {targetsCount.toLocaleString('en-IN')} target{targetsCount === 1 ? '' : 's'} configured
                         </p>
                     </div>
                 </div>
@@ -611,91 +649,45 @@ function TargetsComparison({
                     <table className="performance-comparison-table performance-comparison-table--targets">
                         <thead>
                             <tr>
+                                <th>Month</th>
                                 <th>Platform</th>
-                                {periods.map((period) => (
-                                    <th key={period.key}>
-                                        <span className="performance-comparison-table__col-title">
-                                            {formatMonthLabel(period.month)}
-                                        </span>
-                                        <span className="performance-comparison-table__col-range">
-                                            {formatPeriodRange(period.from, period.to)}
-                                        </span>
-                                    </th>
-                                ))}
-                                <th>vs Target</th>
+                                <th>Target</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {platforms.map((platform) => {
-                                const currentTargetRaw = currentPeriod ? getPlatformTarget(currentPeriod, platform) : 0;
-                                const currentTarget = normalizeRoasTarget(currentTargetRaw);
-                                const currentStats = currentPeriod ? getPlatformStats(currentPeriod, platform) : null;
-                                const currentSpend = isShopifyPlatform(platform)
-                                    ? currentPeriod?.platformMarketingSpend
-                                    : undefined;
-                                const currentRoas =
-                                    currentStats && currentSpend && currentSpend > 0
-                                        ? currentStats.sales / currentSpend
-                                        : 0;
-                                const delta =
-                                    currentTarget > 0 && currentRoas > 0
-                                        ? getDelta(currentRoas, currentTarget)
-                                        : null;
-
-                                return (
-                                    <tr key={platform}>
-                                        <td className="performance-comparison-table__platform">
-                                            <PlatformTag platform={normalizePlatformKey(platform)} />
-                                        </td>
-                                        {periods.map((period) => {
-                                            const targetRaw = getPlatformTarget(period, platform);
-                                            const target = normalizeRoasTarget(targetRaw);
-                                            const stats = getPlatformStats(period, platform);
-                                            const marketingSpend = isShopifyPlatform(platform)
-                                                ? period.platformMarketingSpend
-                                                : undefined;
-                                            const currentPeriodRoas =
-                                                marketingSpend && marketingSpend > 0
-                                                    ? stats.sales / marketingSpend
-                                                    : 0;
-
-                                            return (
-                                                <td key={`${platform}-${period.key}-target`}>
-                                                    {target > 0 ? (
-                                                        <>
-                                                            <div className="performance-comparison-table__amount">
-                                                                Target: {formatRoas(target)}
-                                                            </div>
-                                                            {currentPeriodRoas > 0 ? (
-                                                                <div className="performance-comparison-table__target-current">
-                                                                    Current: {formatRoas(currentPeriodRoas)}
-                                                                </div>
-                                                            ) : null}
-                                                            {marketingSpend != null && marketingSpend > 0 ? (
-                                                                <div className="performance-comparison-table__spend">
-                                                                    Meta Spend: {formatCurrency(marketingSpend)}
-                                                                </div>
-                                                            ) : null}
-                                                            {target > 0 && currentPeriodRoas > 0 ? (
-                                                                <div className="performance-comparison-table__target-status">
-                                                                    <DeltaBadge
-                                                                        delta={getDelta(currentPeriodRoas, target)}
-                                                                    />
-                                                                </div>
-                                                            ) : null}
-                                                        </>
-                                                    ) : (
-                                                        <span>—</span>
-                                                    )}
-                                                </td>
-                                            );
-                                        })}
-                                        <td>
-                                            {delta ? <DeltaBadge delta={delta} /> : <span>—</span>}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                            {groupedTargets.map((group) => (
+                                <tr key={group.month}>
+                                    <td>
+                                        <div className="performance-comparison-table__amount">
+                                            {group.monthLabel}
+                                        </div>
+                                    </td>
+                                    <td className="performance-comparison-table__platform">
+                                        <div className="performance-targets-cell-stack">
+                                            {group.entries.map((item) => (
+                                                <div
+                                                    key={item._id}
+                                                    className="performance-targets-cell-stack__item"
+                                                >
+                                                    <PlatformTag platform={platformKeyForTargetTag(item.platform)} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div className="performance-targets-cell-stack">
+                                            {group.entries.map((item) => (
+                                                <div
+                                                    key={item._id}
+                                                    className="performance-targets-cell-stack__item performance-comparison-table__amount"
+                                                >
+                                                    {formatTargetDisplayValue(item.target)}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
@@ -716,25 +708,27 @@ export default function Performance() {
     const [monthData, setMonthData] = useState<PlatformSalesComparisonResponse | null>(null);
     const [monthLoading, setMonthLoading] = useState(false);
     const [monthError, setMonthError] = useState<string | null>(null);
+    const [targetsData, setTargetsData] = useState<TargetsListResponse | null>(null);
+    const [targetsLoading, setTargetsLoading] = useState(false);
+    const [targetsError, setTargetsError] = useState<string | null>(null);
     const [showAddTarget, setShowAddTarget] = useState(false);
 
     const yearOptions = useMemo(() => buildYearOptions(), []);
 
-    const refreshMonthComparison = useCallback(async () => {
-        if (!selectedDate) return;
+    const refreshTargets = useCallback(async () => {
         try {
-            setMonthLoading(true);
-            setMonthError(null);
-            const data = await fetchPlatformSalesComparison(selectedDate);
-            setMonthData(data);
+            setTargetsLoading(true);
+            setTargetsError(null);
+            const data = await fetchTargets();
+            setTargetsData(data);
         } catch (err) {
-            console.error('Failed to load platform sales comparison', err);
-            setMonthData(null);
-            setMonthError('Failed to load month-wise performance. Please try again.');
+            console.error('Failed to load targets', err);
+            setTargetsData(null);
+            setTargetsError('Failed to load targets. Please try again.');
         } finally {
-            setMonthLoading(false);
+            setTargetsLoading(false);
         }
-    }, [selectedDate]);
+    }, []);
 
     useEffect(() => {
         if (viewTab !== 'platform' || !selectedMonth || !selectedYear) return;
@@ -767,7 +761,7 @@ export default function Performance() {
     }, [viewTab, selectedMonth, selectedYear]);
 
     useEffect(() => {
-        if ((viewTab !== 'month' && viewTab !== 'targets') || !selectedDate) return;
+        if (viewTab !== 'month' || !selectedDate) return;
 
         let cancelled = false;
         (async () => {
@@ -796,6 +790,36 @@ export default function Performance() {
         };
     }, [viewTab, selectedDate]);
 
+    useEffect(() => {
+        if (viewTab !== 'targets') return;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                setTargetsLoading(true);
+                setTargetsError(null);
+                const data = await fetchTargets();
+                if (!cancelled) {
+                    setTargetsData(data);
+                }
+            } catch (err) {
+                console.error('Failed to load targets', err);
+                if (!cancelled) {
+                    setTargetsData(null);
+                    setTargetsError('Failed to load targets. Please try again.');
+                }
+            } finally {
+                if (!cancelled) {
+                    setTargetsLoading(false);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [viewTab]);
+
     const countBarLabel = useMemo(() => {
         if (viewTab === 'platform') {
             if (platformLoading) return 'Loading top and least performing days…';
@@ -807,12 +831,10 @@ export default function Performance() {
             return `Top & least performing days · ${monthLabel}`;
         }
         if (viewTab === 'targets') {
-            if (monthLoading) return 'Loading platform targets…';
-            if (monthError) return monthError;
-            if (!monthData?.periods?.length) {
-                return `Platform targets for ${selectedDate}`;
-            }
-            return `Platform ROAS targets · as of ${monthData.filters.date}`;
+            if (targetsLoading) return 'Loading targets…';
+            if (targetsError) return targetsError;
+            if (!targetsData) return 'Platform targets';
+            return `${getTargetsCount(targetsData).toLocaleString('en-IN')} saved target${getTargetsCount(targetsData) === 1 ? '' : 's'}`;
         }
         if (monthLoading) return 'Loading 3-month platform comparison…';
         if (monthError) return monthError;
@@ -831,6 +853,9 @@ export default function Performance() {
         monthError,
         monthData,
         selectedDate,
+        targetsLoading,
+        targetsError,
+        targetsData,
     ]);
 
     return (
@@ -838,16 +863,11 @@ export default function Performance() {
             {viewTab === 'platform' && platformLoading ? (
                 <Spinner overlay fixed message="Loading platform-wise performance…" />
             ) : null}
-            {(viewTab === 'month' || viewTab === 'targets') && monthLoading ? (
-                <Spinner
-                    overlay
-                    fixed
-                    message={
-                        viewTab === 'targets'
-                            ? 'Loading platform targets…'
-                            : 'Loading month-wise performance…'
-                    }
-                />
+            {viewTab === 'month' && monthLoading ? (
+                <Spinner overlay fixed message="Loading month-wise performance…" />
+            ) : null}
+            {viewTab === 'targets' && targetsLoading ? (
+                <Spinner overlay fixed message="Loading targets…" />
             ) : null}
 
             <div className="card modules-header-card">
@@ -925,14 +945,14 @@ export default function Performance() {
                 ) : viewTab === 'month' ? (
                     <MonthWiseComparison data={monthData} loading={monthLoading} error={monthError} />
                 ) : (
-                    <TargetsComparison data={monthData} loading={monthLoading} error={monthError} />
+                    <TargetsList data={targetsData} loading={targetsLoading} error={targetsError} />
                 )}
             </div>
 
             {showAddTarget ? (
                 <AddTargetModal
                     onClose={() => setShowAddTarget(false)}
-                    onSaved={() => void refreshMonthComparison()}
+                    onSaved={() => void refreshTargets()}
                 />
             ) : null}
         </section>

@@ -913,6 +913,18 @@
   color: #7c3aed;
 }
 
+.performance-targets-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.performance-targets-cell-stack__item {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+
 .performance-comparison-table__rto--total {
   font-weight: 700;
 }

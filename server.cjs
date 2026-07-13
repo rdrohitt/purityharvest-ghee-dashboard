@@ -30,6 +30,7 @@ const DELHI_MARTS_PATH = path.join(__dirname, 'public', 'delhi-marts.json');
 const FOLLOWUPS_PATH = path.join(__dirname, 'public', 'followups.json');
 const AD_SCRIPTS_PATH = path.join(__dirname, 'public', 'ad-scripts.json');
 const CUSTOMERS_PATH = path.join(__dirname, 'public', 'customers.json');
+const TARGETS_PATH = path.join(__dirname, 'public', 'targets.json');
 
 async function readCustomers() {
   try {
@@ -47,6 +48,24 @@ async function readCustomers() {
 async function writeCustomers(customers) {
   const json = JSON.stringify(customers, null, 2);
   await fs.writeFile(CUSTOMERS_PATH, json, 'utf8');
+}
+
+async function readTargets() {
+  try {
+    const data = await fs.readFile(TARGETS_PATH, 'utf8');
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+async function writeTargets(targets) {
+  const json = JSON.stringify(targets, null, 2);
+  await fs.writeFile(TARGETS_PATH, json, 'utf8');
 }
 
 async function readProducts() {
@@ -718,6 +737,29 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
   }
 });
 
+/** GET /api/targets/ — list saved platform targets. */
+app.get('/api/targets/', async (req, res) => {
+  try {
+    const targets = await readTargets();
+    const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
+    const limit = Math.max(1, parseInt(String(req.query.limit), 10) || 10);
+    const total = targets.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+    const items = targets.slice(start, start + limit);
+    res.json({
+      items,
+      total,
+      page,
+      limit,
+      totalPages,
+    });
+  } catch (err) {
+    console.error('Error loading targets', err);
+    res.status(500).json({ message: 'Failed to load targets' });
+  }
+});
+
 /** POST /api/targets/ — create platform ROAS/sales target for a month. */
 app.post('/api/targets/', async (req, res) => {
   try {
@@ -739,6 +781,9 @@ app.post('/api/targets/', async (req, res) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    const targets = await readTargets();
+    targets.unshift(record);
+    await writeTargets(targets);
     res.status(201).json(record);
   } catch (err) {
     console.error('Error creating target', err);

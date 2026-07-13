@@ -7,10 +7,22 @@ export type CreateTargetPayload = {
 };
 
 export type TargetApiItem = {
-    _id?: string;
+    _id: string;
     month: string;
     target: string;
     platform: string;
+    createdBy?: string;
+    updatedBy?: string;
     createdAt?: string;
     updatedAt?: string;
+    __v?: number;
+};
+
+/** GET /api/targets/ */
+export type TargetsListResponse = {
+    items: TargetApiItem[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
 };
