@@ -662,7 +662,7 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
           from: '2026-06-01',
           to: '2026-06-14',
           platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
-          platformTargets: { shopify: 0 },
+          platformTargets: { shopify: 250 },
           platformMarketingSpend: 0,
           platformStats: {
             shopify: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
@@ -680,7 +680,7 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
           from: '2026-05-01',
           to: '2026-05-14',
           platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
-          platformTargets: { shopify: 0 },
+          platformTargets: {},
           platformMarketingSpend: 0,
           platformStats: {
             shopify: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
@@ -698,7 +698,7 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
           from: '2026-04-01',
           to: '2026-04-14',
           platformSales: { shopify: 0, abandoned: 0, callling: 0, whatsapp: 0 },
-          platformTargets: { shopify: 0 },
+          platformTargets: { shopify: 250 },
           platformMarketingSpend: 0,
           platformStats: {
             shopify: { sales: 0, rtoOrderCount: 0, rtoAmount: 0 },
@@ -715,6 +715,34 @@ app.get('/api/analytics/platform-sales-comparison', async (req, res) => {
   } catch (err) {
     console.error('Error analytics platform-sales-comparison', err);
     res.status(500).json({ message: 'Failed to load platform sales comparison' });
+  }
+});
+
+/** POST /api/targets/ — create platform ROAS/sales target for a month. */
+app.post('/api/targets/', async (req, res) => {
+  try {
+    const body = req.body;
+    if (!body || typeof body !== 'object') {
+      return res.status(400).json({ message: 'Invalid target payload' });
+    }
+    const month = typeof body.month === 'string' ? body.month.trim() : '';
+    const target = body.target != null ? String(body.target).trim() : '';
+    const platform = typeof body.platform === 'string' ? body.platform.trim() : '';
+    if (!month || !target || !platform) {
+      return res.status(400).json({ message: 'month, target, and platform are required' });
+    }
+    const record = {
+      _id: `TGT-${Date.now()}`,
+      month,
+      target,
+      platform,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    res.status(201).json(record);
+  } catch (err) {
+    console.error('Error creating target', err);
+    res.status(500).json({ message: 'Failed to save target' });
   }
 });
 

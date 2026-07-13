@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Spinner } from '../../components/Spinner';
 import { fetchDailySalesRanking, fetchPlatformSalesComparison } from '../../utils/analytics';
 import type { DailySalesRankingDateEntry, DailySalesRankingResponse } from '../../types/analytics-daily-sales-ranking';
@@ -10,15 +10,17 @@ import type {
 } from '../../types/analytics-platform-sales-comparison';
 import { DatePicker } from '../sales/Shopify/DatePicker';
 import { ModernSelect, PlatformTag, toInputDate, type ModernSelectOption } from '../sales/Shopify/ShopifyShared';
+import { AddTargetModal } from './AddTargetModal';
 import '../sales/Shopify/Shopify.scss';
 import '../Modules/Modules.scss';
 import './Performance.scss';
 
-type PerformanceViewTab = 'platform' | 'month';
+type PerformanceViewTab = 'platform' | 'month' | 'targets';
 
 const PERFORMANCE_VIEW_TABS: { id: PerformanceViewTab; label: string }[] = [
     { id: 'platform', label: 'Month Wise' },
     { id: 'month', label: 'Platform Wise' },
+    { id: 'targets', label: 'Targets' },
 ];
 
 const PERIOD_ORDER: PlatformSalesComparisonPeriodKey[] = ['currentMonth', 'lastMonth', 'twoMonthsAgo'];
@@ -150,6 +152,35 @@ function getPlatformStats(
         rtoOrderCount: 0,
         rtoAmount: 0,
     };
+}
+
+function normalizeRoasTarget(raw: number): number {
+    const value = Number(raw) || 0;
+    if (value <= 0) return 0;
+    return value >= 10 ? value / 100 : value;
+}
+
+function formatRoas(value: number): string {
+    if (!Number.isFinite(value) || value <= 0) return '—';
+    return value.toFixed(2);
+}
+
+function getPlatformTarget(period: PlatformSalesComparisonPeriod, platform: string): number {
+    return Number(period.platformTargets?.[platform] ?? 0) || 0;
+}
+
+function getPlatformsWithTargets(
+    periods: PlatformSalesComparisonPeriod[],
+    platforms: string[],
+): string[] {
+    const withTarget = new Set<string>();
+    periods.forEach((period) => {
+        Object.entries(period.platformTargets ?? {}).forEach(([platform, target]) => {
+            if (Number(target) > 0) withTarget.add(platform);
+        });
+    });
+    if (withTarget.size === 0) return [];
+    return sortPlatformsWithCallingLast(platforms.filter((platform) => withTarget.has(platform)));
 }
 
 function formatMonthYearLabel(month: string, year: string): string {
@@ -519,6 +550,160 @@ function MonthWiseComparison({
     );
 }
 
+function TargetsComparison({
+    data,
+    loading,
+    error,
+}: {
+    data: PlatformSalesComparisonResponse | null;
+    loading: boolean;
+    error: string | null;
+}) {
+    const periods = useMemo(() => {
+        if (!data?.periods?.length) return [];
+        return PERIOD_ORDER.map((key) => getPeriodByKey(data.periods, key)).filter(
+            (period): period is PlatformSalesComparisonPeriod => Boolean(period),
+        );
+    }, [data]);
+
+    const platforms = useMemo(
+        () => getPlatformsWithTargets(periods, sortPlatformsWithCallingLast(data?.filters?.platforms ?? [])),
+        [periods, data],
+    );
+
+    const currentPeriod = getPeriodByKey(periods, 'currentMonth');
+
+    if (loading) return null;
+
+    if (error) {
+        return <div className="performance-month-empty">{error}</div>;
+    }
+
+    if (!data || periods.length === 0) {
+        return (
+            <div className="performance-month-empty">
+                No targets data for the selected date.
+            </div>
+        );
+    }
+
+    if (platforms.length === 0) {
+        return (
+            <div className="performance-month-empty">
+                No platform targets configured for the selected date.
+            </div>
+        );
+    }
+
+    return (
+        <div className="performance-month-comparison">
+            <div className="performance-comparison-panel">
+                <div className="performance-comparison-panel__head">
+                    <div>
+                        <h3 className="performance-comparison-panel__title">Platform ROAS targets</h3>
+                        <p className="performance-comparison-panel__subtitle">
+                            Target vs current ROAS across three months · as of {data.filters.date}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="table-scroll-wrapper">
+                    <table className="performance-comparison-table performance-comparison-table--targets">
+                        <thead>
+                            <tr>
+                                <th>Platform</th>
+                                {periods.map((period) => (
+                                    <th key={period.key}>
+                                        <span className="performance-comparison-table__col-title">
+                                            {formatMonthLabel(period.month)}
+                                        </span>
+                                        <span className="performance-comparison-table__col-range">
+                                            {formatPeriodRange(period.from, period.to)}
+                                        </span>
+                                    </th>
+                                ))}
+                                <th>vs Target</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {platforms.map((platform) => {
+                                const currentTargetRaw = currentPeriod ? getPlatformTarget(currentPeriod, platform) : 0;
+                                const currentTarget = normalizeRoasTarget(currentTargetRaw);
+                                const currentStats = currentPeriod ? getPlatformStats(currentPeriod, platform) : null;
+                                const currentSpend = isShopifyPlatform(platform)
+                                    ? currentPeriod?.platformMarketingSpend
+                                    : undefined;
+                                const currentRoas =
+                                    currentStats && currentSpend && currentSpend > 0
+                                        ? currentStats.sales / currentSpend
+                                        : 0;
+                                const delta =
+                                    currentTarget > 0 && currentRoas > 0
+                                        ? getDelta(currentRoas, currentTarget)
+                                        : null;
+
+                                return (
+                                    <tr key={platform}>
+                                        <td className="performance-comparison-table__platform">
+                                            <PlatformTag platform={normalizePlatformKey(platform)} />
+                                        </td>
+                                        {periods.map((period) => {
+                                            const targetRaw = getPlatformTarget(period, platform);
+                                            const target = normalizeRoasTarget(targetRaw);
+                                            const stats = getPlatformStats(period, platform);
+                                            const marketingSpend = isShopifyPlatform(platform)
+                                                ? period.platformMarketingSpend
+                                                : undefined;
+                                            const currentPeriodRoas =
+                                                marketingSpend && marketingSpend > 0
+                                                    ? stats.sales / marketingSpend
+                                                    : 0;
+
+                                            return (
+                                                <td key={`${platform}-${period.key}-target`}>
+                                                    {target > 0 ? (
+                                                        <>
+                                                            <div className="performance-comparison-table__amount">
+                                                                Target: {formatRoas(target)}
+                                                            </div>
+                                                            {currentPeriodRoas > 0 ? (
+                                                                <div className="performance-comparison-table__target-current">
+                                                                    Current: {formatRoas(currentPeriodRoas)}
+                                                                </div>
+                                                            ) : null}
+                                                            {marketingSpend != null && marketingSpend > 0 ? (
+                                                                <div className="performance-comparison-table__spend">
+                                                                    Meta Spend: {formatCurrency(marketingSpend)}
+                                                                </div>
+                                                            ) : null}
+                                                            {target > 0 && currentPeriodRoas > 0 ? (
+                                                                <div className="performance-comparison-table__target-status">
+                                                                    <DeltaBadge
+                                                                        delta={getDelta(currentPeriodRoas, target)}
+                                                                    />
+                                                                </div>
+                                                            ) : null}
+                                                        </>
+                                                    ) : (
+                                                        <span>—</span>
+                                                    )}
+                                                </td>
+                                            );
+                                        })}
+                                        <td>
+                                            {delta ? <DeltaBadge delta={delta} /> : <span>—</span>}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function Performance() {
     const now = new Date();
     const [viewTab, setViewTab] = useState<PerformanceViewTab>('platform');
@@ -531,8 +716,25 @@ export default function Performance() {
     const [monthData, setMonthData] = useState<PlatformSalesComparisonResponse | null>(null);
     const [monthLoading, setMonthLoading] = useState(false);
     const [monthError, setMonthError] = useState<string | null>(null);
+    const [showAddTarget, setShowAddTarget] = useState(false);
 
     const yearOptions = useMemo(() => buildYearOptions(), []);
+
+    const refreshMonthComparison = useCallback(async () => {
+        if (!selectedDate) return;
+        try {
+            setMonthLoading(true);
+            setMonthError(null);
+            const data = await fetchPlatformSalesComparison(selectedDate);
+            setMonthData(data);
+        } catch (err) {
+            console.error('Failed to load platform sales comparison', err);
+            setMonthData(null);
+            setMonthError('Failed to load month-wise performance. Please try again.');
+        } finally {
+            setMonthLoading(false);
+        }
+    }, [selectedDate]);
 
     useEffect(() => {
         if (viewTab !== 'platform' || !selectedMonth || !selectedYear) return;
@@ -565,7 +767,7 @@ export default function Performance() {
     }, [viewTab, selectedMonth, selectedYear]);
 
     useEffect(() => {
-        if (viewTab !== 'month' || !selectedDate) return;
+        if ((viewTab !== 'month' && viewTab !== 'targets') || !selectedDate) return;
 
         let cancelled = false;
         (async () => {
@@ -604,6 +806,14 @@ export default function Performance() {
                 : formatMonthYearFromApiMonth(platformData.filters.month);
             return `Top & least performing days · ${monthLabel}`;
         }
+        if (viewTab === 'targets') {
+            if (monthLoading) return 'Loading platform targets…';
+            if (monthError) return monthError;
+            if (!monthData?.periods?.length) {
+                return `Platform targets for ${selectedDate}`;
+            }
+            return `Platform ROAS targets · as of ${monthData.filters.date}`;
+        }
         if (monthLoading) return 'Loading 3-month platform comparison…';
         if (monthError) return monthError;
         if (!monthData?.periods?.length) {
@@ -628,8 +838,16 @@ export default function Performance() {
             {viewTab === 'platform' && platformLoading ? (
                 <Spinner overlay fixed message="Loading platform-wise performance…" />
             ) : null}
-            {viewTab === 'month' && monthLoading ? (
-                <Spinner overlay fixed message="Loading month-wise performance…" />
+            {(viewTab === 'month' || viewTab === 'targets') && monthLoading ? (
+                <Spinner
+                    overlay
+                    fixed
+                    message={
+                        viewTab === 'targets'
+                            ? 'Loading platform targets…'
+                            : 'Loading month-wise performance…'
+                    }
+                />
             ) : null}
 
             <div className="card modules-header-card">
@@ -686,6 +904,17 @@ export default function Performance() {
                             />
                         </div>
                     ) : null}
+                    {viewTab === 'targets' ? (
+                        <div className="performance-targets-header-actions">
+                            <button
+                                type="button"
+                                className="button performance-add-target-btn"
+                                onClick={() => setShowAddTarget(true)}
+                            >
+                                + Add Target
+                            </button>
+                        </div>
+                    ) : null}
                 </div>
             </div>
 
@@ -693,10 +922,19 @@ export default function Performance() {
                 <div className="modules-count-bar">{countBarLabel}</div>
                 {viewTab === 'platform' ? (
                     <PlatformWiseDailyRanking data={platformData} loading={platformLoading} error={platformError} />
-                ) : (
+                ) : viewTab === 'month' ? (
                     <MonthWiseComparison data={monthData} loading={monthLoading} error={monthError} />
+                ) : (
+                    <TargetsComparison data={monthData} loading={monthLoading} error={monthError} />
                 )}
             </div>
+
+            {showAddTarget ? (
+                <AddTargetModal
+                    onClose={() => setShowAddTarget(false)}
+                    onSaved={() => void refreshMonthComparison()}
+                />
+            ) : null}
         </section>
     );
 }
