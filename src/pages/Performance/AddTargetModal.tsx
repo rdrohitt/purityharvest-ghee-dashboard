@@ -114,10 +114,7 @@ export function AddTargetModal({ editingTarget = null, onClose, onSaved }: Props
                 platform,
             };
             if (isEdit && editingTarget?._id) {
-                await updateTarget({
-                    _id: editingTarget._id,
-                    ...payload,
-                });
+                await updateTarget(editingTarget._id, payload);
             } else {
                 await createTarget(payload);
             }

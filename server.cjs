@@ -791,19 +791,34 @@ app.post('/api/targets/', async (req, res) => {
   }
 });
 
-/** PUT /api/targets/ — update an existing platform target. */
-app.put('/api/targets/', async (req, res) => {
+function getTargetIdFromQuery(req) {
+  if (typeof req.query.id === 'string' && req.query.id.trim()) {
+    return req.query.id.trim();
+  }
+  const queryKeys = Object.keys(req.query);
+  if (queryKeys.length === 1) {
+    const key = queryKeys[0].trim();
+    const value = req.query[key];
+    if (value === '' || value == null) {
+      return key;
+    }
+  }
+  return '';
+}
+
+/** PUT /api/targets?<id> — update an existing platform target. */
+app.put(['/api/targets', '/api/targets/'], async (req, res) => {
   try {
+    const id = getTargetIdFromQuery(req);
     const body = req.body;
     if (!body || typeof body !== 'object') {
       return res.status(400).json({ message: 'Invalid target payload' });
     }
-    const id = typeof body._id === 'string' ? body._id.trim() : '';
     const month = typeof body.month === 'string' ? body.month.trim() : '';
     const target = body.target != null ? String(body.target).trim() : '';
     const platform = typeof body.platform === 'string' ? body.platform.trim() : '';
     if (!id || !month || !target || !platform) {
-      return res.status(400).json({ message: '_id, month, target, and platform are required' });
+      return res.status(400).json({ message: 'id, month, target, and platform are required' });
     }
     const targets = await readTargets();
     const index = targets.findIndex((item) => String(item._id) === id);
@@ -2346,6 +2361,30 @@ app.put('/api/ad-scripts/:id', async (req, res) => {
   } catch (err) {
     console.error('Error updating ad-scripts.json', err);
     res.status(500).json({ message: 'Failed to update ad script' });
+  }
+});
+
+app.delete('/api/ad-scripts/:id', async (req, res) => {
+  try {
+    const id = decodeURIComponent(String(req.params.id || ''));
+    if (!id) {
+      return res.status(400).json({ message: 'Missing script id' });
+    }
+
+    const scripts = await readAdScripts();
+    const index = scripts.findIndex(
+      (s) => String(s._id ?? s.id ?? '') === id || String(s.id ?? '') === id,
+    );
+    if (index === -1) {
+      return res.status(404).json({ message: 'Ad script not found' });
+    }
+
+    scripts.splice(index, 1);
+    await writeAdScripts(scripts);
+    res.status(204).end();
+  } catch (err) {
+    console.error('Error deleting ad-scripts.json entry', err);
+    res.status(500).json({ message: 'Failed to delete ad script' });
   }
 });
 

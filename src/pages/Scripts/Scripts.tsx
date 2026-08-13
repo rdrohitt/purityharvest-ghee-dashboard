@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Spinner } from '../../components/Spinner';
 import { useAppSelector } from '../../store';
-import { fetchAllAdScripts, adScriptRowId } from '../../utils/ad-scripts';
+import { fetchAllAdScripts, adScriptRowId, deleteAdScript } from '../../utils/ad-scripts';
 import type { AdScriptApi } from '../../types/ad-scripts';
 import { AddScriptModal } from './AddScriptModal';
+import { ScriptDeleteModal } from './ScriptDeleteModal';
 import { FollowupsPagination } from '../Followups/FollowupsPagination';
 import '../sales/Shopify/Shopify.scss';
 import '../Followups/Followups.scss';
@@ -15,7 +16,7 @@ const SCRIPTS_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 type Toast = {
     id: string;
     message: string;
-    type: 'success' | 'error';
+    type: 'success' | 'error' | 'delete';
 };
 
 function formatDisplayDate(iso: string): string {
@@ -90,7 +91,9 @@ function ScriptsToastContainer({ toasts }: { toasts: Toast[] }) {
             {toasts.map((toast) => (
                 <div key={toast.id} className="toast modules-toast" data-type={toast.type}>
                     <div className="modules-toast-content">
-                        <span className="modules-toast-icon">{toast.type === 'success' ? '✓' : '✕'}</span>
+                        <span className="modules-toast-icon">
+                            {toast.type === 'success' ? '✓' : toast.type === 'delete' ? '🗑' : '✕'}
+                        </span>
                         <span>{toast.message}</span>
                     </div>
                 </div>
@@ -110,6 +113,7 @@ export default function Scripts() {
     const [modalOpen, setModalOpen] = useState(false);
     const [editScriptId, setEditScriptId] = useState<string | null>(null);
     const [scriptModalKey, setScriptModalKey] = useState(0);
+    const [deletingScript, setDeletingScript] = useState<AdScriptApi | null>(null);
     const [toasts, setToasts] = useState<Toast[]>([]);
 
     const defaultAuthor = useMemo(
@@ -194,6 +198,19 @@ export default function Scripts() {
 
     const tableRowOffset = pageOffset;
 
+    const handleDeleteScript = useCallback(async () => {
+        if (!deletingScript) return;
+        const id = adScriptRowId(deletingScript);
+        await deleteAdScript(id);
+        if (editScriptId === id) {
+            setModalOpen(false);
+            setEditScriptId(null);
+        }
+        setDeletingScript(null);
+        showToast('Script deleted successfully.', 'delete');
+        await load();
+    }, [deletingScript, editScriptId, load, showToast]);
+
     return (
         <section className="modules-page scripts-page">
             {loading ? <Spinner overlay fixed message="Loading scripts…" /> : null}
@@ -264,6 +281,7 @@ export default function Scripts() {
                                     <ScriptsTh>Category</ScriptsTh>
                                     <ScriptsTh>Status</ScriptsTh>
                                     <ScriptsTh>Description</ScriptsTh>
+                                    <ScriptsTh aria-label="Actions">&nbsp;</ScriptsTh>
                                 </tr>
                             </thead>
                             <tbody>
@@ -298,11 +316,22 @@ export default function Scripts() {
                                         <ScriptsTd>
                                             <ScriptDescriptionCell html={row.description} />
                                         </ScriptsTd>
+                                        <ScriptsTd className="scripts-table-actions">
+                                            <button
+                                                type="button"
+                                                className="icon-btn icon-btn--danger scripts-table-delete-btn"
+                                                aria-label={`Delete ${row.title}`}
+                                                title="Delete script"
+                                                onClick={() => setDeletingScript(row)}
+                                            >
+                                                🗑️
+                                            </button>
+                                        </ScriptsTd>
                                     </tr>
                                 ))}
                                 {items.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="modules-empty">
+                                        <td colSpan={7} className="modules-empty">
                                             {emptyListMessage}
                                         </td>
                                     </tr>
@@ -344,6 +373,19 @@ export default function Scripts() {
                     showToast={showToast}
                 />
             ) : null}
+
+            <ScriptDeleteModal
+                script={deletingScript}
+                onCancel={() => setDeletingScript(null)}
+                onConfirm={async () => {
+                    try {
+                        await handleDeleteScript();
+                    } catch (err) {
+                        console.error(err);
+                        showToast('Failed to delete script. Please try again.', 'error');
+                    }
+                }}
+            />
         </section>
     );
 }

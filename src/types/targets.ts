@@ -6,10 +6,8 @@ export type CreateTargetPayload = {
     platform: string;
 };
 
-/** PUT /api/targets/ */
-export type UpdateTargetPayload = CreateTargetPayload & {
-    _id: string;
-};
+/** PUT /api/targets?<id> */
+export type UpdateTargetPayload = CreateTargetPayload;
 
 export type TargetApiItem = {
     _id: string;

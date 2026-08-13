@@ -71,9 +71,9 @@ export async function createTarget(payload: CreateTargetPayload): Promise<Target
     return (await res.json()) as TargetApiItem;
 }
 
-/** PUT /api/targets/ */
-export async function updateTarget(payload: UpdateTargetPayload): Promise<TargetApiItem> {
-    const res = await apiFetch('/api/targets/', {
+/** PUT /api/targets?<id> */
+export async function updateTarget(id: string, payload: UpdateTargetPayload): Promise<TargetApiItem> {
+    const res = await apiFetch(`/api/targets?${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',

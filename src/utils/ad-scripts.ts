@@ -145,6 +145,21 @@ export async function updateAdScript(id: string, payload: AdScriptUpdatePayload)
     return (await response.json()) as AdScriptApi;
 }
 
+/**
+ * DELETE /api/ad-scripts/:id — remove an ad script.
+ */
+export async function deleteAdScript(id: string): Promise<void> {
+    const response = await apiFetch(`/api/ad-scripts/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) {
+        if (response.status === 404) {
+            throw new Error('Script not found');
+        }
+        throw new Error('Failed to delete script');
+    }
+}
+
 export function adScriptRowId(s: AdScriptApi): string {
     return String(s._id ?? s.id ?? `${s.title}-${s.date}`);
 }

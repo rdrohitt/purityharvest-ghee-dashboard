@@ -5,6 +5,7 @@ import { loadProductsPage, addProduct, updateProduct, deleteProduct, syncShopify
 import { useAppDispatch, useAppSelector, setProducts, setProductsLoading, addProductToStore, updateProductInStore, removeProduct } from '../../store';
 import { Categories } from './Categories';
 import { ProductModal } from './ProductModal';
+import { ProductDeleteModal, type ProductDeleteTarget } from './ProductDeleteModal';
 import './Products.scss';
 
 function formatCurrency(n: number): string {
@@ -77,6 +78,7 @@ export default function Products() {
         page: number;
         limit: number;
     } | null>(null);
+    const [deletingProduct, setDeletingProduct] = useState<ProductDeleteTarget | null>(null);
 
     const refreshProductsPage = useCallback(async (targetPage = page, targetLimit = pageSize) => {
         const dash = await loadProductsPage({ page: targetPage, limit: targetLimit });
@@ -236,16 +238,20 @@ export default function Products() {
     }
 
     async function handleDeleteProduct(id: string) {
-        const confirmed = window.confirm('Are you sure you want to delete this product? This action cannot be undone.');
-        if (!confirmed) return;
         try {
             await deleteProduct(id);
+            if (editingProduct?._id === id) {
+                setShowAddProduct(false);
+                setEditingProduct(null);
+            }
             dispatch(removeProduct(id));
             await refreshProductsPage(page, pageSize);
+            setDeletingProduct(null);
             showToast('Product deleted successfully!', 'delete');
         } catch (err) {
             console.error('Failed to delete product', err);
             showToast('Failed to delete product. Please try again.', 'error');
+            throw err;
         }
     }
 
@@ -362,6 +368,7 @@ export default function Products() {
                             <col className="products-col-actual" />
                             <col className="products-col-shopify" />
                             <col className="products-col-actions" />
+                            <col className="products-col-delete" />
                         </colgroup>
                         <thead>
                             <tr className="products-thead-row">
@@ -372,6 +379,7 @@ export default function Products() {
                                 <Th>Actual Price</Th>
                                 <Th>Shopify</Th>
                                 <Th>Actions</Th>
+                                <th className="products-th products-th--delete" aria-label="Delete" />
                             </tr>
                         </thead>
                         <tbody>
@@ -411,16 +419,29 @@ export default function Products() {
                                                         >
                                                             Edit
                                                         </button>
-                                                        {!group.rows[0]?.isShopify && (
-                                                            <button
-                                                                type="button"
-                                                                className="icon-btn icon-btn--danger"
-                                                                onClick={() => handleDeleteProduct(row.productId)}
-                                                            >
-                                                                Delete
-                                                            </button>
-                                                        )}
                                                     </div>
+                                                </td>
+                                            ) : null}
+                                            {idx === 0 ? (
+                                                <td
+                                                    rowSpan={group.rows.length}
+                                                    className="products-td products-td--delete"
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        className="icon-btn icon-btn--danger products-table-delete-btn"
+                                                        aria-label={`Delete ${group.productName}`}
+                                                        title="Delete product"
+                                                        onClick={() =>
+                                                            setDeletingProduct({
+                                                                productId: row.productId,
+                                                                productName: group.productName,
+                                                                categoryName: group.categoryName,
+                                                            })
+                                                        }
+                                                    >
+                                                        🗑️
+                                                    </button>
                                                 </td>
                                             ) : null}
                                         </tr>
@@ -429,7 +450,7 @@ export default function Products() {
                             ))}
                             {groupedByProduct.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="products-empty-cell">
+                                    <td colSpan={8} className="products-empty-cell">
                                         No products found
                                     </td>
                                 </tr>
@@ -503,6 +524,15 @@ export default function Products() {
                     onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
                 />
             ) : null}
+
+            <ProductDeleteModal
+                product={deletingProduct}
+                onCancel={() => setDeletingProduct(null)}
+                onConfirm={async () => {
+                    if (!deletingProduct) return;
+                    await handleDeleteProduct(deletingProduct.productId);
+                }}
+            />
         </section>
     );
 }

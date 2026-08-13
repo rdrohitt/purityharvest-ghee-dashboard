@@ -380,7 +380,34 @@
 .products-col-actual { width: 120px; min-width: 120px; }
 .products-col-stock { width: 100px; min-width: 100px; }
 .products-col-shopify { width: 80px; min-width: 80px; }
-.products-col-actions { width: 140px; min-width: 140px; }
+.products-col-actions { width: 96px; min-width: 96px; }
+.products-col-delete { width: 56px; min-width: 56px; }
+
+.products-th--delete,
+.products-td--delete {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  text-align: center;
+  vertical-align: middle;
+  background: var(--bg-elev, #fff);
+  box-shadow: -6px 0 10px rgba(15, 23, 42, 0.06);
+}
+
+.products-thead-row .products-th--delete {
+  z-index: 3;
+  background: var(--bg);
+}
+
+[data-theme="dark"] .products-th--delete,
+[data-theme="dark"] .products-td--delete {
+  background: var(--bg-elev, #111827);
+  box-shadow: -6px 0 10px rgba(0, 0, 0, 0.28);
+}
+
+[data-theme="dark"] .products-thead-row .products-th--delete {
+  background: var(--bg);
+}
 
 .products-thead-row {
   background: var(--bg);
@@ -410,6 +437,15 @@
 .products-actions-cell {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.products-table-delete-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .products-tag {
