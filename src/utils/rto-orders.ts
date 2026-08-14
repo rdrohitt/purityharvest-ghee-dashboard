@@ -1,5 +1,6 @@
 import { apiFetch } from '../api';
 import type { ShopifyOrderApi } from '../types/shopify';
+import { getProductApiId } from './products';
 import { buildShopifyOrderPayloadFromForm, shopifyOrderToOrder } from './shopify-orders';
 
 export interface RtoOrdersResponse {
@@ -65,24 +66,23 @@ export async function updateRtoOrderFields(
     // Keep payload generation aligned with edit PUT flow (no extra GET).
     const basePayload = buildShopifyOrderPayloadFromForm(order, shopifyOrderToOrder(order));
     const normalizedProducts = (basePayload.products || []).map((p, index) => {
-        const rawProductId = p.productId;
-        const productId =
-            typeof rawProductId === 'string'
-                ? rawProductId.trim()
-                : rawProductId && typeof rawProductId === 'object'
-                ? String((rawProductId as { _id?: string })._id ?? '').trim()
-                : '';
+        let productId = '';
+        const raw = p.productId;
+        if (typeof raw === 'string') {
+            productId = raw.trim();
+        } else {
+            productId = getProductApiId(raw as { _id?: string; id?: string });
+        }
         if (productId) {
             return { ...p, productId };
         }
         const fallbackRaw = order.products?.[index]?.productId;
-        const fallbackProductId =
-            typeof fallbackRaw === 'string'
-                ? fallbackRaw.trim()
-                : fallbackRaw && typeof fallbackRaw === 'object'
-                ? String((fallbackRaw as { _id?: string })._id ?? '').trim()
-                : '';
-        return { ...p, productId: fallbackProductId };
+        if (typeof fallbackRaw === 'string') {
+            productId = fallbackRaw.trim();
+        } else {
+            productId = getProductApiId(fallbackRaw as { _id?: string; id?: string });
+        }
+        return { ...p, productId };
     });
     const payload: ShopifyOrderApi = {
         ...basePayload,

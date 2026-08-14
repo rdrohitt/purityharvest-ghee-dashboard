@@ -1,4 +1,5 @@
 import { apiFetch } from '../api';
+import { getProductApiId } from './products';
 import type { ProductApiItem } from '../types/products';
 import type { ShopifyOrderApi, ShopifyOrderCustomer, ShopifyOrderProduct } from '../types/shopify';
 import type { Order, PaymentStatus, FulfillmentStatus, DeliveryStatus, OrderType } from './orders';
@@ -18,6 +19,31 @@ function findProductByVariantLabel(
         products.find((p) => label.startsWith(p.name)) ||
         undefined
     );
+}
+
+function resolveOrderLineProductId(rawProductId: unknown): string {
+    if (typeof rawProductId === 'string') return rawProductId.trim();
+    if (rawProductId && typeof rawProductId === 'object') {
+        return getProductApiId(rawProductId as { _id?: string; id?: string });
+    }
+    return '';
+}
+
+function matchOrderLineToFormVariant(p: ShopifyOrderProduct, formVariant: string): boolean {
+    const label = (formVariant || '').trim();
+    if (!label) return false;
+    const variantName = String(p.variantName ?? '').trim();
+    if (variantName === label) return true;
+    const raw = p.productId;
+    const name =
+        raw && typeof raw === 'object' && 'name' in raw
+            ? String((raw as { name?: string }).name ?? '').trim()
+            : '';
+    if (name) {
+        const fullLabel = `${name} - ${variantName}`.trim();
+        if (fullLabel === label) return true;
+    }
+    return false;
 }
 
 /**
@@ -568,8 +594,10 @@ export function buildShopifyOrderPayloadFromForm(
 
     const baseProducts = (base.products || []) as ShopifyOrderApi['products'];
 
-    const updatedProducts: ShopifyOrderApi['products'] = form.items.map((line) => {
-        const existing = baseProducts.find((p) => p.variantName === line.variant);
+    const updatedProducts: ShopifyOrderApi['products'] = form.items.map((line, lineIndex) => {
+        const existing =
+            baseProducts.find((p) => matchOrderLineToFormVariant(p as ShopifyOrderProduct, line.variant)) ??
+            baseProducts[lineIndex];
 
         // Derive a clean variant name (e.g. "1 Ltr") from the form label "Product Name - 1 Ltr"
         const parsedVariantName = (() => {
@@ -580,15 +608,12 @@ export function buildShopifyOrderPayloadFromForm(
             return parts.slice(1).join('-').trim();
         })();
 
-        const rawProductId = existing ? (existing as any).productId : undefined;
-        const productIdFromBase =
-            typeof rawProductId === 'string'
-                ? rawProductId
-                : rawProductId && typeof rawProductId === 'object'
-                ? String((rawProductId as { _id?: string })._id ?? '')
-                : '';
+        const rawProductId = existing ? (existing as ShopifyOrderProduct).productId : undefined;
+        const productIdFromBase = resolveOrderLineProductId(rawProductId);
         const productIdFromResolver = resolveProductId ? resolveProductId(line.variant) ?? '' : '';
-        const productId = productIdFromBase || productIdFromResolver;
+        const catalogProduct = findProductByVariantLabel(products, line.variant || '');
+        const productIdFromCatalog = getProductApiId(catalogProduct);
+        const productId = productIdFromBase || productIdFromResolver || productIdFromCatalog;
 
         const baseVariantSku = existing ? (existing as any).variantSku : undefined;
         const variantSku =
@@ -603,9 +628,8 @@ export function buildShopifyOrderPayloadFromForm(
                 ? getShopifyProductUnitPrice(existing as ShopifyOrderProduct)
                 : 0;
 
-        const baseRest = (existing as any) ?? {};
+        const baseRest = (existing as ShopifyOrderProduct) ?? {};
 
-        const catalogProduct = findProductByVariantLabel(products, line.variant || '');
         const catalogVariants = Array.isArray(catalogProduct?.variants) ? catalogProduct!.variants : [];
         const variantNameForPayload =
             catalogProduct && catalogVariants.length === 0

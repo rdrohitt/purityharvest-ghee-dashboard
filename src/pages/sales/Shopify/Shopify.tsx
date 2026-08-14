@@ -43,7 +43,7 @@ import type {
 } from '../../../types/analytics-overview';
 import type { ShopifyOrderApi, ShopifyOrderProduct } from '../../../types/shopify';
 import { fetchAnalyticsOverview } from '../../../utils/analytics';
-import { loadProducts, type ProductApiItem } from '../../../utils/products';
+import { loadProducts, getProductApiId, type ProductApiItem } from '../../../utils/products';
 import { useAppDispatch, useAppSelector, setProducts, setProductsLoading } from '../../../store';
 import AddOrderModal, { type ProductVariantOption, formatVariantLabel } from './AddOrderModal';
 import { CustomerProfileModal } from './CustomerProfileModal';
@@ -587,7 +587,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             if (variants.length === 0) {
                 return [
                     {
-                        id: p._id,
+                        id: getProductApiId(p),
                         name: p.name,
                         size: '',
                         price: Number(p.price || 0),
@@ -596,7 +596,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             }
 
             return variants.map((v) => ({
-                id: p._id,
+                id: getProductApiId(p),
                 name: p.name,
                 size: v.name,
                 price: v.price,
@@ -614,8 +614,8 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             } else if (typeof p.category === 'string') {
                 categoryName = p.category;
             }
-            if (p._id && categoryName) {
-                map.set(p._id, categoryName.toLowerCase());
+            if (getProductApiId(p) && categoryName) {
+                map.set(getProductApiId(p), categoryName.toLowerCase());
             }
         });
         return map;
@@ -1386,14 +1386,14 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                         if (!product) return undefined;
 
                                         if (!size) {
-                                            return product._id;
+                                            return getProductApiId(product);
                                         }
 
                                         const hasVariant =
                                             Array.isArray(product.variants) &&
                                             product.variants.some((v) => v.name === size);
 
-                                        return hasVariant ? product._id : product._id;
+                                        return hasVariant ? getProductApiId(product) : getProductApiId(product);
                                     },
                                     modalProductSource,
                                 );

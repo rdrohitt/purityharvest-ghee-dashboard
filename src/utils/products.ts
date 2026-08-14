@@ -4,6 +4,14 @@ import type { ProductApiItem, ProductsApiResponse } from '../types/products';
 export type { ProductApiItem } from '../types/products';
 export type Product = ProductApiItem;
 
+/** Mongo `_id` or legacy `id` — API responses may use either. */
+export function getProductApiId(
+    product: { _id?: string; id?: string } | null | undefined,
+): string {
+    if (!product) return '';
+    return String(product._id ?? product.id ?? '').trim();
+}
+
 export type LoadProductsOptions = {
     page?: number;
     limit?: number;
