@@ -26,30 +26,30 @@ export type ProductsPageResponse = {
     totalPages: number;
 };
 
+const FETCH_ALL_CHUNK = 500;
+
 /**
- * Load products from the backend API (GET /api/products).
+ * Loads every product by paging GET /api/products.
+ */
+export async function fetchAllProducts(): Promise<ProductApiItem[]> {
+    const merged: ProductApiItem[] = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+        const res = await loadProductsPage({ page, limit: FETCH_ALL_CHUNK });
+        merged.push(...res.rows);
+        totalPages = Math.max(1, res.totalPages);
+        if (res.rows.length === 0) break;
+        page += 1;
+    } while (page <= totalPages);
+    return merged;
+}
+
+/**
+ * Load all products from the backend API (GET /api/products).
  */
 export async function loadProducts(): Promise<ProductApiItem[]> {
-    const page = 1;
-    const limit = 20;
-    let response = await apiFetch(`/api/products?page=${page}&limit=${limit}`);
-    if (response.status === 404) {
-        response = await apiFetch(`/products?page=${page}&limit=${limit}`);
-    }
-    if (!response.ok) {
-        throw new Error('Failed to load products from API');
-    }
-    const json: unknown = await response.json();
-    if (Array.isArray(json)) {
-        return json as ProductApiItem[];
-    }
-    if (json && typeof json === 'object') {
-        const obj = json as { rows?: unknown; products?: unknown; data?: unknown };
-        if (Array.isArray(obj.rows)) return obj.rows as ProductApiItem[];
-        if (Array.isArray(obj.products)) return obj.products as ProductApiItem[];
-        if (Array.isArray(obj.data)) return obj.data as ProductApiItem[];
-    }
-    return [];
+    return fetchAllProducts();
 }
 
 /**

@@ -15,6 +15,7 @@ export default function AdminLayout() {
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [theme, setTheme] = useState<Theme>(getInitialTheme());
     const [salesOpen, setSalesOpen] = useState(true);
+    const [whatsappOpen, setWhatsappOpen] = useState(false);
     const [martsOpen, setMartsOpen] = useState(false);
     const [forbiddenSection, setForbiddenSection] = useState(false);
     const [showSessionExpiredModal, setShowSessionExpiredModal] = useState(false);
@@ -62,6 +63,11 @@ export default function AdminLayout() {
             location.pathname.startsWith('/admin/rto-orders')
         ) {
             setSalesOpen(true);
+        }
+
+        // ensure whatsapp group is expanded when a whatsapp route is active
+        if (location.pathname.startsWith('/admin/whatsapp')) {
+            setWhatsappOpen(true);
         }
 
         // ensure marts group is expanded when a marts route is active
@@ -226,6 +232,33 @@ export default function AdminLayout() {
                             ) : null}
                         </div>
                     )}
+
+                    <div className="menu-group">
+                        <button
+                            type="button"
+                            className="menu-group-label"
+                            onClick={() => setWhatsappOpen((open) => !open)}
+                            aria-expanded={whatsappOpen}
+                        >
+                            <span className="mi-icon">💬</span>
+                            <span className="mi-label">WhatsApp</span>
+                            <span className={whatsappOpen ? 'menu-group-chevron open' : 'menu-group-chevron'}>
+                                ▸
+                            </span>
+                        </button>
+                        {whatsappOpen ? (
+                            <div className="menu-group-items">
+                                <NavLink to="/admin/whatsapp/sarita" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                    <span className="mi-icon">•</span>
+                                    <span className="mi-label">Sarita</span>
+                                </NavLink>
+                                <NavLink to="/admin/whatsapp/monia" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                    <span className="mi-icon">•</span>
+                                    <span className="mi-label">Monia</span>
+                                </NavLink>
+                            </div>
+                        ) : null}
+                    </div>
 
                     {hasMenuLabel('Marketing Spend') && (
                         <NavLink to="/admin/marketing-spend" className={({ isActive }) => (isActive ? 'active' : '')}>

@@ -43,7 +43,7 @@ export default defineConfig({
 			workbox: {
 				globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webp}'],
 				navigateFallback: 'index.html',
-				navigateFallbackDenylist: [/^\/api/],
+				navigateFallbackDenylist: [/^\/api/, /^\/msg91/, /^\/msg91-api/],
 			},
 		}),
 	],
@@ -52,6 +52,16 @@ export default defineConfig({
 			'/api': {
 				target: 'http://localhost:4000',
 				changeOrigin: true,
+			},
+			'/msg91': {
+				target: 'https://control.msg91.com',
+				changeOrigin: true,
+				rewrite: (path) => path.replace(/^\/msg91/, ''),
+			},
+			'/msg91-api': {
+				target: 'https://api.msg91.com',
+				changeOrigin: true,
+				rewrite: (path) => path.replace(/^\/msg91-api/, ''),
 			},
 		},
 	},

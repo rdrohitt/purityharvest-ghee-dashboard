@@ -244,6 +244,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     useEffect(() => {
         if (!(showAddOrder || editingOrder)) return;
         let cancelled = false;
+        setModalApiProducts([]);
         setModalApiProductsLoading(true);
         loadProducts()
             .then((data) => {
@@ -576,10 +577,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         };
     }, [editingOrderId]);
 
-    const modalProductSource = useMemo(
-        () => (modalApiProducts.length > 0 ? modalApiProducts : productsList),
-        [modalApiProducts, productsList],
-    );
+    const modalProductSource = useMemo(() => {
+        if (showAddOrder || editingOrder) {
+            return modalApiProducts;
+        }
+        return modalApiProducts.length > 0 ? modalApiProducts : productsList;
+    }, [showAddOrder, editingOrder, modalApiProducts, productsList]);
 
     const productOptions = useMemo((): ProductVariantOption[] => {
         return modalProductSource.flatMap((p) => {

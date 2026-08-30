@@ -245,7 +245,7 @@
   flex-shrink: 0;
   height: 44px;
   border-radius: 8px;
-  background: var(--primary);
+  background: #e5792f;
   color: #fff;
   font-weight: 600;
   border: 0;
@@ -261,11 +261,12 @@
   border-radius: 8px;
   font-weight: 600;
   border: 0;
-  background: #7c3aed !important;
+  background: #e5792f !important;
   color: #fff !important;
   cursor: pointer;
   &:hover:not(:disabled) {
-    background: #6d28d9 !important;
+    background: #e5792f !important;
+    filter: brightness(0.96);
   }
   &:disabled {
     opacity: 0.7;

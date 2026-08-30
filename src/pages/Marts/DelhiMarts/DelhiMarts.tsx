@@ -1724,7 +1724,7 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                     fontSize: 12,
                                     fontWeight: 600,
                                     color: '#ffffff',
-                                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                                    background: '#e5792f',
                                     border: 'none',
                                     borderRadius: 6,
                                     cursor: 'pointer',
@@ -1733,11 +1733,11 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                     marginRight: 20,
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)';
+                                    e.currentTarget.style.background = '#e5792f';
                                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+                                    e.currentTarget.style.background = '#e5792f';
                                     e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
                                 }}
                             >
@@ -1914,7 +1914,7 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                                             style={{
                                                                 padding: '6px 12px',
                                                                 borderRadius: 6,
-                                                                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                                                background: '#e5792f',
                                                                 color: '#ffffff',
                                                                 border: 'none',
                                                                 cursor: 'pointer',
@@ -1926,11 +1926,11 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                                                 transition: 'all 0.2s',
                                                             }}
                                                             onMouseEnter={(e) => {
-                                                                e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+                                                                e.currentTarget.style.background = '#e5792f';
                                                                 e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
                                                             }}
                                                             onMouseLeave={(e) => {
-                                                                e.currentTarget.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+                                                                e.currentTarget.style.background = '#e5792f';
                                                                 e.currentTarget.style.boxShadow = 'none';
                                                             }}
                                                         >
@@ -1964,7 +1964,7 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                     fontSize: 12,
                                     fontWeight: 600,
                                     color: '#ffffff',
-                                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                                    background: '#e5792f',
                                     border: 'none',
                                     borderRadius: 6,
                                     cursor: 'pointer',
@@ -1973,11 +1973,11 @@ function MartDetailsModal({ mart, orders, onClose, onMartUpdate }: { mart: Mart;
                                     marginRight: 20,
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)';
+                                    e.currentTarget.style.background = '#e5792f';
                                     e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+                                    e.currentTarget.style.background = '#e5792f';
                                     e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
                                 }}
                             >
