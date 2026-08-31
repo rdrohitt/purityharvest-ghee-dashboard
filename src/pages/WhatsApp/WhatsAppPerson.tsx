@@ -74,8 +74,6 @@ export default function WhatsAppPerson({ person }: { person: WhatsAppPersonName 
                             <p className="wa-tab-panel-copy">
                                 {activeTab === 'get-templates' && `View WhatsApp templates for ${person}.`}
                                 {activeTab === 'create-templates' && `Create a new WhatsApp template for ${person}.`}
-                                {activeTab === 'send-template' && `Send a WhatsApp template from ${person}.`}
-                                {activeTab === 'logs' && `Template send logs for ${person}.`}
                             </p>
                         </>
                     )}
