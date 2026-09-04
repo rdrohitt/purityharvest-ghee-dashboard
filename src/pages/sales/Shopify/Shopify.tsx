@@ -67,7 +67,7 @@ function toBackendTrackingStatus(status: DeliveryStatus | ''): string | undefine
 }
 
 type UiRange = 'all' | 'today' | 'yesterday' | 'last7' | 'currentMonth' | 'lastMonth' | 'custom';
-type CategoryTab = 'all' | 'milk' | 'ghee' | 'oils';
+type CategoryTab = 'all' | 'milk' | 'ghee' | 'oils' | 'pickle';
 type ShippedTab = 'shipped' | 'notShipped';
 
 /**
@@ -334,7 +334,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return { from: '2024-01-01', to: todayStr };
     }, [range, appliedCustomStart, appliedCustomEnd]);
 
-    const ordersCategoryQueryParam = categoryTab === 'all' ? undefined : categoryTab;
+    const ordersCategoryQueryParam = categoryTab;
 
     const applyAnalyticsOverviewData = useCallback((data: AnalyticsOverviewResponse) => {
         setAnalyticsShippingPipeline(data.shippingPipeline ?? null);
@@ -679,6 +679,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     if (categoryTab === 'milk' && (catNorm === 'milk' || nameNorm === 'milk')) return true;
                     if (categoryTab === 'ghee' && (catNorm === 'ghee' || nameNorm === 'ghee')) return true;
                     if (categoryTab === 'oils' && (catNorm.includes('oil') || nameNorm.includes('oil'))) return true;
+                    if (categoryTab === 'pickle' && (catNorm.includes('pickle') || nameNorm.includes('pickle'))) return true;
                 }
                 return false;
             })();
@@ -880,6 +881,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             onClick={() => setCategoryTab('oils')}
                         >
                             Oils
+                        </FilterButton>
+                        <FilterButton
+                            active={categoryTab === 'pickle'}
+                            onClick={() => setCategoryTab('pickle')}
+                        >
+                            Pickle
                         </FilterButton>
                     </div>
                     <div className="shopify-header-filters">

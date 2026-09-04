@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MSG91 } from '../../config/msg91';
 import { Spinner } from '../../components/Spinner';
-import { ModernSelect, type ModernSelectOption } from '../sales/Shopify/ShopifyShared';
+import { ModernSelect, Th, Td, type ModernSelectOption } from '../sales/Shopify/ShopifyShared';
 import '../sales/Shopify/Shopify.scss';
-import {
-    getOrderCustomerPhone,
-    loadOrdersDashboardFromApi,
-} from '../../utils/shopify-orders';
+import { fetchMonthlyOrderCustomers } from '../../utils/analytics';
 import {
     buildSendTemplateRequest,
     fetchWhatsAppTemplates,
@@ -16,6 +13,7 @@ import {
     sendWhatsAppTemplate,
 } from '../../utils/whatsapp-templates';
 import type { Msg91WhatsAppTemplate } from '../../types/whatsapp-templates';
+import type { MonthlyOrderCustomer } from '../../types/analytics-monthly-order-customers';
 
 type ToMode = 'customer' | 'manual' | 'csv';
 
@@ -40,6 +38,43 @@ function buildYearOptions(): ModernSelectOption<string>[] {
         const year = String(currentYear - index);
         return { value: year, label: year };
     });
+}
+
+function normalizeFetchedCustomers(customers: MonthlyOrderCustomer[]): MonthlyOrderCustomer[] {
+    const seen = new Set<string>();
+    const rows: MonthlyOrderCustomer[] = [];
+    for (const customer of customers) {
+        const phone = parsePhoneNumbers(customer.phoneNumber || '')[0] ?? '';
+        if (!phone || seen.has(phone)) continue;
+        seen.add(phone);
+        rows.push({
+            customerId: customer.customerId || phone,
+            name: customer.name?.trim() || '—',
+            phoneNumber: phone,
+        });
+    }
+    return rows;
+}
+
+function csvEscapeCell(value: string): string {
+    if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+    return value;
+}
+
+function downloadCustomersCsv(rows: MonthlyOrderCustomer[], month: string, year: string) {
+    const lines = [
+        'Name,Phone no',
+        ...rows.map((row) => `${csvEscapeCell(row.name)},${csvEscapeCell(row.phoneNumber)}`),
+    ];
+    const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `customers_${year}-${month}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
 }
 
 function RefreshIcon() {
@@ -115,6 +150,7 @@ export default function SendTemplateModal({
     const [integratedNumber, setIntegratedNumber] = useState(defaultIntegratedNumber);
     const [templateName, setTemplateName] = useState('');
     const [phones, setPhones] = useState('');
+    const [fetchedCustomers, setFetchedCustomers] = useState<MonthlyOrderCustomer[]>([]);
     const [headerMediaUrl, setHeaderMediaUrl] = useState('');
     const [templates, setTemplates] = useState<Msg91WhatsAppTemplate[]>([]);
     const [loadingTemplates, setLoadingTemplates] = useState(true);
@@ -182,7 +218,8 @@ export default function SendTemplateModal({
         setHeaderMediaUrl(preview.headerImageUrl ?? '');
     }, [selectedTemplate]);
 
-    const recipientCount = parsePhoneNumbers(phones).length;
+    const recipientCount =
+        toMode === 'customer' ? fetchedCustomers.length : parsePhoneNumbers(phones).length;
 
     const templateOptions = useMemo((): ModernSelectOption<string>[] => {
         return templates.map((t) => ({
@@ -209,41 +246,27 @@ export default function SendTemplateModal({
             setError('Select month and year.');
             return;
         }
-        const year = Number(customerYear);
-        const month = Number(customerMonth);
-        const lastDay = new Date(year, month, 0).getDate();
-        const from = `${customerYear}-${customerMonth}-01`;
-        const to = `${customerYear}-${customerMonth}-${String(lastDay).padStart(2, '0')}`;
-
         setFetchingCustomers(true);
         try {
-            const unique = new Set<string>();
-            let page = 1;
-            let totalPages = 1;
-            const limit = 200;
-            const maxPages = 50;
-            do {
-                const data = await loadOrdersDashboardFromApi({ from, to, page, limit });
-                totalPages = Math.max(1, data.totalPages || 1);
-                for (const order of data.rows) {
-                    for (const number of parsePhoneNumbers(getOrderCustomerPhone(order))) {
-                        unique.add(number);
-                    }
-                }
-                page += 1;
-            } while (page <= totalPages && page <= maxPages);
-
-            const list = [...unique];
-            setPhones(list.join(', '));
-            if (list.length === 0) {
+            const data = await fetchMonthlyOrderCustomers(customerMonth, customerYear);
+            const rows = normalizeFetchedCustomers(data.customers ?? []);
+            setFetchedCustomers(rows);
+            setPhones(rows.map((row) => row.phoneNumber).join(', '));
+            if (rows.length === 0) {
                 setError('No customer numbers found for this month.');
             }
         } catch (err) {
             setPhones('');
+            setFetchedCustomers([]);
             setError(err instanceof Error ? err.message : 'Failed to fetch customers');
         } finally {
             setFetchingCustomers(false);
         }
+    }
+
+    function handleExportCsv() {
+        if (fetchedCustomers.length === 0) return;
+        downloadCustomersCsv(fetchedCustomers, customerMonth, customerYear);
     }
 
     async function handleCsv(file: File | undefined) {
@@ -269,7 +292,10 @@ export default function SendTemplateModal({
             setError('Select a template.');
             return;
         }
-        const to = parsePhoneNumbers(phones);
+        const to =
+            toMode === 'customer'
+                ? fetchedCustomers.map((row) => row.phoneNumber)
+                : parsePhoneNumbers(phones);
         if (to.length === 0) {
             setError('Enter at least one mobile number with country code.');
             return;
@@ -353,6 +379,7 @@ export default function SendTemplateModal({
                         </div>
 
                         {toMode === 'customer' ? (
+                            <>
                             <div className="wa-composer-from-grid wa-composer-customer-row">
                                 <div className="wa-composer-field">
                                     <span>Month *</span>
@@ -392,6 +419,29 @@ export default function SendTemplateModal({
                                     </button>
                                 </div>
                             </div>
+                            {fetchedCustomers.length > 0 ? (
+                                <div className="wa-composer-customers">
+                                    <div className="wa-composer-customers-scroll">
+                                        <table className="orders-table wa-composer-customers-table">
+                                            <thead>
+                                                <tr>
+                                                    <Th>Name</Th>
+                                                    <Th>Phone no</Th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {fetchedCustomers.map((row) => (
+                                                    <tr key={row.customerId}>
+                                                        <Td>{row.name}</Td>
+                                                        <Td>{row.phoneNumber}</Td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ) : null}
+                            </>
                         ) : toMode === 'manual' ? (
                             <div className="wa-composer-outline">
                                 <span className="wa-composer-outline-label">Mobile Numbers *</span>
@@ -419,14 +469,24 @@ export default function SendTemplateModal({
                             </label>
                         )}
                         {toMode === 'customer' ? (
-                            <p className="wa-composer-hint">
-                                Customers from {MONTH_OPTIONS.find((m) => m.value === customerMonth)?.label} {customerYear}.
-                                {recipientCount > 0 ? (
-                                    <span className="wa-composer-count">
-                                        {recipientCount} recipient{recipientCount === 1 ? '' : 's'}
-                                    </span>
-                                ) : null}
-                            </p>
+                            <div className="wa-composer-hint-row">
+                                <p className="wa-composer-hint">
+                                    Customers from {MONTH_OPTIONS.find((m) => m.value === customerMonth)?.label} {customerYear}.
+                                    {recipientCount > 0 ? (
+                                        <span className="wa-composer-count">
+                                            {recipientCount} recipient{recipientCount === 1 ? '' : 's'}
+                                        </span>
+                                    ) : null}
+                                </p>
+                                <button
+                                    type="button"
+                                    className="wa-composer-export"
+                                    onClick={handleExportCsv}
+                                    disabled={sending || fetchingCustomers || fetchedCustomers.length === 0}
+                                >
+                                    Export CSV
+                                </button>
+                            </div>
                         ) : (
                             <p className="wa-composer-hint">
                                 Comma-separated numbers <strong>with country code</strong>, no + sign.

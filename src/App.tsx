@@ -12,6 +12,7 @@ import Flipkart from './pages/sales/Flipkart/index';
 import RTOOrders from './pages/sales/RTOOrders/index';
 import WALeads from './pages/WALeads/index';
 import WhatsAppPerson from './pages/WhatsApp/index';
+import CustomerWinback from './pages/CustomerWinback/index';
 import Followups from './pages/Followups/index';
 import Scripts from './pages/Scripts/index';
 import MarketingSpend from './pages/MarketingSpend/index';
@@ -126,6 +127,7 @@ export default function App() {
 						<Route path="wa-leads" element={<WALeads />} />
 						<Route path="whatsapp/sarita" element={<WhatsAppPerson person="Sarita" />} />
 						<Route path="whatsapp/monia" element={<WhatsAppPerson person="Monia" />} />
+						<Route path="customer-winback" element={<CustomerWinback />} />
 						<Route path="amazon" element={<Amazon />} />
 						<Route path="flipkart" element={<Flipkart />} />
 						<Route path="rto-orders" element={<RTOOrders />} />

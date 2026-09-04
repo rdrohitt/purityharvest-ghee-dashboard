@@ -1,0 +1,69 @@
+.cw-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  width: auto;
+  margin-left: auto;
+}
+
+.cw-date-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cw-datepicker {
+  width: 180px;
+  flex: 0 0 180px;
+}
+
+.cw-datepicker .shopify-dp-root,
+.cw-datepicker .shopify-dp-trigger {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0;
+}
+
+.cw-datepicker .shopify-dp-trigger {
+  height: 44px;
+  min-height: 44px;
+}
+
+.button.cw-fetch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 96px;
+  height: 44px;
+  padding: 0 20px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.cw-table-loading {
+  min-height: 220px;
+}
+
+.cw-customers-table.shopify-orders-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.cw-table-loading {
+  min-height: 220px;
+}
+
+.cw-customers-table.shopify-orders-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}

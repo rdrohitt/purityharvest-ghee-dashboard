@@ -7,6 +7,11 @@ import type {
 } from '../types/analytics-top-performing-customers';
 import type { PlatformSalesComparisonResponse } from '../types/analytics-platform-sales-comparison';
 import type { DailySalesRankingResponse } from '../types/analytics-daily-sales-ranking';
+import type { MonthlyOrderCustomersResponse } from '../types/analytics-monthly-order-customers';
+import type {
+    CustomerNotOrderedSince,
+    CustomersNotOrderedSinceResponse,
+} from '../types/analytics-customers-not-ordered-since';
 
 type AnalyticsOverviewFilters = {
     category?: string;
@@ -103,4 +108,81 @@ export async function fetchTopPerformingCustomers(
         throw new Error('Failed to load top performing customers');
     }
     return (await res.json()) as TopPerformingCustomersResponse;
+}
+
+/** GET /api/analytics/monthly-order-customers?month=6&year=2026 */
+export async function fetchMonthlyOrderCustomers(
+    month: string | number,
+    year: string | number,
+): Promise<MonthlyOrderCustomersResponse> {
+    const monthNum = Number(month);
+    const yearNum = Number(year);
+    if (!Number.isFinite(monthNum) || monthNum < 1 || monthNum > 12) {
+        throw new Error('Select a valid month.');
+    }
+    if (!Number.isFinite(yearNum) || yearNum < 2000) {
+        throw new Error('Select a valid year.');
+    }
+    const params = new URLSearchParams({
+        month: String(monthNum),
+        year: String(yearNum),
+    });
+    const res = await apiFetch(`/api/analytics/monthly-order-customers?${params.toString()}`);
+    if (!res.ok) {
+        throw new Error('Failed to load monthly order customers');
+    }
+    return (await res.json()) as MonthlyOrderCustomersResponse;
+}
+
+function asCustomerNotOrderedSince(item: unknown): CustomerNotOrderedSince | null {
+    if (!item || typeof item !== 'object') return null;
+    const row = item as Record<string, unknown>;
+    const phoneNumber = String(row.phoneNumber ?? row.phone ?? row.mobile ?? '').trim();
+    const name = String(row.name ?? '').trim() || '—';
+    const customerId = String(row.customerId ?? row._id ?? row.id ?? phoneNumber).trim();
+    if (!customerId && !phoneNumber) return null;
+    const lastOrderDate = String(
+        row.lastOrderDate ?? row.lastOrderedAt ?? row.lastOrderAt ?? row.lastOrder ?? '',
+    ).trim();
+    return {
+        customerId: customerId || phoneNumber,
+        name,
+        phoneNumber,
+        lastOrderDate: lastOrderDate || undefined,
+    };
+}
+
+/** GET /api/analytics/customers-not-ordered-since?date=DD-MM-YYYY */
+export async function fetchCustomersNotOrderedSince(
+    inputDate: string,
+): Promise<CustomersNotOrderedSinceResponse> {
+    if (!inputDate) {
+        throw new Error('Select a date.');
+    }
+    const date = toPlatformSalesComparisonDateParam(inputDate);
+    const params = new URLSearchParams({ date });
+    const res = await apiFetch(`/api/analytics/customers-not-ordered-since?${params.toString()}`);
+    if (!res.ok) {
+        throw new Error('Failed to load customers who have not ordered since this date');
+    }
+    const raw: unknown = await res.json();
+    if (Array.isArray(raw)) {
+        const customers = raw.map(asCustomerNotOrderedSince).filter((row): row is CustomerNotOrderedSince => row != null);
+        return { count: customers.length, customers };
+    }
+    const rec = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    const list = Array.isArray(rec.customers)
+        ? rec.customers
+        : Array.isArray(rec.data)
+          ? rec.data
+          : Array.isArray(rec.rows)
+            ? rec.rows
+            : [];
+    const customers = list.map(asCustomerNotOrderedSince).filter((row): row is CustomerNotOrderedSince => row != null);
+    const count = typeof rec.count === 'number' ? rec.count : customers.length;
+    const filters =
+        rec.filters && typeof rec.filters === 'object'
+            ? (rec.filters as CustomersNotOrderedSinceResponse['filters'])
+            : { date };
+    return { filters, count, customers };
 }

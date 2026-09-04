@@ -662,6 +662,23 @@
   line-height: 1.45;
 }
 
+.wa-composer-hint-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.wa-composer-hint-row .wa-composer-hint {
+  margin: 0;
+  min-width: 0;
+}
+
+.wa-composer-hint-row .wa-composer-export {
+  flex-shrink: 0;
+}
+
 .wa-composer-count {
   display: inline-flex;
   margin-left: 8px;
@@ -732,6 +749,76 @@
 
 .wa-composer-fetch:hover:not(:disabled) {
   filter: brightness(0.96);
+}
+
+.wa-composer-export {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 650;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.wa-composer-export:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 6%, #fff);
+}
+
+.wa-composer-customers {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.wa-composer-customers-scroll {
+  height: 150px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.wa-composer-customers-table {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.wa-composer-customers-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+}
+
+.wa-composer-customers-table .shopify-th,
+.wa-composer-customers-table .shopify-td {
+  padding: 8px 8px 8px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wa-composer-customers-table .shopify-td {
+  font-size: 55%;
+}
+
+.wa-composer-customers-table th:first-child,
+.wa-composer-customers-table td:first-child {
+  width: 56%;
+  padding-right: 6px;
+}
+
+.wa-composer-customers-table th:last-child,
+.wa-composer-customers-table td:last-child {
+  width: 44%;
+  padding-left: 6px;
 }
 
 .wa-composer-field {
@@ -986,7 +1073,8 @@
 .wa-composer-send:disabled,
 .wa-composer-cancel:disabled,
 .wa-composer-refresh:disabled,
-.wa-composer-fetch:disabled {
+.wa-composer-fetch:disabled,
+.wa-composer-export:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

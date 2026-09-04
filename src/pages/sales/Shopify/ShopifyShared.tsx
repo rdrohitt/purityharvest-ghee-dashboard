@@ -496,7 +496,7 @@ export function formatDate(date: string | Date): string {
 }
 
 /** Product tab on the Shopify orders page — drives the WhatsApp summary title (e.g. Milk vs Ghee). */
-export type WhatsAppSummaryCategoryTab = 'all' | 'milk' | 'ghee' | 'oils';
+export type WhatsAppSummaryCategoryTab = 'all' | 'milk' | 'ghee' | 'oils' | 'pickle';
 
 function whatsAppSummaryTitlePrefix(tab: WhatsAppSummaryCategoryTab): string {
     switch (tab) {
@@ -504,6 +504,8 @@ function whatsAppSummaryTitlePrefix(tab: WhatsAppSummaryCategoryTab): string {
             return 'Milk Summary';
         case 'oils':
             return 'Oils Summary';
+        case 'pickle':
+            return 'Pickle Summary';
         case 'all':
             return 'Summary';
         case 'ghee':
