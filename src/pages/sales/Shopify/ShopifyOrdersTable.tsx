@@ -6,6 +6,14 @@ import type { Platform } from '../../../utils/orders';
 import type { SpendRecord } from '../../../utils/marketing-spend';
 import { updateRtoOrderFields } from '../../../utils/rto-orders';
 import {
+    formatShipmozoDateDdMmmYyyy,
+    pushOrderToShipmozo,
+    trackShipmozoOrder,
+} from '../../../utils/shipmozo';
+import { DeleteConfirmModal } from '../../../components/DeleteConfirmModal/DeleteConfirmModal';
+import { BulkUpdateOrdersModal } from './BulkUpdateOrdersModal';
+import { openPickupSummaryPdf } from './pickupSummaryPdf';
+import {
     shopifyOrderToOrder,
     getOrderAddress,
     getOrderCustomerName,
@@ -170,7 +178,8 @@ function buildOrderWhatsAppMessage(o: ShopifyOrderApi): string {
     const name = getOrderCustomerName(o) || 'Customer';
     const awb = o.shippingDetails?.trackingNumber || '';
     const courier = o.shippingDetails?.trackingCompany || '';
-    const trackingUrl = buildDefaultTrackingUrlFromCourier(awb, courier);
+    const trackingUrl =
+        o.shippingDetails?.trackingUrl || buildDefaultTrackingUrlFromCourier(awb, courier);
 
     const lines: string[] = [];
     lines.push(`Dear ${name},`, '');
@@ -534,6 +543,18 @@ function generateOrderInvoicePDF(order: ShopifyOrderApi): void {
     setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
 }
 
+export type OrdersTableColumn =
+    | 'refNo'
+    | 'platform'
+    | 'shipped'
+    | 'type'
+    | 'updatedBy'
+    | 'expectedDelivery'
+    | 'actions';
+
+const NO_HIDDEN_COLUMNS: readonly OrdersTableColumn[] = [];
+const NON_RTO_ONLY_COLUMNS: readonly OrdersTableColumn[] = ['platform', 'shipped', 'type', 'actions'];
+
 export function ShopifyOrdersTable({
     groupedByDate,
     marketingSpend,
@@ -546,7 +567,13 @@ export function ShopifyOrdersTable({
     onDelete,
     onOrdersRefresh,
     onWaybillSyncError,
+    onPushResult,
     viewMode = 'default',
+    hiddenColumns = NO_HIDDEN_COLUMNS,
+    allowEdit = true,
+    selectable = false,
+    onBulkUpdateResult,
+    showPickupSummaryPdf = false,
 }: {
     groupedByDate: GroupedOrdersByDate[];
     marketingSpend: SpendRecord[];
@@ -561,10 +588,26 @@ export function ShopifyOrdersTable({
     onDelete: (order: Order) => void;
     onOrdersRefresh?: () => Promise<void> | void;
     onWaybillSyncError?: () => void;
+    onPushResult?: (message: string, type: 'success' | 'error') => void;
     viewMode?: 'default' | 'rto';
+    hiddenColumns?: readonly OrdersTableColumn[];
+    /** Show the edit (pencil) button next to the customer name. */
+    allowEdit?: boolean;
+    /** Show a checkbox column (after Date) for selecting rows. */
+    selectable?: boolean;
+    onBulkUpdateResult?: (message: string, type: 'success' | 'error') => void;
+    /** Show a PDF button in each date cell that opens a pickup summary for that group. */
+    showPickupSummaryPdf?: boolean;
 }) {
     const isRtoView = viewMode === 'rto';
-    const columnCount = isRtoView ? 12 : 14;
+    const showCol = (col: OrdersTableColumn) =>
+        !hiddenColumns.includes(col) && !(isRtoView && NON_RTO_ONLY_COLUMNS.includes(col));
+    const columnCount =
+        (isRtoView ? 14 : 16) +
+        (selectable ? 1 : 0) -
+        hiddenColumns.filter((col) => !(isRtoView && NON_RTO_ONLY_COLUMNS.includes(col))).length;
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+    const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
     const rtoConditionOptions = useMemo<ModernSelectOption<string>[]>(
         () => [
             {
@@ -697,6 +740,39 @@ export function ShopifyOrdersTable({
     >({});
     const [savingRtoById, setSavingRtoById] = useState<Record<string, boolean>>({});
     const [syncingWaybillById, setSyncingWaybillById] = useState<Record<string, boolean>>({});
+    const [pushingById, setPushingById] = useState<Record<string, boolean>>({});
+    const [orderToPush, setOrderToPush] = useState<ShopifyOrderApi | null>(null);
+    const [expectedDeliveryById, setExpectedDeliveryById] = useState<
+        Record<string, { loading?: boolean; date?: string; error?: string }>
+    >({});
+
+    const loadExpectedDelivery = useCallback(async (orderId: string, awb: string) => {
+        setExpectedDeliveryById((prev) => ({ ...prev, [orderId]: { loading: true } }));
+        const result = await trackShipmozoOrder(awb);
+        const date = result.ok ? formatShipmozoDateDdMmmYyyy(result.data?.expected_delivery_date) : '';
+        if (!result.ok) console.error('Track order failed', result);
+        setExpectedDeliveryById((prev) => ({
+            ...prev,
+            [orderId]: date
+                ? { date }
+                : { error: result.ok ? 'Expected delivery date not available' : result.message },
+        }));
+    }, []);
+
+    const confirmPushOrder = useCallback(async () => {
+        const o = orderToPush;
+        if (!o) return;
+        const ref = o.referenceNo || o._id;
+        setPushingById((prev) => ({ ...prev, [o._id]: true }));
+        try {
+            const result = await pushOrderToShipmozo(o);
+            if (!result.ok) console.error('Push order failed', result);
+            onPushResult?.(`${ref}: ${result.message}`, result.ok ? 'success' : 'error');
+        } finally {
+            setPushingById((prev) => ({ ...prev, [o._id]: false }));
+            setOrderToPush(null);
+        }
+    }, [orderToPush, onPushResult]);
 
     useEffect(() => {
         return () => {
@@ -729,6 +805,38 @@ export function ShopifyOrdersTable({
         });
     }, [displayGroups, isRtoView]);
 
+    const visibleOrderIds = useMemo(
+        () => displayGroups.flatMap((g) => g.items.map((o) => o._id)),
+        [displayGroups],
+    );
+
+    useEffect(() => {
+        if (!selectable) return;
+        setSelectedIds((prev) => {
+            if (prev.size === 0) return prev;
+            const visible = new Set(visibleOrderIds);
+            const next = new Set([...prev].filter((id) => visible.has(id)));
+            return next.size === prev.size ? prev : next;
+        });
+    }, [selectable, visibleOrderIds]);
+
+    const selectedCount = selectable ? selectedIds.size : 0;
+    const allVisibleSelected =
+        visibleOrderIds.length > 0 && visibleOrderIds.every((id) => selectedIds.has(id));
+
+    const toggleOrderSelected = useCallback((orderId: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(orderId)) next.delete(orderId);
+            else next.add(orderId);
+            return next;
+        });
+    }, []);
+
+    const toggleAllVisibleSelected = () => {
+        setSelectedIds(allVisibleSelected ? new Set() : new Set(visibleOrderIds));
+    };
+
     return (
         <div className="card shopify-orders-card">
             <div className="shopify-orders-count-bar">
@@ -739,6 +847,30 @@ export function ShopifyOrdersTable({
                         <span>
                             {orderCount.toLocaleString()} order{orderCount === 1 ? '' : 's'}
                         </span>
+                        {selectedCount > 0 ? (
+                            <>
+                                <span className="shopify-orders-count-bar__selected">
+                                    {' '}
+                                    · {selectedCount.toLocaleString()} selected
+                                </span>
+                                <span className="shopify-bulk-actions">
+                                    <button
+                                        type="button"
+                                        className="shopify-bulk-actions__update"
+                                        onClick={() => setBulkUpdateOpen(true)}
+                                    >
+                                        Update selected
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="shopify-bulk-actions__clear"
+                                        onClick={() => setSelectedIds(new Set())}
+                                    >
+                                        Clear selection
+                                    </button>
+                                </span>
+                            </>
+                        ) : null}
                         {useProgressive && visibleRowCap < totalFlatRows ? (
                             <span className="shopify-orders-count-bar__progressive">
                                 {' '}
@@ -755,7 +887,11 @@ export function ShopifyOrdersTable({
                 </div>
             ) : (
                 <div className="table-scroll-wrapper">
-                    <table className="orders-table shopify-orders-table">
+                    <table
+                        className={`orders-table shopify-orders-table${
+                            hiddenColumns.length > 0 ? ' shopify-orders-table--reduced' : ''
+                        }`}
+                    >
                         <colgroup>
                             {Array.from({ length: columnCount }).map((_, idx) => (
                                 <col key={idx} />
@@ -764,22 +900,39 @@ export function ShopifyOrdersTable({
                         <thead>
                             <tr className="shopify-orders-header-row">
                                 <Th>Date</Th>
+                                {selectable ? (
+                                    <th className="shopify-th shopify-th--center shopify-select-cell">
+                                        <input
+                                            type="checkbox"
+                                            className="shopify-row-checkbox"
+                                            aria-label="Select all orders"
+                                            checked={allVisibleSelected}
+                                            ref={(el) => {
+                                                if (el) el.indeterminate = selectedCount > 0 && !allVisibleSelected;
+                                            }}
+                                            disabled={visibleOrderIds.length === 0}
+                                            onChange={toggleAllVisibleSelected}
+                                        />
+                                    </th>
+                                ) : null}
+                                {showCol('refNo') ? <Th>Ref No</Th> : null}
                                 <Th>Customer</Th>
                                 <Th>Variant</Th>
                                 <Th>Amount</Th>
                                 <Th>Payment Mode</Th>
                                 {isRtoView ? <Th>Condition</Th> : null}
                                 {isRtoView ? <Th>Remarks</Th> : null}
-                                {!isRtoView ? <Th>Platform</Th> : null}
+                                {showCol('platform') ? <Th>Platform</Th> : null}
                                 <Th>Shipping Status</Th>
-                                {!isRtoView ? <Th>Shipped</Th> : null}
-                                {!isRtoView ? <Th>Type</Th> : null}
-                                <Th>Updated by</Th>
+                                {showCol('shipped') ? <Th>Shipped</Th> : null}
+                                {showCol('type') ? <Th>Type</Th> : null}
+                                {showCol('updatedBy') ? <Th>Updated by</Th> : null}
                                 <Th>Pickup Date</Th>
                                 {!isRtoView ? <Th>Delivered On</Th> : null}
                                 <Th>Returned On</Th>
+                                {showCol('expectedDelivery') ? <Th>Expected Delivery</Th> : null}
                                 {isRtoView ? <Th>Action</Th> : null}
-                                {!isRtoView ? <Th>Actions</Th> : null}
+                                {showCol('actions') ? <Th>Actions</Th> : null}
                             </tr>
                         </thead>
                         <tbody>
@@ -810,7 +963,7 @@ export function ShopifyOrdersTable({
                                             key={o._id}
                                             className={`shopify-orders-row${
                                                 idx === 0 ? ' shopify-orders-row--group-start' : ''
-                                            }`}
+                                            }${selectable && selectedIds.has(o._id) ? ' shopify-orders-row--selected' : ''}`}
                                             >
                                             {idx === 0 ? (
                                                 <td rowSpan={group.items.length} className="shopify-orders-date-cell">
@@ -839,6 +992,19 @@ export function ShopifyOrdersTable({
                                                                         </svg>
                                                                     </a>
                                                                 )}
+                                                                {showPickupSummaryPdf && group.items.length > 0 ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="shopify-pickup-summary-btn"
+                                                                        title={`Pickup summary PDF – ${group.label}`}
+                                                                        aria-label={`Open pickup summary PDF for ${group.label}`}
+                                                                        onClick={() => openPickupSummaryPdf(group.label, group.items)}
+                                                                    >
+                                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm0 2.5L18.5 9H14zM8 13h8v1.5H8zm0 3h8v1.5H8zm0-6h4v1.5H8z" />
+                                                                        </svg>
+                                                                    </button>
+                                                                ) : null}
                                                                 <span className="shopify-orders-date-title">{group.label}</span>
                                                             </div>
                                                             <div className="shopify-orders-date-badges">
@@ -875,6 +1041,24 @@ export function ShopifyOrdersTable({
                                                     )}
                                                 </td>
                                             ) : null}
+                                            {selectable ? (
+                                                <Td className="shopify-select-cell">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="shopify-row-checkbox"
+                                                        aria-label={`Select order of ${getOrderCustomerName(o) || 'customer'}`}
+                                                        checked={selectedIds.has(o._id)}
+                                                        onChange={() => toggleOrderSelected(o._id)}
+                                                    />
+                                                </Td>
+                                            ) : null}
+                                            {showCol('refNo') ? (
+                                                <Td>
+                                                    <span className="shopify-ref-no">
+                                                        {o.referenceNo?.trim() || '—'}
+                                                    </span>
+                                                </Td>
+                                            ) : null}
                                             <Td>
                                                 <div className="shopify-customer-cell">
                                                     <div className="shopify-customer-name-row">
@@ -902,7 +1086,7 @@ export function ShopifyOrdersTable({
                                                         >
                                                             {getOrderCustomerName(o)}
                                                         </span>
-                                                        {!isRtoView ? (
+                                                        {!isRtoView && allowEdit ? (
                                                             <button
                                                                 type="button"
                                                                 className="icon-btn shopify-customer-edit-btn"
@@ -1050,43 +1234,90 @@ export function ShopifyOrdersTable({
                                                     />
                                                 </Td>
                                             ) : null}
-                                            {!isRtoView ? (
+                                            {showCol('platform') ? (
                                                 <Td>
                                                     <PlatformTag platform={(o.platform as Platform) || 'Shopify'} />
                                                 </Td>
                                             ) : null}
                                             <Td>
-                                                <div className="shopify-shipping-status-cell">
-                                                    <StatusTag
-                                                        kind={mapDeliveryStatusFromTracking(
-                                                            o.shippingDetails?.trackingStatus,
-                                                            o.returnStatus,
-                                                        )}
-                                                        type="delivery"
-                                                    />
-                                                    {(() => {
-                                                        const awbLink =
-                                                            o.shippingDetails?.trackingNumber || '';
-                                                        const courierLink =
-                                                            o.shippingDetails?.trackingCompany || '';
-                                                        const href = buildDefaultTrackingUrlFromCourier(
-                                                            awbLink,
-                                                            courierLink
-                                                        );
-                                                        return href ? (
-                                                            <a
-                                                                href={href}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="link shopify-shipping-track-link"
-                                                            >
-                                                                Track
-                                                            </a>
-                                                        ) : null;
-                                                    })()}
-                                                </div>
+                                                {(() => {
+                                                    const sd = o.shippingDetails;
+                                                    const awb = sd?.trackingNumber?.trim() || '';
+                                                    const courier = sd?.trackingCompany?.trim() || '';
+                                                    const rawStatus = sd?.trackingStatus?.trim() || '';
+                                                    const href =
+                                                        sd?.trackingUrl?.trim() ||
+                                                        buildDefaultTrackingUrlFromCourier(awb, courier);
+                                                    return (
+                                                        <div className="shopify-shipping-details-cell">
+                                                            <div className="shopify-shipping-status-cell">
+                                                                <StatusTag
+                                                                    kind={mapDeliveryStatusFromTracking(
+                                                                        rawStatus,
+                                                                        o.returnStatus,
+                                                                    )}
+                                                                    type="delivery"
+                                                                />
+                                                                {href ? (
+                                                                    <a
+                                                                        href={href}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="link shopify-shipping-track-link"
+                                                                    >
+                                                                        Track
+                                                                    </a>
+                                                                ) : null}
+                                                            </div>
+                                                            {courier ? (
+                                                                <span className="shopify-shipping-meta shopify-shipping-courier-row">
+                                                                    <span className="shopify-shipping-meta__key">Courier:</span>{' '}
+                                                                    <span className="shopify-shipping-courier-name">{courier}</span>
+                                                                    {href ? (
+                                                                        copiedOrderId === `track:${o._id}` ? (
+                                                                            <span
+                                                                                className="shopify-shipping-copy-done"
+                                                                                role="status"
+                                                                                aria-live="polite"
+                                                                            >
+                                                                                Copied
+                                                                            </span>
+                                                                        ) : (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="shopify-shipping-copy-btn"
+                                                                                title="Copy tracking URL"
+                                                                                aria-label="Copy tracking URL"
+                                                                                onClick={async (e) => {
+                                                                                    e.stopPropagation();
+                                                                                    const ok = await copyTextToClipboard(href);
+                                                                                    if (ok) flashCopied(`track:${o._id}`);
+                                                                                }}
+                                                                            >
+                                                                                <svg
+                                                                                    width="12"
+                                                                                    height="12"
+                                                                                    viewBox="0 0 24 24"
+                                                                                    fill="none"
+                                                                                    stroke="currentColor"
+                                                                                    strokeWidth="2"
+                                                                                    strokeLinecap="round"
+                                                                                    strokeLinejoin="round"
+                                                                                    aria-hidden
+                                                                                >
+                                                                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                                                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                                                                </svg>
+                                                                            </button>
+                                                                        )
+                                                                    ) : null}
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </Td>
-                                            {!isRtoView ? (
+                                            {showCol('shipped') ? (
                                                 <Td>
                                                     <span
                                                         className={
@@ -1099,20 +1330,22 @@ export function ShopifyOrdersTable({
                                                     </span>
                                                 </Td>
                                             ) : null}
-                                            {!isRtoView ? (
+                                            {showCol('type') ? (
                                                 <Td>
                                                     <TypeTag type={mapOrderType(o.type)} />
                                                 </Td>
                                             ) : null}
-                                            <Td>
-                                                <span className="shopify-updated-by">
-                                                    {o.updatedBy &&
-                                                    typeof o.updatedBy === 'object' &&
-                                                    'name' in o.updatedBy
-                                                        ? (o.updatedBy as { name?: string }).name || 'Shopify'
-                                                        : 'Shopify'}
-                                                </span>
-                                            </Td>
+                                            {showCol('updatedBy') ? (
+                                                <Td>
+                                                    <span className="shopify-updated-by">
+                                                        {o.updatedBy &&
+                                                        typeof o.updatedBy === 'object' &&
+                                                        'name' in o.updatedBy
+                                                            ? (o.updatedBy as { name?: string }).name || 'Shopify'
+                                                            : 'Shopify'}
+                                                    </span>
+                                                </Td>
+                                            ) : null}
                                             <Td>
                                                 <span className="shopify-order-timeline-date shopify-order-timeline-date--pickup">
                                                     {formatOrderTimelineDate(o.shippingDetails?.pickedUpDate || o.pickedUpDate)}
@@ -1130,6 +1363,55 @@ export function ShopifyOrdersTable({
                                                     {formatOrderTimelineDate(o.shippingDetails?.returnedAt || o.returnedAt)}
                                                 </span>
                                             </Td>
+                                            {showCol('expectedDelivery') ? (
+                                            <Td>
+                                                {(() => {
+                                                    const awb = (o.shippingDetails?.trackingNumber || '').trim();
+                                                    const state = expectedDeliveryById[o._id];
+                                                    if (state?.date) {
+                                                        return (
+                                                            <span className="shopify-expected-delivery-date">{state.date}</span>
+                                                        );
+                                                    }
+                                                    if (state?.error) {
+                                                        return (
+                                                            <span className="shopify-expected-delivery-error" title={state.error}>
+                                                                Not Found
+                                                            </span>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            className="shopify-expected-delivery-btn"
+                                                            title={awb ? 'View expected delivery' : 'No AWB number'}
+                                                            aria-label="View expected delivery"
+                                                            disabled={!awb || Boolean(state?.loading)}
+                                                            onClick={() => void loadExpectedDelivery(o._id, awb)}
+                                                        >
+                                                            {state?.loading ? (
+                                                                <span className="shopify-expected-delivery-loading">…</span>
+                                                            ) : (
+                                                                <svg
+                                                                    width="16"
+                                                                    height="16"
+                                                                    viewBox="0 0 24 24"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    strokeWidth="2"
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    aria-hidden
+                                                                >
+                                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                                                    <circle cx="12" cy="12" r="3" />
+                                                                </svg>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })()}
+                                            </Td>
+                                            ) : null}
                                             {isRtoView ? (
                                                 <Td>
                                                     <button
@@ -1162,7 +1444,7 @@ export function ShopifyOrdersTable({
                                                     </button>
                                                 </Td>
                                             ) : null}
-                                            {!isRtoView ? (
+                                            {showCol('actions') ? (
                                                 <Td>
                                                     <div className="shopify-row-actions">
                                                         <button
@@ -1240,6 +1522,16 @@ export function ShopifyOrdersTable({
                                                         <button type="button" className="icon-btn icon-btn--danger" onClick={() => onDelete(shopifyOrderToOrder(o))}>
                                                             Delete
                                                         </button>
+                                                        <button
+                                                            type="button"
+                                                            className="icon-btn shopify-push-btn"
+                                                            title="Push order to shipping"
+                                                            aria-label="Push order to shipping"
+                                                            disabled={Boolean(pushingById[o._id])}
+                                                            onClick={() => setOrderToPush(o)}
+                                                        >
+                                                            {pushingById[o._id] ? 'Pushing…' : 'Push'}
+                                                        </button>
                                                     </div>
                                                 </Td>
                                             ) : null}
@@ -1252,6 +1544,54 @@ export function ShopifyOrdersTable({
                     </table>
                 </div>
             )}
+            {selectable ? (
+                <BulkUpdateOrdersModal
+                    open={bulkUpdateOpen}
+                    orderIds={[...selectedIds]}
+                    onClose={() => setBulkUpdateOpen(false)}
+                    onUpdated={async (count) => {
+                        setBulkUpdateOpen(false);
+                        setSelectedIds(new Set());
+                        onBulkUpdateResult?.(
+                            `${count.toLocaleString()} order${count === 1 ? '' : 's'} updated`,
+                            'success',
+                        );
+                        try {
+                            await onOrdersRefresh?.();
+                        } catch (err) {
+                            console.error('Failed to refresh orders after bulk update', err);
+                        }
+                    }}
+                    onError={(message) => onBulkUpdateResult?.(message, 'error')}
+                />
+            ) : null}
+            <DeleteConfirmModal
+                open={orderToPush !== null}
+                icon="🚚"
+                backdropClassName="push-confirm-backdrop"
+                title="Push order to shipping?"
+                description="This will create a shipment for this order with the shipping partner."
+                details={
+                    orderToPush ? (
+                        <>
+                            <div className="delete-modal-customer-label">
+                                Order {orderToPush.referenceNo || '(no ref no)'}
+                            </div>
+                            <div className="delete-modal-customer-name">
+                                {getOrderCustomerName(orderToPush) || 'Customer'}
+                            </div>
+                            <div className="delete-modal-customer-amount">
+                                {formatCurrency(orderToPush.totalAmount)} ·{' '}
+                                {orderToPush.paymentMode === 'PAID' ? 'Prepaid' : 'COD'}
+                            </div>
+                        </>
+                    ) : null
+                }
+                confirmLabel="Push"
+                busyConfirmLabel="Pushing…"
+                onConfirm={confirmPushOrder}
+                onCancel={() => setOrderToPush(null)}
+            />
         </div>
     );
 }

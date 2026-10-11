@@ -107,14 +107,6 @@ export function FollowupsFiltersSection({
     return (
         <div className="fu-body">
             <div className="fu-panel">
-                <div className="fu-panel__head">
-                    <span className="fu-panel__title">Filters</span>
-                    {hasActiveFilters ? (
-                        <button type="button" className="fu-btn-clear" onClick={onClearAll}>
-                            Clear all
-                        </button>
-                    ) : null}
-                </div>
                 <div className="fu-panel__grid">
                     <div className="fu-search-wrap">
                         <label className="fu-flt__lab" htmlFor="followups-search">
@@ -156,59 +148,72 @@ export function FollowupsFiltersSection({
                         optionValues={[...FEEDBACK_OPTIONS]}
                         selectClassName={`fu-flt__sel--interactive ${feedbackFilterClass}`}
                     />
-                    <StatusFilter
-                        label="Month"
-                        value={monthDraft}
-                        onChange={setMonthDraft}
-                        options={monthOptions.map((m) => m.label)}
-                        optionValues={monthOptions.map((m) => m.value)}
-                        selectClassName={`fu-flt__sel--interactive fu-flt__sel--month${monthDraft ? ' fu-flt__sel--active' : ''}`}
-                    />
-                    <StatusFilter
-                        label="Year"
-                        value={yearDraft}
-                        onChange={setYearDraft}
-                        options={yearOptions.map((y) => y.label)}
-                        optionValues={yearOptions.map((y) => y.value)}
-                        selectClassName={`fu-flt__sel--interactive fu-flt__sel--year${yearDraft ? ' fu-flt__sel--active' : ''}`}
-                    />
-                    <div className="fu-flt fu-flt--apply">
-                        <span className="fu-flt__lab fu-flt__lab--apply-spacer" aria-hidden>
-                            &nbsp;
-                        </span>
-                        <button
-                            type="button"
-                            className="fu-btn-apply"
-                            disabled={monthYearApplyDisabled}
-                            onClick={onApplyMonthYear}
-                        >
-                            Apply
-                        </button>
+                    <div className="fu-flt">
+                        <span className="fu-flt__lab">Last called</span>
+                        <ModernSelect<string>
+                            value={callingDateFilter}
+                            onChange={setCallingDateFilter}
+                            options={lastCallingDateOptions}
+                            placeholder="All"
+                            aria-label="Last calling date filter"
+                            className={`fu-followups-modern-select fu-flt__modern-select fu-flt__sel--quick${callingDateFilter ? ' fu-flt__sel--active' : ''}`}
+                        />
                     </div>
-                </div>
-            </div>
-            <div className="fu-quick fu-quick--dropdowns">
-                <div className="fu-flt fu-quick__flt">
-                    <span className="fu-flt__lab">Last calling date</span>
-                    <ModernSelect<string>
-                        value={callingDateFilter}
-                        onChange={setCallingDateFilter}
-                        options={lastCallingDateOptions}
-                        placeholder="All"
-                        aria-label="Last calling date filter"
-                        className="fu-followups-modern-select"
-                    />
-                </div>
-                <div className="fu-flt fu-quick__flt">
-                    <span className="fu-flt__lab">Call again</span>
-                    <ModernSelect<string>
-                        value={upcomingFilter}
-                        onChange={setUpcomingFilter}
-                        options={callAgainOptions}
-                        placeholder="All"
-                        aria-label="Call again filter"
-                        className="fu-followups-modern-select"
-                    />
+                    <div className="fu-flt">
+                        <span className="fu-flt__lab">Call again</span>
+                        <ModernSelect<string>
+                            value={upcomingFilter}
+                            onChange={setUpcomingFilter}
+                            options={callAgainOptions}
+                            placeholder="All"
+                            aria-label="Call again filter"
+                            className={`fu-followups-modern-select fu-flt__modern-select fu-flt__sel--quick${upcomingFilter ? ' fu-flt__sel--active' : ''}`}
+                        />
+                    </div>
+                    <div className="fu-flt fu-flt--period">
+                        <span className="fu-flt__lab">Period</span>
+                        <div className="fu-period">
+                            <ModernSelect<string>
+                                value={monthDraft}
+                                onChange={setMonthDraft}
+                                options={monthOptions}
+                                placeholder="Month"
+                                aria-label="Month"
+                                className={`fu-followups-modern-select fu-flt__modern-select fu-flt__sel--month${monthDraft ? ' fu-flt__sel--active' : ''}`}
+                            />
+                            <ModernSelect<string>
+                                value={yearDraft}
+                                onChange={setYearDraft}
+                                options={yearOptions}
+                                placeholder="Year"
+                                aria-label="Year"
+                                className={`fu-followups-modern-select fu-flt__modern-select fu-flt__sel--year${yearDraft ? ' fu-flt__sel--active' : ''}`}
+                            />
+                            <button
+                                type="button"
+                                className="fu-btn-apply"
+                                disabled={monthYearApplyDisabled}
+                                onClick={onApplyMonthYear}
+                            >
+                                Apply
+                            </button>
+                            {hasActiveFilters ? (
+                                <button
+                                    type="button"
+                                    className="fu-btn-clear"
+                                    onClick={onClearAll}
+                                    title="Clear all filters"
+                                    aria-label="Clear all filters"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+                                        <path d="M18 6 6 18" />
+                                        <path d="m6 6 12 12" />
+                                    </svg>
+                                    <span className="fu-btn-clear__text">Clear</span>
+                                </button>
+                            ) : null}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

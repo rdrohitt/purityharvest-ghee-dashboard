@@ -11,7 +11,7 @@ export const FEEDBACK_OPTIONS = [
 
 export const CALLER_OPTIONS = ['Monia', 'Sarita'] as const;
 
-export const FOLLOWUPS_PAGE_SIZE_OPTIONS = [25, 50, 100, 200, 500] as const;
+export const FOLLOWUPS_PAGE_SIZE_OPTIONS = [25, 50, 100, 200, 500, 1000, 2000, 3000, 5000, 10000] as const;
 
 /** Values match {@link filterFollowups} `callingDateFilter`. */
 export const FOLLOWUPS_LAST_CALLING_DATE_VALUES = [

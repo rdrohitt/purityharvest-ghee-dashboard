@@ -10,6 +10,7 @@ export type DeleteConfirmModalProps = {
     confirmLabel?: string;
     cancelLabel?: string;
     busyConfirmLabel?: string;
+    icon?: ReactNode;
     onConfirm: () => void | Promise<void>;
     onCancel: () => void;
     /** Extra classes on the backdrop (e.g. higher z-index when nested inside another modal). */
@@ -28,6 +29,7 @@ export function DeleteConfirmModal({
     confirmLabel = 'Delete',
     cancelLabel = 'Cancel',
     busyConfirmLabel,
+    icon = '⚠️',
     onConfirm,
     onCancel,
     backdropClassName,
@@ -65,7 +67,7 @@ export function DeleteConfirmModal({
                     <div className="delete-modal-icon-row">
                         <div className="delete-modal-icon-wrap">
                             <span className="delete-modal-icon" aria-hidden="true">
-                                ⚠️
+                                {icon}
                             </span>
                         </div>
                     </div>

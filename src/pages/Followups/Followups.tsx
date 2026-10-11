@@ -16,7 +16,7 @@ import type { FollowupsToast } from './followupsTypes';
 import { filterFollowups } from './filterFollowups';
 import { FollowupsFiltersSection } from './FollowupsFiltersSection';
 import { FollowupsHeader } from './FollowupsHeader';
-import { FollowupsPagination } from './FollowupsPagination';
+import { FollowupsPagination, FollowupsRowsPerPage } from './FollowupsPagination';
 import { FollowupsTable } from './FollowupsTable';
 import { ToastContainer } from './ToastContainer';
 import '../sales/Shopify/Shopify.scss';
@@ -155,7 +155,7 @@ export default function Followups() {
     const [selectedWhatsAppCustomerName, setSelectedWhatsAppCustomerName] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(100);
+    const [pageSize, setPageSize] = useState(500);
     const [dashboardMeta, setDashboardMeta] = useState<{
         total: number;
         totalPages: number;
@@ -642,6 +642,14 @@ export default function Followups() {
             </div>
 
             <div className="card fu-table-card">
+                <div className="fu-table-topbar">
+                    <FollowupsRowsPerPage
+                        loading={loading}
+                        pageSize={pageSize}
+                        setPage={setPage}
+                        setPageSize={setPageSize}
+                    />
+                </div>
                 <FollowupsTable
                     key={followupsTableKey}
                     loading={loading}

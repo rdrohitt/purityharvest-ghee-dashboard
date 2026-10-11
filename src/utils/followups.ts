@@ -150,7 +150,7 @@ export async function fetchFollowupsDashboard(
     options: LoadFollowupsDashboardOptions = {}
 ): Promise<FollowupsDashboardResponse> {
     const page = Math.max(1, options.page ?? 1);
-    const limit = Math.max(1, Math.min(500, options.limit ?? 50));
+    const limit = Math.max(1, Math.trunc(options.limit ?? 500));
     const params = new URLSearchParams({
         page: String(page),
         limit: String(limit),

@@ -163,7 +163,10 @@ function normalizeOrder(raw: unknown): ShopifyOrderApi | null {
             o.trackingCompanyName ??
             ''
     ).trim();
-    const trackingUrl = buildDefaultTrackingUrlFromCourier(trackingNumber, trackingCompany);
+    const apiTrackingUrl = String(shippingDetailsRaw?.trackingUrl ?? o.trackingUrl ?? '').trim();
+    const trackingUrl =
+        apiTrackingUrl || buildDefaultTrackingUrlFromCourier(trackingNumber, trackingCompany);
+    const referenceNoRaw = String(o.referenceNo ?? o.reference_no ?? o.orderNumber ?? '').trim();
     const strShipField = (k: string, snake?: string): string | undefined => {
         const v = shippingDetailsRaw?.[k] ?? (snake ? shippingDetailsRaw?.[snake] : undefined);
         return typeof v === 'string' && v.trim() ? v.trim() : undefined;
@@ -203,6 +206,7 @@ function normalizeOrder(raw: unknown): ShopifyOrderApi | null {
     return {
         _id,
         shopifyOrderId: o.shopifyOrderId as string | undefined,
+        referenceNo: referenceNoRaw || undefined,
         customer: (customer as ShopifyOrderApi['customer']) ?? '',
         customerName: customerName || undefined,
         phoneNumber: phoneNumber || undefined,
@@ -328,10 +332,12 @@ export function orderDetailToOrder(o: ShopifyOrderApi): Order {
         platform: platformLabel,
         type: mapOrderType(o.type),
         shippingTrackingUrl:
+            o.shippingDetails?.trackingUrl ||
             buildDefaultTrackingUrlFromCourier(
                 o.shippingDetails?.trackingNumber ?? '',
                 o.shippingDetails?.trackingCompany ?? '',
-            ) || undefined,
+            ) ||
+            undefined,
         shippingTrackingCompany: o.shippingDetails?.trackingCompany,
         is_shipped: Boolean(o.is_shipped),
         ...shippingTimestampsFromApi(o),
@@ -373,7 +379,7 @@ export async function loadOrdersDashboardFromApi(options?: LoadOrdersOptions): P
         params.set('page', String(Math.max(1, Math.trunc(options.page))));
     }
     if (typeof options?.limit === 'number' && Number.isFinite(options.limit)) {
-        params.set('limit', String(Math.max(1, Math.min(1000, Math.trunc(options.limit)))));
+        params.set('limit', String(Math.max(1, Math.trunc(options.limit))));
     }
     if (options?.category) params.set('category', options.category);
     if (options?.type) params.set('type', options.type);
@@ -494,6 +500,10 @@ export function toBackendFulfillmentStatus(status: FulfillmentStatus): 'fulfille
     return 'fulfilled';
 }
 
+/** Shipmozo public tracking-page account uid; it appears in every customer tracking link, so it is not secret. */
+const SHIPMOZO_TRACKING_UID =
+    String(import.meta.env.VITE_SHIPMOZO_PUBLIC_KEY ?? '').trim() || '84CowZrZiTuQIvgH5pM0';
+
 /**
  * When no explicit tracking URL is stored, build one from AWB and courier partner (case-insensitive).
  */
@@ -504,6 +514,9 @@ export function buildDefaultTrackingUrlFromCourier(awb: string, courierPartner: 
     const enc = encodeURIComponent(trimmed);
     if (c.includes('amazon')) {
         return `https://track.amazon.in/tracking/${enc}`;
+    }
+    if (c.includes('shipmozo')) {
+        return `https://panel.shipmozo.com/track-order?uid=${encodeURIComponent(SHIPMOZO_TRACKING_UID)}&awb=${enc}`;
     }
     // Delhivery and other couriers: same public tracker used when partner is Delhivery or unspecified
     return `https://www.delhivery.com/track-v2/package/${enc}`;
@@ -781,10 +794,12 @@ export function shopifyOrderToOrder(o: ShopifyOrderApi): Order {
         platform: platformLabel,
         type: mapOrderType(o.type),
         shippingTrackingUrl:
+            o.shippingDetails?.trackingUrl ||
             buildDefaultTrackingUrlFromCourier(
                 o.shippingDetails?.trackingNumber ?? '',
                 o.shippingDetails?.trackingCompany ?? '',
-            ) || undefined,
+            ) ||
+            undefined,
         shippingTrackingCompany: o.shippingDetails?.trackingCompany,
         is_shipped: Boolean(o.is_shipped),
         ...shippingTimestampsFromApi(o),

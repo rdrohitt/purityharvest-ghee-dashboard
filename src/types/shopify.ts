@@ -108,6 +108,8 @@ export interface ShopifyOrderUserRef {
 export interface ShopifyOrderApi {
     _id: string;
     shopifyOrderId?: string;
+    /** Human-facing order reference from API, e.g. "#8236". */
+    referenceNo?: string;
     customer?: ShopifyOrderCustomer | string;
     customerName?: string;
     phoneNumber?: string;

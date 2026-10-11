@@ -58,10 +58,10 @@ export function DatePicker({
             const popup = popupRef.current;
             const popupHeight = 350;
             const popupWidth = 280;
-            let top = inputRect.bottom + window.scrollY + 4;
-            let left = inputRect.left + window.scrollX;
+            let top = inputRect.bottom + 4;
+            let left = inputRect.left;
             if (inputRect.bottom + popupHeight > window.innerHeight) {
-                top = inputRect.top + window.scrollY - popupHeight - 4;
+                top = Math.max(8, inputRect.top - popupHeight - 4);
             }
             if (inputRect.left + popupWidth > window.innerWidth) {
                 left = window.innerWidth - popupWidth - 10;

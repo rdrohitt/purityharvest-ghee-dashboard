@@ -229,6 +229,7 @@ export function ModernSelect<T extends string>({
     disabled,
     variant = 'default',
     className = '',
+    triggerPrefix,
     'aria-label': ariaLabel,
 }: {
     value: T | '';
@@ -238,6 +239,8 @@ export function ModernSelect<T extends string>({
     disabled?: boolean;
     variant?: 'default' | 'ribbon';
     className?: string;
+    /** Rendered inside the trigger before the selected value (e.g. a filter name), so it is clickable too. */
+    triggerPrefix?: React.ReactNode;
     'aria-label'?: string;
 }) {
     const [open, setOpen] = useState(false);
@@ -395,6 +398,7 @@ export function ModernSelect<T extends string>({
 			onClick={() => !disabled && setOpen((o) => !o)}
 		>
 			<span className="shopify-modern-select__trigger-inner">
+				{triggerPrefix}
 				{displayIcon ? (
 					<span className="shopify-modern-select__trigger-icon">{displayIcon}</span>
 				) : null}
@@ -442,7 +446,7 @@ export const ORDER_MODAL_DELIVERY_OPTIONS: ModernSelectOption<DeliveryStatus>[] 
 }));
 
 /** Carrier options for order tracking (Shopify add/edit modal). */
-export type TrackingCompany = 'Delhivery' | 'Amazon' | 'Shiprocket';
+export type TrackingCompany = 'Delhivery' | 'Amazon' | 'Shiprocket' | 'Shipmozo';
 
 function trackingCompanyIcon(company: TrackingCompany | ''): React.ReactNode {
     if (company === 'Delhivery')
@@ -465,6 +469,14 @@ function trackingCompanyIcon(company: TrackingCompany | ''): React.ReactNode {
                 <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
             </MsIcon>
         );
+    if (company === 'Shipmozo')
+        return (
+            <MsIcon>
+                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                <path d="m3.3 7 8.7 5 8.7-5" />
+                <path d="M12 22V12" />
+            </MsIcon>
+        );
     return iconPlaceholder();
 }
 
@@ -473,6 +485,7 @@ export const ORDER_MODAL_TRACKING_COMPANY_OPTIONS: ModernSelectOption<TrackingCo
     { value: 'Delhivery', label: 'Delhivery', icon: trackingCompanyIcon('Delhivery') },
     { value: 'Amazon', label: 'Amazon', icon: trackingCompanyIcon('Amazon') },
     { value: 'Shiprocket', label: 'Shiprocket', icon: trackingCompanyIcon('Shiprocket') },
+    { value: 'Shipmozo', label: 'Shipmozo', icon: trackingCompanyIcon('Shipmozo') },
 ];
 
 export function toInputDate(d: Date): string {
@@ -640,16 +653,29 @@ export function StatusFilter<T extends string>({
     return (
         <div className={`shopify-status-filter${ribbon ? ' shopify-status-filter--ribbon' : ''}`}>
             {ribbon ? (
-                <div className="shopify-status-filter__ribbon-shell">
-                    <span className="label shopify-status-filter__ribbon-label">{label}</span>
+                <div className={`shopify-filter-chip${value ? ' is-active' : ''}`}>
                     <ModernSelect<T>
                         variant="ribbon"
-                        className="shopify-status-filter__modern"
+                        className="shopify-filter-chip__select"
                         value={value}
                         onChange={onChange}
                         options={modernOptions}
                         aria-label={label}
+                        triggerPrefix={<span className="shopify-filter-chip__label">{label}</span>}
                     />
+                    {value ? (
+                        <button
+                            type="button"
+                            className="shopify-filter-chip__clear"
+                            aria-label={`Clear ${label} filter`}
+                            title={`Clear ${label}`}
+                            onClick={() => onChange('')}
+                        >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                                <path d="M18 6 6 18M6 6l12 12" />
+                            </svg>
+                        </button>
+                    ) : null}
                 </div>
             ) : (
                 <>

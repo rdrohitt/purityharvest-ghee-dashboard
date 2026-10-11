@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useId, useMemo } from 'react';
 import { ModernSelect, type ModernSelectOption } from '../sales/Shopify/ShopifyShared';
 import { FOLLOWUPS_PAGE_SIZE_OPTIONS } from './followupsConstants';
 
@@ -27,6 +27,50 @@ type Props = {
     ariaLabel?: string;
 };
 
+type RowsPerPageProps = {
+    loading: boolean;
+    pageSize: number;
+    setPage: React.Dispatch<React.SetStateAction<number>>;
+    setPageSize: React.Dispatch<React.SetStateAction<number>>;
+    pageSizeOptions?: readonly number[];
+};
+
+export function FollowupsRowsPerPage({
+    loading,
+    pageSize,
+    setPage,
+    setPageSize,
+    pageSizeOptions = FOLLOWUPS_PAGE_SIZE_OPTIONS,
+}: RowsPerPageProps) {
+    const labelId = useId();
+    const sizeOptions = useMemo((): ModernSelectOption<string>[] => {
+        return pageSizeOptions.map((n) => ({ value: String(n), label: n.toLocaleString() }));
+    }, [pageSizeOptions]);
+
+    return (
+        <div className="fu-pagination__size" role="group" aria-labelledby={labelId}>
+            <span className="fu-pagination__size-lab" id={labelId}>
+                Rows per page
+            </span>
+            <ModernSelect<string>
+                className="fu-pagination__modern-select"
+                value={String(pageSize)}
+                onChange={(v) => {
+                    if (!v) return;
+                    const n = Number(v);
+                    if (Number.isFinite(n)) {
+                        setPageSize(n);
+                        setPage(1);
+                    }
+                }}
+                options={sizeOptions}
+                disabled={loading}
+                aria-label="Rows per page"
+            />
+        </div>
+    );
+}
+
 export function FollowupsPagination({
     loading,
     dashboardMeta,
@@ -41,10 +85,6 @@ export function FollowupsPagination({
     pageSizeOptions = FOLLOWUPS_PAGE_SIZE_OPTIONS,
     ariaLabel = 'Followups pagination',
 }: Props) {
-    const sizeOptions = useMemo((): ModernSelectOption<string>[] => {
-        return pageSizeOptions.map((n) => ({ value: String(n), label: String(n) }));
-    }, [pageSizeOptions]);
-
     return (
         <footer className="fu-pagination" aria-label={ariaLabel}>
             <div className="fu-pagination__range">
@@ -68,26 +108,13 @@ export function FollowupsPagination({
                     <span className="fu-pagination__muted">Total unavailable</span>
                 )}
             </div>
-            <div className="fu-pagination__size" role="group" aria-labelledby="fu-pagination-rows-label">
-                <span className="fu-pagination__size-lab" id="fu-pagination-rows-label">
-                    Rows per page
-                </span>
-                <ModernSelect<string>
-                    className="fu-pagination__modern-select"
-                    value={String(pageSize)}
-                    onChange={(v) => {
-                        if (!v) return;
-                        const n = Number(v);
-                        if (Number.isFinite(n)) {
-                            setPageSize(n);
-                            setPage(1);
-                        }
-                    }}
-                    options={sizeOptions}
-                    disabled={loading}
-                    aria-label="Rows per page"
-                />
-            </div>
+            <FollowupsRowsPerPage
+                loading={loading}
+                pageSize={pageSize}
+                setPage={setPage}
+                setPageSize={setPageSize}
+                pageSizeOptions={pageSizeOptions}
+            />
             <div className="fu-pagination__nav">
                 <button type="button" className="fu-page-btn" disabled={loading || page <= 1} onClick={() => setPage(1)}>
                     First

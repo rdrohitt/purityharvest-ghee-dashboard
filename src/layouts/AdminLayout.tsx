@@ -45,7 +45,8 @@ export default function AdminLayout() {
         if (
             path.startsWith('/admin/shopify') ||
             path.startsWith('/admin/amazon') ||
-            path.startsWith('/admin/flipkart')
+            path.startsWith('/admin/flipkart') ||
+            path.startsWith('/admin/order-status')
         ) {
             blocked = !canSalesChannels;
         } else if (path.startsWith('/admin/rto-orders')) {
@@ -60,7 +61,8 @@ export default function AdminLayout() {
             location.pathname.startsWith('/admin/shopify') ||
             location.pathname.startsWith('/admin/amazon') ||
             location.pathname.startsWith('/admin/flipkart') ||
-            location.pathname.startsWith('/admin/rto-orders')
+            location.pathname.startsWith('/admin/rto-orders') ||
+            location.pathname.startsWith('/admin/order-status')
         ) {
             setSalesOpen(true);
         }
@@ -226,6 +228,12 @@ export default function AdminLayout() {
                                         <NavLink to="/admin/rto-orders" className={({ isActive }) => (isActive ? 'active' : '')}>
                                             <span className="mi-icon">•</span>
                                             <span className="mi-label">RTO Orders</span>
+                                        </NavLink>
+                                    ) : null}
+                                    {canSalesChannels ? (
+                                        <NavLink to="/admin/order-status" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                            <span className="mi-icon">•</span>
+                                            <span className="mi-label">Order Status</span>
                                         </NavLink>
                                     ) : null}
                                 </div>

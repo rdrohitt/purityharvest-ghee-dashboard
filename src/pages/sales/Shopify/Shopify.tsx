@@ -51,7 +51,7 @@ import { DatePicker } from './DatePicker';
 import { DeleteConfirmationModal } from './DeleteConfirmationModal';
 import { formatCurrency, formatDate, FilterButton, StatusFilter, toInputDate } from './ShopifyShared';
 import { Spinner } from '../../../components/Spinner';
-import { ShopifyOrdersTable } from './ShopifyOrdersTable';
+import { ShopifyOrdersTable, type OrdersTableColumn } from './ShopifyOrdersTable';
 import { ToastContainer, type Toast } from './ToastContainer';
 import './Shopify.scss';
 
@@ -133,9 +133,33 @@ type ShopifyProps = {
      * Used by derived pages like Gurugram / Delhi marts.
      */
     stateFilter?: string;
+    /** Show the metrics summary cards (and load analytics overview for them). Defaults to true. */
+    showMetrics?: boolean;
+    /** Show the All products / Milk / Ghee / Oils / Pickle tabs. When hidden, the page stays on All products. */
+    showCategoryFilter?: boolean;
+    /** Orders table columns to leave out on this page. */
+    hiddenTableColumns?: readonly OrdersTableColumn[];
+    /** Show the edit (pencil) button on each order row. Defaults to true. */
+    allowOrderEdit?: boolean;
+    /** Show a checkbox column for selecting orders. */
+    selectableOrders?: boolean;
+    /** Show the Shipped / Not Shipped tabs. When hidden, the page stays on Shipped. */
+    showShippedFilter?: boolean;
+    /** Group table rows by pickup date (instead of order date) and offer a pickup summary PDF per date. */
+    groupByPickupDate?: boolean;
 };
 
-export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps) {
+export default function Shopify({
+    title = 'Shopify',
+    stateFilter,
+    showMetrics = true,
+    showCategoryFilter = true,
+    hiddenTableColumns,
+    allowOrderEdit = true,
+    selectableOrders = false,
+    showShippedFilter = true,
+    groupByPickupDate = false,
+}: ShopifyProps) {
     const [range, setRange] = useState<UiRange>('currentMonth');
     const [customerFilter, setCustomerFilter] = useState('');
     const [phoneSearchOrders, setPhoneSearchOrders] = useState<ShopifyOrderApi[]>([]);
@@ -162,7 +186,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     const productsList = useMemo(() => (Array.isArray(products) ? products : []), [products]);
     const productsLoading = useAppSelector((state) => state.products.loading);
     const [loading, setLoading] = useState(true);
-    const [categoryTab, setCategoryTab] = useState<CategoryTab>('ghee');
+    const [categoryTab, setCategoryTab] = useState<CategoryTab>('all');
     const [shippedTab, setShippedTab] = useState<ShippedTab>('shipped');
     const [syncingShopify, setSyncingShopify] = useState(false);
     const [page, setPage] = useState(1);
@@ -344,6 +368,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     }, []);
 
     const refreshAnalyticsOverview = useCallback(async () => {
+        if (!showMetrics) return;
         setAnalyticsOverviewLoading(true);
         try {
             const data = await fetchAnalyticsOverview(dateRangeForApi.from, dateRangeForApi.to, {
@@ -368,9 +393,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         platformFilter,
         typeFilter,
         applyAnalyticsOverviewData,
+        showMetrics,
     ]);
 
     useEffect(() => {
+        if (!showMetrics) return;
         let cancelled = false;
         setAnalyticsOverviewLoading(true);
         fetchAnalyticsOverview(dateRangeForApi.from, dateRangeForApi.to, {
@@ -409,6 +436,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         platformFilter,
         typeFilter,
         applyAnalyticsOverviewData,
+        showMetrics,
     ]);
 
     /** GET /api/orders with date range + pagination + selected dropdown filters. */
@@ -726,8 +754,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         return () => document.removeEventListener('click', onDocClick);
     }, [showCustom]);
 
-    // Group orders by order date (date = when order was placed; fallback to createdAt)
+    // Group orders by order date (date = when order was placed; fallback to createdAt), or by pickup date
     const groupedByDate = useMemo(() => {
+        const groupDateOf = (o: ShopifyOrderApi): string | undefined =>
+            groupByPickupDate
+                ? o.shippingDetails?.pickedUpDate || o.pickedUpDate || undefined
+                : o.date ?? o.createdAt;
         const groups: Array<{
             label: string;
             items: ShopifyOrderApi[];
@@ -742,8 +774,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
         }> = [];
         const dateToIndex = new Map<string, number>();
         for (const o of filtered) {
-            const orderDateIso = o.date ?? o.createdAt;
-            const label = orderDateIso ? formatDate(orderDateIso) : 'No date';
+            const groupDateIso = groupDateOf(o);
+            const label = groupDateIso
+                ? formatDate(groupDateIso)
+                : groupByPickupDate
+                  ? 'No pickup date'
+                  : 'No date';
             const idx = dateToIndex.get(label);
             if (idx === undefined) {
                 groups.push({
@@ -796,14 +832,15 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
             g.shopifyOrderCount = shopifyOrderCount;
             g.metaSpent = 0;
         }
-        // Sort groups by order date descending (newest first)
-        groups.sort((a, b) => {
-            const isoA = a.items[0]?.date ?? a.items[0]?.createdAt ?? '';
-            const isoB = b.items[0]?.date ?? b.items[0]?.createdAt ?? '';
-            return isoB.localeCompare(isoA);
-        });
+        // Newest first; groups without a date go last
+        const groupTime = (g: (typeof groups)[number]) => {
+            const iso = g.items[0] ? groupDateOf(g.items[0]) : undefined;
+            const t = iso ? new Date(iso).getTime() : NaN;
+            return Number.isNaN(t) ? -Infinity : t;
+        };
+        groups.sort((a, b) => groupTime(b) - groupTime(a));
         return groups;
-    }, [filtered]);
+    }, [filtered, groupByPickupDate]);
 
     const refreshOrdersAfterWaybillSync = async () => {
         setLoading(true);
@@ -842,6 +879,132 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
     /** During phone search, only block on the phone API — not the paginated `/api/orders` fetch (can be very slow). */
     const showFullPageSpinner = isPhoneSearch ? phoneSearchLoading : loading;
 
+    const rowsPerPageControl = (
+        <label className="shopify-pagination__size shopify-rows-per-page">
+            <span className="shopify-pagination__size-lab">Rows per page</span>
+            <select
+                className="shopify-pagination__select"
+                value={pageSize}
+                disabled={(!isPhoneSearch && loading) || (isPhoneSearch && !phoneSearchLoading)}
+                aria-label="Rows per page"
+                onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                }}
+            >
+                {[20, 50, 100, 250, 500, 1000, 2000, 3000, 5000].map((n) => (
+                    <option key={n} value={n}>
+                        {n}
+                    </option>
+                ))}
+            </select>
+        </label>
+    );
+
+    const handleExportCsv = () => {
+        const headers = [
+            'S.No',
+            'Customer Name',
+            'Phone No',
+            'Address',
+            'Shipping Status',
+            'Quantity (L)',
+            'Amount',
+            'State',
+            'Pincode',
+        ];
+
+        function lineLitersFromOrder(order: ShopifyOrderApi): number {
+            return (order.products || []).reduce(
+                (sum: number, p: { variantName: string; quantity: number }) => {
+                    const sizeMatch = (p.variantName || '').match(
+                        /-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|L)/i,
+                    );
+                    if (!sizeMatch) return sum;
+                    const sizeValue = parseFloat(sizeMatch[1]);
+                    const sizeUnit = sizeMatch[2].toLowerCase();
+                    let litersPerUnit = 0;
+                    if (sizeUnit === 'ml') litersPerUnit = sizeValue / 1000;
+                    else if (sizeUnit === 'l' || sizeUnit === 'ltr')
+                        litersPerUnit = sizeValue;
+                    return sum + litersPerUnit * p.quantity;
+                },
+                0,
+            );
+        }
+
+        function csvEscapeCell(cell: unknown): string {
+            const cellStr = String(cell);
+            if (
+                cellStr.includes(',') ||
+                cellStr.includes('"') ||
+                cellStr.includes('\n')
+            ) {
+                return `"${cellStr.replace(/"/g, '""')}"`;
+            }
+            return cellStr;
+        }
+
+        function rowToCsvLine(row: unknown[]): string {
+            return row.map(csvEscapeCell).join(',');
+        }
+
+        // Include all orders (COD, PAID, RTO, In Transit, etc.)
+        const exportableOrders = filtered;
+        let sumQuantityL = 0;
+        let sumAmount = 0;
+        const rows = exportableOrders.map((order: ShopifyOrderApi, index: number) => {
+            const qtyL = lineLitersFromOrder(order);
+            const amt = Number(order.totalAmount) || 0;
+            sumQuantityL += qtyL;
+            sumAmount += amt;
+            return [
+                index + 1,
+                getOrderCustomerName(order),
+                getOrderCustomerPhone(order),
+                getOrderAddress(order),
+                deliveryStatusLabel(
+                    order.shippingDetails?.trackingStatus,
+                    order.returnStatus,
+                ),
+                qtyL === 0 ? 0 : Number(qtyL.toFixed(4)),
+                amt,
+                getOrderState(order),
+                getOrderPincode(order),
+            ];
+        });
+
+        const totalRow = [
+            'Total',
+            '',
+            '',
+            '',
+            '',
+            Number(sumQuantityL.toFixed(4)),
+            Number(sumAmount.toFixed(2)),
+            '',
+            '',
+        ];
+
+        const csvContent = [
+            rowToCsvLine(headers),
+            ...rows.map(rowToCsvLine),
+            rowToCsvLine(totalRow),
+        ].join('\n');
+
+        // Create blob and download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `orders_export_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Orders exported successfully!', 'success');
+    };
+
     return (
         <section className="shopify-page">
             {showFullPageSpinner ? (
@@ -851,9 +1014,81 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     message={isPhoneSearch ? 'Searching by phone…' : 'Loading Orders'}
                 />
             ) : null}
-            <div className="card shopify-header-card">
-                <div className="shopify-header-title">{title}</div>
+            <div className="card shopify-header-card shopify-header-card--orders">
+                <div className="shopify-header-top">
+                    <h2 className="shopify-header-title">{title}</h2>
+                    <div className="shopify-header-top-actions">
+                        <div className="shopify-search-wrapper">
+                            <span className="shopify-search-icon" aria-hidden>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                            </span>
+                            <input
+                                className="input shopify-search-input"
+                                type="search"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                maxLength={MIN_PHONE_SEARCH_DIGITS}
+                                placeholder="Search by phone number"
+                                aria-label={`Phone search; enter ${MIN_PHONE_SEARCH_DIGITS} digits`}
+                                title={`Enter all ${MIN_PHONE_SEARCH_DIGITS} digits, e.g. 9876543210`}
+                                value={customerFilter}
+                                onChange={(e) => {
+                                    const digits = e.target.value.replace(/\D/g, '').slice(0, MIN_PHONE_SEARCH_DIGITS);
+                                    setCustomerFilter(digits);
+                                }}
+                            />
+                        </div>
+                        <button
+                            className="button shopify-export-top-btn"
+                            type="button"
+                            title="Export the filtered orders as CSV"
+                            onClick={handleExportCsv}
+                        >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                            Export CSV
+                        </button>
+                        <button
+                            className="button shopify-refresh-btn"
+                            type="button"
+                            title="Sync latest Shopify orders"
+                            onClick={syncShopifyOrders}
+                        >
+                            <svg
+                                width="15"
+                                height="15"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                            >
+                                <polyline points="23 4 23 10 17 10" />
+                                <polyline points="1 20 1 14 7 14" />
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+                                <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+                            </svg>
+                            Sync
+                        </button>
+                        <button
+                            className="button shopify-add-order-btn"
+                            type="button"
+                            onClick={() => setShowAddOrder(true)}
+                        >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                                <path d="M12 5v14M5 12h14" />
+                            </svg>
+                            Add Order
+                        </button>
+                    </div>
+                </div>
                 <div className="shopify-header-main">
+                    {showCategoryFilter ? (
                     <div className="shopify-category-tabs">
                         <FilterButton
                             active={categoryTab === 'all'}
@@ -889,7 +1124,16 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             Pickle
                         </FilterButton>
                     </div>
-                    <div className="shopify-header-filters">
+                    ) : null}
+                    <div className="shopify-toolbar-panel">
+                    <div className="shopify-toolbar-row">
+                        <span className="shopify-filters-heading">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <rect x="3" y="4" width="18" height="18" rx="2" />
+                                <path d="M16 2v4M8 2v4M3 10h18" />
+                            </svg>
+                            Date
+                        </span>
                         <div className="filter-group shopify-header-filter-group">
                             <FilterButton active={range === 'all'} onClick={() => { setRange('all'); setShowCustom(false); }}>All</FilterButton>
                             <FilterButton active={range === 'today'} onClick={() => { setRange('today'); setShowCustom(false); }}>Today</FilterButton>
@@ -909,62 +1153,17 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                 }}
                             >Custom</FilterButton>
                         </div>
-                        <div className="shopify-header-spacer" />
-                        <div className="shopify-search-wrapper">
-                            <span className="shopify-search-icon" aria-hidden>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-                            </span>
-                            <input
-                                className="input shopify-search-input"
-                                type="search"
-                                inputMode="numeric"
-                                autoComplete="off"
-                                maxLength={MIN_PHONE_SEARCH_DIGITS}
-                                placeholder={`Enter ${MIN_PHONE_SEARCH_DIGITS} phone digits to search (e.g. 9876543210)`}
-                                aria-label={`Phone search; enter ${MIN_PHONE_SEARCH_DIGITS} digits`}
-                                value={customerFilter}
-                                onChange={(e) => {
-                                    const digits = e.target.value.replace(/\D/g, '').slice(0, MIN_PHONE_SEARCH_DIGITS);
-                                    setCustomerFilter(digits);
-                                }}
-                            />
-                        </div>
-                        <div className="shopify-header-actions">
-                            <button
-                                className="button shopify-add-order-btn"
-                                onClick={() => setShowAddOrder(true)}
-                            >
-                                <span>+</span> Add Order
-                            </button>
-                            <button
-                                className="button shopify-refresh-btn"
-                                type="button"
-                                title="Sync latest Shopify orders"
-                                onClick={syncShopifyOrders}
-                            >
-                                <svg
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                >
-                                    <polyline points="23 4 23 10 17 10" />
-                                    <polyline points="1 20 1 14 7 14" />
-                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
-                                    <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
-                                </svg>
-                            </button>
-                        </div>
                     </div>
                     <div className="status-filters-row shopify-status-filters shopify-status-filters--toolbar">
+                        <span className="shopify-filters-heading">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+                            </svg>
+                            Filters
+                        </span>
                         <StatusFilter
                             layout="ribbon"
-                            label="Payment Mode"
+                            label="Payment"
                             value={paymentStatusFilter}
                             onChange={setPaymentStatusFilter}
                             options={['COD', 'PAID'] as PaymentStatus[]}
@@ -991,125 +1190,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             onChange={setTypeFilter}
                             options={['New', 'Repeat', 'Reference'] as OrderType[]}
                         />
-                        <button
-                            type="button"
-                            className="shopify-export-btn"
-                            onClick={() => {
-                                // Export to CSV
-                                const headers = [
-                                    'S.No',
-                                    'Customer Name',
-                                    'Phone No',
-                                    'Address',
-                                    'Shipping Status',
-                                    'Quantity (L)',
-                                    'Amount',
-                                    'State',
-                                    'Pincode',
-                                ];
-
-                                function lineLitersFromOrder(order: ShopifyOrderApi): number {
-                                    return (order.products || []).reduce(
-                                        (sum: number, p: { variantName: string; quantity: number }) => {
-                                            const sizeMatch = (p.variantName || '').match(
-                                                /-?\s*(\d+(?:\.\d+)?)\s*(ml|ltr|L)/i,
-                                            );
-                                            if (!sizeMatch) return sum;
-                                            const sizeValue = parseFloat(sizeMatch[1]);
-                                            const sizeUnit = sizeMatch[2].toLowerCase();
-                                            let litersPerUnit = 0;
-                                            if (sizeUnit === 'ml') litersPerUnit = sizeValue / 1000;
-                                            else if (sizeUnit === 'l' || sizeUnit === 'ltr')
-                                                litersPerUnit = sizeValue;
-                                            return sum + litersPerUnit * p.quantity;
-                                        },
-                                        0,
-                                    );
-                                }
-
-                                function csvEscapeCell(cell: unknown): string {
-                                    const cellStr = String(cell);
-                                    if (
-                                        cellStr.includes(',') ||
-                                        cellStr.includes('"') ||
-                                        cellStr.includes('\n')
-                                    ) {
-                                        return `"${cellStr.replace(/"/g, '""')}"`;
-                                    }
-                                    return cellStr;
-                                }
-
-                                function rowToCsvLine(row: unknown[]): string {
-                                    return row.map(csvEscapeCell).join(',');
-                                }
-
-                                // Include all orders (COD, PAID, RTO, In Transit, etc.)
-                                const exportableOrders = filtered;
-                                let sumQuantityL = 0;
-                                let sumAmount = 0;
-                                const rows = exportableOrders.map((order: ShopifyOrderApi, index: number) => {
-                                    const qtyL = lineLitersFromOrder(order);
-                                    const amt = Number(order.totalAmount) || 0;
-                                    sumQuantityL += qtyL;
-                                    sumAmount += amt;
-                                    return [
-                                        index + 1,
-                                        getOrderCustomerName(order),
-                                        getOrderCustomerPhone(order),
-                                        getOrderAddress(order),
-                                        deliveryStatusLabel(
-                                            order.shippingDetails?.trackingStatus,
-                                            order.returnStatus,
-                                        ),
-                                        qtyL === 0 ? 0 : Number(qtyL.toFixed(4)),
-                                        amt,
-                                        getOrderState(order),
-                                        getOrderPincode(order),
-                                    ];
-                                });
-
-                                const totalRow = [
-                                    'Total',
-                                    '',
-                                    '',
-                                    '',
-                                    '',
-                                    Number(sumQuantityL.toFixed(4)),
-                                    Number(sumAmount.toFixed(2)),
-                                    '',
-                                    '',
-                                ];
-
-                                const csvContent = [
-                                    rowToCsvLine(headers),
-                                    ...rows.map(rowToCsvLine),
-                                    rowToCsvLine(totalRow),
-                                ].join('\n');
-
-                                // Create blob and download
-                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                                const link = document.createElement('a');
-                                const url = URL.createObjectURL(blob);
-                                link.setAttribute('href', url);
-                                link.setAttribute('download', `orders_export_${new Date().toISOString().split('T')[0]}.csv`);
-                                link.style.visibility = 'hidden';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                showToast('Orders exported successfully!', 'success');
-                            }}
-                        >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="7 10 12 15 17 10" />
-                                <line x1="12" y1="15" x2="12" y2="3" />
-                            </svg>
-                            Export CSV
-                        </button>
                         {(paymentStatusFilter || deliveryStatusFilter || platformFilter || typeFilter) ? (
                             <button
                                 type="button"
                                 className="shopify-clear-filters-btn"
+                                title="Clear all filters"
                                 onClick={() => {
                                     setPaymentStatusFilter('');
                                     setDeliveryStatusFilter('');
@@ -1117,10 +1202,15 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                                     setTypeFilter('');
                                 }}
                             >
-                                Clear All
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                                    <path d="M18 6 6 18M6 6l12 12" />
+                                </svg>
+                                <span className="shopify-clear-filters-btn__text">Clear</span>
                             </button>
                         ) : null}
                     </div>
+                    </div>
+                    {showMetrics ? (
                     <div
                         className={`shopify-metrics-summary${metricsSummaryOpen ? ' shopify-metrics-summary--open' : ''}`}
                     >
@@ -1181,6 +1271,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                             </div>
                         </div>
                     </div>
+                    ) : null}
                 </div>
 
                 {showCustom ? (
@@ -1189,6 +1280,9 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         className="date-range-popover shopify-date-range-popover"
                         style={{
                             left: customBtnRef.current ? customBtnRef.current.offsetLeft : 0,
+                            top: customBtnRef.current
+                                ? customBtnRef.current.offsetTop + customBtnRef.current.offsetHeight + 8
+                                : undefined,
                         }}
                     >
                         <div className="shopify-date-range-inner">
@@ -1221,7 +1315,7 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 ) : null}
             </div>
 
-            {categoryTab !== 'milk' ? (
+            {showShippedFilter && categoryTab !== 'milk' ? (
                 <div className="shopify-category-tabs">
                     <FilterButton
                         active={shippedTab === 'shipped'}
@@ -1235,8 +1329,11 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                     >
                         Not Shipped
                     </FilterButton>
+                    {rowsPerPageControl}
                 </div>
-            ) : null}
+            ) : (
+                <div className="shopify-rows-per-page-bar">{rowsPerPageControl}</div>
+            )}
 
             <ShopifyOrdersTable
                 key={shopifyOrdersTableKey}
@@ -1255,6 +1352,12 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                 onDelete={setOrderToDelete}
                 onOrdersRefresh={refreshOrdersAfterWaybillSync}
                 onWaybillSyncError={() => showToast('No record found', 'error')}
+                onPushResult={(message, type) => showToast(message, type)}
+                hiddenColumns={hiddenTableColumns}
+                allowEdit={allowOrderEdit}
+                selectable={selectableOrders}
+                onBulkUpdateResult={(message, type) => showToast(message, type)}
+                showPickupSummaryPdf={groupByPickupDate}
             />
             <footer className="shopify-pagination" aria-label="Orders pagination">
                 <div className="shopify-pagination__range">
@@ -1283,25 +1386,6 @@ export default function Shopify({ title = 'Shopify', stateFilter }: ShopifyProps
                         <span className="shopify-pagination__muted">Total unavailable</span>
                     )}
                 </div>
-                <label className="shopify-pagination__size">
-                    <span className="shopify-pagination__size-lab">Rows per page</span>
-                    <select
-                        className="shopify-pagination__select"
-                        value={pageSize}
-                        disabled={(!isPhoneSearch && loading) || (isPhoneSearch && !phoneSearchLoading)}
-                        aria-label="Rows per page"
-                        onChange={(e) => {
-                            setPageSize(Number(e.target.value));
-                            setPage(1);
-                        }}
-                    >
-                        {[20, 50, 100, 250, 500, 1000].map((n) => (
-                            <option key={n} value={n}>
-                                {n}
-                            </option>
-                        ))}
-                    </select>
-                </label>
                 <div className="shopify-pagination__nav">
                     <button
                         type="button"

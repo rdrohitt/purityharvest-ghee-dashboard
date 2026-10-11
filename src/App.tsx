@@ -10,6 +10,7 @@ import Shopify from './pages/sales/Shopify/index';
 import Amazon from './pages/sales/Amazon/index';
 import Flipkart from './pages/sales/Flipkart/index';
 import RTOOrders from './pages/sales/RTOOrders/index';
+import OrderStatus from './pages/sales/OrderStatus/index';
 import WALeads from './pages/WALeads/index';
 import WhatsAppPerson from './pages/WhatsApp/index';
 import CustomerWinback from './pages/CustomerWinback/index';
@@ -84,7 +85,9 @@ export default function App() {
 	}, []);
 
 	const isMarketingSpendRoute = location.pathname.startsWith('/admin/marketing-spend');
-	const isShopifyRoute = location.pathname.startsWith('/admin/shopify');
+	const isShopifyRoute =
+		location.pathname.startsWith('/admin/shopify') ||
+		location.pathname.startsWith('/admin/order-status');
 	const isWALeadsRoute = location.pathname.startsWith('/admin/wa-leads');
 	const isUsersRoute =
 		location.pathname.startsWith('/admin/users-and-roles') ||
@@ -131,6 +134,7 @@ export default function App() {
 						<Route path="amazon" element={<Amazon />} />
 						<Route path="flipkart" element={<Flipkart />} />
 						<Route path="rto-orders" element={<RTOOrders />} />
+						<Route path="order-status" element={<OrderStatus />} />
 						<Route path="users-and-roles" element={<Users />} />
 						<Route path="modules" element={<Modules />} />
 						<Route path="products" element={<Products />} />

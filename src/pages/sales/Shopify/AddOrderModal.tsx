@@ -234,6 +234,7 @@ function normalizeTrackingCompany(v: string | undefined): TrackingCompany | '' {
     if (lower.includes('delhivery')) return 'Delhivery';
     if (lower.includes('amazon')) return 'Amazon';
     if (lower.includes('shiprocket')) return 'Shiprocket';
+    if (lower.includes('shipmozo')) return 'Shipmozo';
     return '';
 }
 
