@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { apiFetch } from '../../../api';
 import type { ShopifyOrderApi, ShopifyOrderCustomer } from '../../../types/shopify';
 import type { Order } from '../../../utils/orders';
@@ -574,6 +574,8 @@ export function ShopifyOrdersTable({
     selectable = false,
     onBulkUpdateResult,
     showPickupSummaryPdf = false,
+    toolbarMiddle,
+    toolbarEnd,
 }: {
     groupedByDate: GroupedOrdersByDate[];
     marketingSpend: SpendRecord[];
@@ -598,6 +600,10 @@ export function ShopifyOrdersTable({
     onBulkUpdateResult?: (message: string, type: 'success' | 'error') => void;
     /** Show a PDF button in each date cell that opens a pickup summary for that group. */
     showPickupSummaryPdf?: boolean;
+    /** Center of the count bar (e.g. pickup / return date filters). */
+    toolbarMiddle?: ReactNode;
+    /** Right side of the count bar (e.g. Rows per page). */
+    toolbarEnd?: ReactNode;
 }) {
     const isRtoView = viewMode === 'rto';
     const showCol = (col: OrdersTableColumn) =>
@@ -840,46 +846,52 @@ export function ShopifyOrdersTable({
     return (
         <div className="card shopify-orders-card">
             <div className="shopify-orders-count-bar">
-                {loading ? (
-                    '—'
-                ) : (
-                    <>
-                        <span>
-                            {orderCount.toLocaleString()} order{orderCount === 1 ? '' : 's'}
-                        </span>
-                        {selectedCount > 0 ? (
-                            <>
-                                <span className="shopify-orders-count-bar__selected">
-                                    {' '}
-                                    · {selectedCount.toLocaleString()} selected
-                                </span>
-                                <span className="shopify-bulk-actions">
-                                    <button
-                                        type="button"
-                                        className="shopify-bulk-actions__update"
-                                        onClick={() => setBulkUpdateOpen(true)}
-                                    >
-                                        Update selected
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="shopify-bulk-actions__clear"
-                                        onClick={() => setSelectedIds(new Set())}
-                                    >
-                                        Clear selection
-                                    </button>
-                                </span>
-                            </>
-                        ) : null}
-                        {useProgressive && visibleRowCap < totalFlatRows ? (
-                            <span className="shopify-orders-count-bar__progressive">
-                                {' '}
-                                · Showing {Math.min(visibleRowCap, totalFlatRows).toLocaleString()} of{' '}
-                                {totalFlatRows.toLocaleString()} rows…
+                <div className="shopify-orders-count-bar__left">
+                    {loading ? (
+                        '—'
+                    ) : (
+                        <>
+                            <span>
+                                {orderCount.toLocaleString()} order{orderCount === 1 ? '' : 's'}
                             </span>
-                        ) : null}
-                    </>
-                )}
+                            {selectedCount > 0 ? (
+                                <>
+                                    <span className="shopify-orders-count-bar__selected">
+                                        {' '}
+                                        · {selectedCount.toLocaleString()} selected
+                                    </span>
+                                    <span className="shopify-bulk-actions">
+                                        <button
+                                            type="button"
+                                            className="shopify-bulk-actions__update"
+                                            onClick={() => setBulkUpdateOpen(true)}
+                                        >
+                                            Update selected
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="shopify-bulk-actions__clear"
+                                            onClick={() => setSelectedIds(new Set())}
+                                        >
+                                            Clear selection
+                                        </button>
+                                    </span>
+                                </>
+                            ) : null}
+                            {useProgressive && visibleRowCap < totalFlatRows ? (
+                                <span className="shopify-orders-count-bar__progressive">
+                                    {' '}
+                                    · Showing {Math.min(visibleRowCap, totalFlatRows).toLocaleString()} of{' '}
+                                    {totalFlatRows.toLocaleString()} rows…
+                                </span>
+                            ) : null}
+                        </>
+                    )}
+                </div>
+                {toolbarMiddle ? (
+                    <div className="shopify-orders-count-bar__middle">{toolbarMiddle}</div>
+                ) : null}
+                {toolbarEnd ? <div className="shopify-orders-count-bar__right">{toolbarEnd}</div> : null}
             </div>
             {loading ? (
                 <div className="shopify-orders-loading">

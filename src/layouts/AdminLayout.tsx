@@ -46,7 +46,8 @@ export default function AdminLayout() {
             path.startsWith('/admin/shopify') ||
             path.startsWith('/admin/amazon') ||
             path.startsWith('/admin/flipkart') ||
-            path.startsWith('/admin/order-status')
+            path.startsWith('/admin/order-status') ||
+            path.startsWith('/admin/supply-vs-demand')
         ) {
             blocked = !canSalesChannels;
         } else if (path.startsWith('/admin/rto-orders')) {
@@ -62,7 +63,8 @@ export default function AdminLayout() {
             location.pathname.startsWith('/admin/amazon') ||
             location.pathname.startsWith('/admin/flipkart') ||
             location.pathname.startsWith('/admin/rto-orders') ||
-            location.pathname.startsWith('/admin/order-status')
+            location.pathname.startsWith('/admin/order-status') ||
+            location.pathname.startsWith('/admin/supply-vs-demand')
         ) {
             setSalesOpen(true);
         }
@@ -231,10 +233,16 @@ export default function AdminLayout() {
                                         </NavLink>
                                     ) : null}
                                     {canSalesChannels ? (
-                                        <NavLink to="/admin/order-status" className={({ isActive }) => (isActive ? 'active' : '')}>
-                                            <span className="mi-icon">•</span>
-                                            <span className="mi-label">Order Status</span>
-                                        </NavLink>
+                                        <>
+                                            <NavLink to="/admin/order-status" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                                <span className="mi-icon">•</span>
+                                                <span className="mi-label">Order Status</span>
+                                            </NavLink>
+                                            <NavLink to="/admin/supply-vs-demand" className={({ isActive }) => (isActive ? 'active' : '')}>
+                                                <span className="mi-icon">•</span>
+                                                <span className="mi-label">Supply Vs Demand</span>
+                                            </NavLink>
+                                        </>
                                     ) : null}
                                 </div>
                             ) : null}

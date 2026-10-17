@@ -120,6 +120,58 @@ function orderActualPriceText(order: ShopifyOrderApi): string {
     return value == null ? '—' : amount(value);
 }
 
+const GROUP_ORDER = ['Delhivery', 'Shipmozo', 'Shiprocket', 'Amazon', 'Flipkart'] as const;
+
+function titleCase(value: string): string {
+    return value
+        .split(/[\s_-]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(' ');
+}
+
+/** Bucket for PDF sections: marketplace platforms first, else courier, else platform. */
+function orderGroupKey(order: ShopifyOrderApi): string {
+    const platform = String(order.platform ?? '').trim().toLowerCase();
+    const courier = String(order.shippingDetails?.trackingCompany ?? '')
+        .trim()
+        .toLowerCase();
+
+    if (platform.includes('amazon') || courier.includes('amazon')) return 'Amazon';
+    if (platform.includes('flipkart')) return 'Flipkart';
+    if (courier.includes('delhivery')) return 'Delhivery';
+    if (courier.includes('shipmozo')) return 'Shipmozo';
+    if (courier.includes('shiprocket')) return 'Shiprocket';
+    if (courier) return titleCase(courier);
+    if (platform) return titleCase(platform);
+    return 'Unassigned';
+}
+
+function groupSortRank(name: string): number {
+    const idx = GROUP_ORDER.indexOf(name as (typeof GROUP_ORDER)[number]);
+    if (idx >= 0) return idx;
+    if (name === 'Unassigned') return 1000;
+    return 100;
+}
+
+type OrderGroup = { name: string; orders: ShopifyOrderApi[] };
+
+function groupOrdersByPlatformAndCourier(orders: ShopifyOrderApi[]): OrderGroup[] {
+    const map = new Map<string, ShopifyOrderApi[]>();
+    for (const order of orders) {
+        const key = orderGroupKey(order);
+        const list = map.get(key);
+        if (list) list.push(order);
+        else map.set(key, [order]);
+    }
+    return Array.from(map.entries())
+        .map(([name, groupOrders]) => ({ name, orders: groupOrders }))
+        .sort((a, b) => {
+            const rank = groupSortRank(a.name) - groupSortRank(b.name);
+            return rank !== 0 ? rank : a.name.localeCompare(b.name);
+        });
+}
+
 /** Opens an invoice-style PDF summarising all orders picked up on one date. */
 export function openPickupSummaryPdf(dateLabel: string, orders: ShopifyOrderApi[]): void {
     const doc = new jsPDF();
@@ -307,34 +359,105 @@ export function openPickupSummaryPdf(dateLabel: string, orders: ShopifyOrderApi[
         y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
     }
 
-    const body = orders.map((o, idx) => [
-        String(idx + 1),
-        getOrderCustomerName(o) || 'Customer',
-        o.shippingDetails?.trackingNumber?.trim() || '—',
-        orderItemsText(o),
-        isPaid(o) ? 'Prepaid' : 'COD',
-        orderActualPriceText(o),
-    ]);
+    const groups = groupOrdersByPlatformAndCourier(orders);
 
-    autoTable(doc, {
-        startY: y,
-        head: [['#', 'Customer', 'AWB', 'Items', 'Payment', 'Actual Price']],
-        body: body.length > 0 ? body : [['', 'No orders', '', '', '', '—']],
-        theme: 'grid',
-        headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold', fontSize: 9.5 },
-        bodyStyles: { fillColor: [255, 255, 255], textColor: textDark, fontSize: 8.8, valign: 'top' },
-        alternateRowStyles: { fillColor: lightGray },
-        styles: { cellPadding: 2.4, lineColor: borderGray, lineWidth: 0.2, overflow: 'linebreak' },
-        columnStyles: {
-            0: { halign: 'center', cellWidth: 8 },
-            1: { cellWidth: 40 },
-            2: { cellWidth: 34 },
-            3: { cellWidth: 50 },
-            4: { cellWidth: 22 },
-            5: { halign: 'right', cellWidth: 32 },
-        },
-        margin: { left: margin, right: margin },
-    });
+    if (groups.length > 1) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        doc.setTextColor(...accentDark);
+        doc.text('Orders by Platform / Courier', leftX, y);
+        y += 3;
+        const breakdownBody = groups.map((g) => {
+            const gCod = g.orders.filter((o) => !isPaid(o));
+            const gPaid = g.orders.filter(isPaid);
+            return [
+                g.name,
+                String(g.orders.length),
+                String(gCod.length),
+                String(gPaid.length),
+                amount(sum(g.orders)),
+            ];
+        });
+        autoTable(doc, {
+            startY: y,
+            head: [['Platform / Courier', 'Orders', 'COD', 'Prepaid', 'Actual Price']],
+            body: breakdownBody,
+            theme: 'grid',
+            headStyles: { fillColor: accentDark, textColor: 255, fontStyle: 'bold', fontSize: 9 },
+            bodyStyles: { fillColor: [255, 255, 255], textColor: textDark, fontSize: 8.8 },
+            alternateRowStyles: { fillColor: lightGray },
+            styles: { cellPadding: 2.2, lineColor: borderGray, lineWidth: 0.2 },
+            columnStyles: {
+                0: { cellWidth: 60, fontStyle: 'bold' },
+                1: { halign: 'center', cellWidth: 28 },
+                2: { halign: 'center', cellWidth: 28 },
+                3: { halign: 'center', cellWidth: 32 },
+                4: { halign: 'right', cellWidth: 38 },
+            },
+            margin: { left: margin, right: margin },
+        });
+        y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+    }
+
+    const ensureSpace = (needed: number) => {
+        if (y + needed <= pageHeight - margin) return;
+        doc.addPage();
+        y = margin;
+    };
+
+    const drawOrdersTable = (sectionOrders: ShopifyOrderApi[], startY: number) => {
+        const body = sectionOrders.map((o, idx) => [
+            String(idx + 1),
+            getOrderCustomerName(o) || 'Customer',
+            o.shippingDetails?.trackingNumber?.trim() || '—',
+            orderItemsText(o),
+            isPaid(o) ? 'Prepaid' : 'COD',
+            orderActualPriceText(o),
+        ]);
+        autoTable(doc, {
+            startY,
+            head: [['#', 'Customer', 'AWB', 'Items', 'Payment', 'Actual Price']],
+            body: body.length > 0 ? body : [['', 'No orders', '', '', '', '—']],
+            theme: 'grid',
+            headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold', fontSize: 9.5 },
+            bodyStyles: { fillColor: [255, 255, 255], textColor: textDark, fontSize: 8.8, valign: 'top' },
+            alternateRowStyles: { fillColor: lightGray },
+            styles: { cellPadding: 2.4, lineColor: borderGray, lineWidth: 0.2, overflow: 'linebreak' },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 8 },
+                1: { cellWidth: 40 },
+                2: { cellWidth: 34 },
+                3: { cellWidth: 50 },
+                4: { cellWidth: 22 },
+                5: { halign: 'right', cellWidth: 32 },
+            },
+            margin: { left: margin, right: margin },
+        });
+        return (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+    };
+
+    if (orders.length === 0) {
+        ensureSpace(24);
+        y = drawOrdersTable([], y) + 4;
+    } else {
+        groups.forEach((group, groupIdx) => {
+            ensureSpace(28);
+            const sectionH = 9;
+            doc.setFillColor(...accentDark);
+            doc.roundedRect(leftX, y, contentW, sectionH, 1.5, 1.5, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(255, 255, 255);
+            const sectionTotal = sum(group.orders);
+            doc.text(
+                `${group.name}  ·  ${group.orders.length} order${group.orders.length === 1 ? '' : 's'}  ·  ${money(sectionTotal)}`,
+                leftX + 3.5,
+                y + 6.1,
+            );
+            y += sectionH + 1.5;
+            y = drawOrdersTable(group.orders, y) + (groupIdx < groups.length - 1 ? 7 : 4);
+        });
+    }
 
     const fileName = `${dateLabel.trim().replace(/[\\/:*?"<>|\s]+/g, '-') || 'pickup-summary'}.pdf`;
     doc.setProperties({ title: `Pickup Summary ${dateLabel}` });

@@ -356,6 +356,12 @@ export type LoadOrdersOptions = {
     trackingStatus?: string;
     /** When set, GET /api/orders includes shipped=true|false */
     shipped?: boolean;
+    /** Pickup date range filter (YYYY-MM-DD) → pickedUpDateFrom / pickedUpDateTo */
+    pickedUpDateFrom?: string;
+    pickedUpDateTo?: string;
+    /** Return date range filter (YYYY-MM-DD) → returnedAtFrom / returnedAtTo */
+    returnedAtFrom?: string;
+    returnedAtTo?: string;
 };
 
 export type OrdersDashboardResponse = {
@@ -389,6 +395,10 @@ export async function loadOrdersDashboardFromApi(options?: LoadOrdersOptions): P
     if (typeof options?.shipped === 'boolean') {
         params.set('shipped', options.shipped ? 'true' : 'false');
     }
+    if (options?.pickedUpDateFrom) params.set('pickedUpDateFrom', options.pickedUpDateFrom);
+    if (options?.pickedUpDateTo) params.set('pickedUpDateTo', options.pickedUpDateTo);
+    if (options?.returnedAtFrom) params.set('returnedAtFrom', options.returnedAtFrom);
+    if (options?.returnedAtTo) params.set('returnedAtTo', options.returnedAtTo);
     const query = params.toString();
     const path = query ? `/api/orders?${query}` : '/api/orders';
     let response = await apiFetch(path);

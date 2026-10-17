@@ -147,6 +147,8 @@ type ShopifyProps = {
     showShippedFilter?: boolean;
     /** Group table rows by pickup date (instead of order date) and offer a pickup summary PDF per date. */
     groupByPickupDate?: boolean;
+    /** Show pickup / return date range filters and send them on GET /api/orders. */
+    showTimelineDateFilters?: boolean;
 };
 
 export default function Shopify({
@@ -159,6 +161,7 @@ export default function Shopify({
     selectableOrders = false,
     showShippedFilter = true,
     groupByPickupDate = false,
+    showTimelineDateFilters = false,
 }: ShopifyProps) {
     const [range, setRange] = useState<UiRange>('currentMonth');
     const [customerFilter, setCustomerFilter] = useState('');
@@ -169,6 +172,10 @@ export default function Shopify({
     const [appliedCustomStart, setAppliedCustomStart] = useState<string>(toInputDate(new Date()));
     const [appliedCustomEnd, setAppliedCustomEnd] = useState<string>(toInputDate(new Date()));
     const [showCustom, setShowCustom] = useState(false);
+    const [pickupDateFrom, setPickupDateFrom] = useState('');
+    const [pickupDateTo, setPickupDateTo] = useState('');
+    const [returnDateFrom, setReturnDateFrom] = useState('');
+    const [returnDateTo, setReturnDateTo] = useState('');
     const [showAddOrder, setShowAddOrder] = useState(false);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
     const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
@@ -453,6 +460,10 @@ export default function Shopify({
             paymentMode: paymentStatusFilter || undefined,
             trackingStatus: toBackendTrackingStatus(deliveryStatusFilter),
             shipped: shippedQueryParam,
+            pickedUpDateFrom: showTimelineDateFilters && pickupDateFrom ? pickupDateFrom : undefined,
+            pickedUpDateTo: showTimelineDateFilters && pickupDateTo ? pickupDateTo : undefined,
+            returnedAtFrom: showTimelineDateFilters && returnDateFrom ? returnDateFrom : undefined,
+            returnedAtTo: showTimelineDateFilters && returnDateTo ? returnDateTo : undefined,
         }),
         [
             ordersCategoryQueryParam,
@@ -465,6 +476,11 @@ export default function Shopify({
             paymentStatusFilter,
             deliveryStatusFilter,
             shippedQueryParam,
+            showTimelineDateFilters,
+            pickupDateFrom,
+            pickupDateTo,
+            returnDateFrom,
+            returnDateTo,
         ],
     );
 
@@ -479,6 +495,10 @@ export default function Shopify({
         deliveryStatusFilter,
         shippedTab,
         categoryTab,
+        pickupDateFrom,
+        pickupDateTo,
+        returnDateFrom,
+        returnDateTo,
     ]);
 
     const loadOrdersPage = async (query = ordersListQuery) => {
@@ -901,6 +921,63 @@ export default function Shopify({
         </label>
     );
 
+    const timelineDateFilters = showTimelineDateFilters ? (
+        <div className="shopify-timeline-filters">
+            <div
+                className={`shopify-mini-range${pickupDateFrom || pickupDateTo ? ' shopify-mini-range--active' : ''}`}
+            >
+                <span className="shopify-mini-range__lab">Pickup date</span>
+                <div className="shopify-mini-range__pickers">
+                    <DatePicker value={pickupDateFrom} onChange={setPickupDateFrom} placeholder="From" />
+                    <span className="shopify-mini-range__sep" aria-hidden>
+                        —
+                    </span>
+                    <DatePicker value={pickupDateTo} onChange={setPickupDateTo} placeholder="To" />
+                </div>
+                {pickupDateFrom || pickupDateTo ? (
+                    <button
+                        type="button"
+                        className="shopify-mini-range__clear"
+                        title="Clear pickup date filter"
+                        aria-label="Clear pickup date filter"
+                        onClick={() => {
+                            setPickupDateFrom('');
+                            setPickupDateTo('');
+                        }}
+                    >
+                        ×
+                    </button>
+                ) : null}
+            </div>
+            <div
+                className={`shopify-mini-range${returnDateFrom || returnDateTo ? ' shopify-mini-range--active' : ''}`}
+            >
+                <span className="shopify-mini-range__lab">Return date</span>
+                <div className="shopify-mini-range__pickers">
+                    <DatePicker value={returnDateFrom} onChange={setReturnDateFrom} placeholder="From" />
+                    <span className="shopify-mini-range__sep" aria-hidden>
+                        —
+                    </span>
+                    <DatePicker value={returnDateTo} onChange={setReturnDateTo} placeholder="To" />
+                </div>
+                {returnDateFrom || returnDateTo ? (
+                    <button
+                        type="button"
+                        className="shopify-mini-range__clear"
+                        title="Clear return date filter"
+                        aria-label="Clear return date filter"
+                        onClick={() => {
+                            setReturnDateFrom('');
+                            setReturnDateTo('');
+                        }}
+                    >
+                        ×
+                    </button>
+                ) : null}
+            </div>
+        </div>
+    ) : null;
+
     const handleExportCsv = () => {
         const headers = [
             'S.No',
@@ -1190,7 +1267,12 @@ export default function Shopify({
                             onChange={setTypeFilter}
                             options={['New', 'Repeat', 'Reference'] as OrderType[]}
                         />
-                        {(paymentStatusFilter || deliveryStatusFilter || platformFilter || typeFilter) ? (
+                        {(paymentStatusFilter ||
+                            deliveryStatusFilter ||
+                            platformFilter ||
+                            typeFilter ||
+                            (showTimelineDateFilters &&
+                                (pickupDateFrom || pickupDateTo || returnDateFrom || returnDateTo))) ? (
                             <button
                                 type="button"
                                 className="shopify-clear-filters-btn"
@@ -1200,6 +1282,12 @@ export default function Shopify({
                                     setDeliveryStatusFilter('');
                                     setPlatformFilter('');
                                     setTypeFilter('');
+                                    if (showTimelineDateFilters) {
+                                        setPickupDateFrom('');
+                                        setPickupDateTo('');
+                                        setReturnDateFrom('');
+                                        setReturnDateTo('');
+                                    }
                                 }}
                             >
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
@@ -1329,11 +1417,8 @@ export default function Shopify({
                     >
                         Not Shipped
                     </FilterButton>
-                    {rowsPerPageControl}
                 </div>
-            ) : (
-                <div className="shopify-rows-per-page-bar">{rowsPerPageControl}</div>
-            )}
+            ) : null}
 
             <ShopifyOrdersTable
                 key={shopifyOrdersTableKey}
@@ -1358,6 +1443,8 @@ export default function Shopify({
                 selectable={selectableOrders}
                 onBulkUpdateResult={(message, type) => showToast(message, type)}
                 showPickupSummaryPdf={groupByPickupDate}
+                toolbarMiddle={timelineDateFilters}
+                toolbarEnd={rowsPerPageControl}
             />
             <footer className="shopify-pagination" aria-label="Orders pagination">
                 <div className="shopify-pagination__range">

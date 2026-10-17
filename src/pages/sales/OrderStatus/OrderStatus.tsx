@@ -22,6 +22,7 @@ export default function OrderStatus() {
             selectableOrders
             showShippedFilter={false}
             groupByPickupDate
+            showTimelineDateFilters
         />
     );
 }
