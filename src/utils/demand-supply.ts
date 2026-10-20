@@ -133,7 +133,7 @@ export function rowToSavePayload(row: DemandSupplyDayRow): DemandSupplySavePaylo
 }
 
 /**
- * GET /api/demandsupply?month=&year=
+ * GET /api/demandsupply/monthly-demand?month=&year=
  * Response: `{ month, year, daily: [{ date, demand: { count, amount }, supply, rto }] }`
  */
 export async function fetchDemandSupply(month: number, year: number): Promise<DemandSupplyDayRow[]> {
@@ -141,7 +141,7 @@ export async function fetchDemandSupply(month: number, year: number): Promise<De
         month: String(Math.trunc(month)),
         year: String(Math.trunc(year)),
     });
-    const response = await apiFetch(`/api/demandsupply?${params.toString()}`);
+    const response = await apiFetch(`/api/demandsupply/monthly-demand?${params.toString()}`);
     if (!response.ok) {
         throw new Error(`Failed to load demand/supply (${response.status})`);
     }

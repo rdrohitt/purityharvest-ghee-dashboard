@@ -380,7 +380,7 @@ export default function SupplyVsDemand() {
                                             <CountInput
                                                 value={row.demandCount}
                                                 placeholder="Count"
-                                                disabled={loading}
+                                                disabled
                                                 ariaLabel={`Demand shipment count for ${row.dateKey}`}
                                                 onChange={(value) =>
                                                     updateRow(row.dateKey, 'demandCount', value)
@@ -390,7 +390,7 @@ export default function SupplyVsDemand() {
                                         <td className="svd-col--demand" data-label="Demand · Amount">
                                             <AmountInput
                                                 value={row.demandAmount}
-                                                disabled={loading}
+                                                disabled
                                                 ariaLabel={`Demand amount for ${row.dateKey}`}
                                                 onChange={(value) =>
                                                     updateRow(row.dateKey, 'demandAmount', value)
@@ -422,7 +422,7 @@ export default function SupplyVsDemand() {
                                             <CountInput
                                                 value={row.rtoCount}
                                                 placeholder="Count"
-                                                disabled={loading}
+                                                disabled
                                                 ariaLabel={`RTO shipment count for ${row.dateKey}`}
                                                 onChange={(value) =>
                                                     updateRow(row.dateKey, 'rtoCount', value)
@@ -432,7 +432,7 @@ export default function SupplyVsDemand() {
                                         <td className="svd-col--rto" data-label="RTO · Amount">
                                             <AmountInput
                                                 value={row.rtoAmount}
-                                                disabled={loading}
+                                                disabled
                                                 ariaLabel={`RTO amount for ${row.dateKey}`}
                                                 onChange={(value) =>
                                                     updateRow(row.dateKey, 'rtoAmount', value)
