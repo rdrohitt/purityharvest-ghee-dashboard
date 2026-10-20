@@ -19,6 +19,17 @@
   color: var(--muted);
 }
 
+.svd-error {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #ef4444 35%, var(--border));
+  background: color-mix(in srgb, #ef4444 8%, #ffffff);
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .svd-filters {
   display: flex;
   align-items: flex-end;
@@ -135,6 +146,8 @@
 }
 
 .svd-table-card {
+  position: relative;
+  min-height: 280px;
   overflow: hidden;
   margin-bottom: 100px;
 }
@@ -216,6 +229,51 @@
 
 .svd-col--diff-start {
   border-left: 3px solid #94a3b8 !important;
+}
+
+.svd-th-action {
+  width: 100px;
+  text-align: center !important;
+  vertical-align: middle;
+}
+
+.svd-col--action {
+  text-align: center;
+  white-space: nowrap;
+  border-left: 1px solid var(--border);
+}
+
+.svd-save-btn {
+  height: 32px;
+  min-width: 72px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #e5792f;
+  background: #e5792f;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.05);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.svd-save-btn--ok {
+  background: #15803d;
+  border-color: #15803d;
+}
+
+.svd-save-btn--err {
+  background: #b91c1c;
+  border-color: #b91c1c;
 }
 
 .svd-row td {

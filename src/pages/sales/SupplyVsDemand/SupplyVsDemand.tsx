@@ -1,26 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Spinner } from '../../../components/Spinner';
+import {
+    buildMonthRows,
+    fetchDemandSupply,
+    saveDemandSupplyDay,
+    type DemandSupplyDayRow,
+} from '../../../utils/demand-supply';
 import { ModernSelect, type ModernSelectOption } from '../Shopify/ShopifyShared';
 import '../Shopify/Shopify.scss';
 import '../../Modules/Modules.scss';
 import './SupplyVsDemand.scss';
 
-type DayRow = {
-    dateKey: string;
-    demandCount: string;
-    demandAmount: string;
-    supplyCount: string;
-    supplyAmount: string;
-    rtoCount: string;
-    rtoAmount: string;
-};
-
-type SavedDayRow = Partial<DayRow> & {
-    /** Legacy fields from earlier UI versions. */
-    demand?: string;
-    supply?: string;
-    shipmentAmount?: string;
-    totalAmount?: string;
-};
+type DayRow = DemandSupplyDayRow;
 
 const MONTH_OPTIONS: ModernSelectOption<string>[] = [
     { value: '1', label: 'January' },
@@ -37,8 +28,6 @@ const MONTH_OPTIONS: ModernSelectOption<string>[] = [
     { value: '12', label: 'December' },
 ];
 
-const STORAGE_PREFIX = 'ph-supply-vs-demand:';
-
 function buildYearOptions(): ModernSelectOption<string>[] {
     const currentYear = new Date().getFullYear();
     return Array.from({ length: 7 }, (_, index) => {
@@ -47,16 +36,8 @@ function buildYearOptions(): ModernSelectOption<string>[] {
     });
 }
 
-function daysInMonth(year: number, month: number): number {
-    return new Date(year, month, 0).getDate();
-}
-
 function pad2(n: number): string {
     return String(n).padStart(2, '0');
-}
-
-function dateKey(year: number, month: number, day: number): string {
-    return `${year}-${pad2(month)}-${pad2(day)}`;
 }
 
 function formatDayLabel(year: number, month: number, day: number): string {
@@ -78,84 +59,18 @@ function formatAmount(n: number): string {
     return n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 }
 
-function emptyRow(key: string): DayRow {
-    return {
-        dateKey: key,
-        demandCount: '',
-        demandAmount: '',
-        supplyCount: '',
-        supplyAmount: '',
-        rtoCount: '',
-        rtoAmount: '',
-    };
-}
-
-function normalizeSavedRow(key: string, row: SavedDayRow | undefined): DayRow {
-    if (!row) return emptyRow(key);
-    return {
-        dateKey: key,
-        demandCount: String(row.demandCount ?? row.demand ?? ''),
-        demandAmount: String(row.demandAmount ?? ''),
-        supplyCount: String(row.supplyCount ?? row.supply ?? ''),
-        supplyAmount: String(row.supplyAmount ?? row.shipmentAmount ?? ''),
-        rtoCount: String(row.rtoCount ?? ''),
-        rtoAmount: String(row.rtoAmount ?? ''),
-    };
-}
-
-function loadMonthRows(year: number, month: number): DayRow[] {
-    const totalDays = daysInMonth(year, month);
-    const keys = Array.from({ length: totalDays }, (_, i) => dateKey(year, month, i + 1));
-    let saved: Record<string, SavedDayRow> = {};
-    try {
-        const raw = localStorage.getItem(`${STORAGE_PREFIX}${year}-${pad2(month)}`);
-        if (raw) {
-            const parsed = JSON.parse(raw) as unknown;
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                saved = parsed as Record<string, SavedDayRow>;
-            }
-        }
-    } catch {
-        saved = {};
-    }
-    return keys.map((key) => normalizeSavedRow(key, saved[key]));
-}
-
-function saveMonthRows(year: number, month: number, rows: DayRow[]) {
-    const payload: Record<string, Omit<DayRow, 'dateKey'>> = {};
-    for (const row of rows) {
-        if (
-            !row.demandCount &&
-            !row.demandAmount &&
-            !row.supplyCount &&
-            !row.supplyAmount &&
-            !row.rtoCount &&
-            !row.rtoAmount
-        ) {
-            continue;
-        }
-        payload[row.dateKey] = {
-            demandCount: row.demandCount,
-            demandAmount: row.demandAmount,
-            supplyCount: row.supplyCount,
-            supplyAmount: row.supplyAmount,
-            rtoCount: row.rtoCount,
-            rtoAmount: row.rtoAmount,
-        };
-    }
-    localStorage.setItem(`${STORAGE_PREFIX}${year}-${pad2(month)}`, JSON.stringify(payload));
-}
-
 function AmountInput({
     value,
     onChange,
     ariaLabel,
     placeholder = 'Amount',
+    disabled,
 }: {
     value: string;
     onChange: (value: string) => void;
     ariaLabel: string;
     placeholder?: string;
+    disabled?: boolean;
 }) {
     return (
         <div className="svd-amount-wrap">
@@ -170,6 +85,7 @@ function AmountInput({
                 step="any"
                 placeholder={placeholder}
                 value={value}
+                disabled={disabled}
                 onChange={(e) => onChange(e.target.value)}
                 aria-label={ariaLabel}
             />
@@ -182,11 +98,13 @@ function CountInput({
     onChange,
     ariaLabel,
     placeholder = 'Count',
+    disabled,
 }: {
     value: string;
     onChange: (value: string) => void;
     ariaLabel: string;
     placeholder?: string;
+    disabled?: boolean;
 }) {
     return (
         <input
@@ -197,6 +115,7 @@ function CountInput({
             step="any"
             placeholder={placeholder}
             value={value}
+            disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
             aria-label={ariaLabel}
         />
@@ -208,29 +127,73 @@ export default function SupplyVsDemand() {
     const [month, setMonth] = useState(String(now.getMonth() + 1));
     const [year, setYear] = useState(String(now.getFullYear()));
     const [rows, setRows] = useState<DayRow[]>(() =>
-        loadMonthRows(now.getFullYear(), now.getMonth() + 1),
+        buildMonthRows(now.getFullYear(), now.getMonth() + 1),
     );
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [savingDate, setSavingDate] = useState<string | null>(null);
+    const [saveFeedback, setSaveFeedback] = useState<Record<string, 'ok' | 'err'>>({});
     const yearOptions = useMemo(() => buildYearOptions(), []);
 
     const yearNum = Number(year);
     const monthNum = Number(month);
 
     useEffect(() => {
-        setRows(loadMonthRows(yearNum, monthNum));
+        let cancelled = false;
+        setLoading(true);
+        setError(null);
+        setSaveFeedback({});
+        setSavingDate(null);
+        setRows(buildMonthRows(yearNum, monthNum));
+
+        fetchDemandSupply(monthNum, yearNum)
+            .then((next) => {
+                if (!cancelled) setRows(next);
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    setError(err instanceof Error ? err.message : 'Failed to load demand/supply');
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
     }, [yearNum, monthNum]);
 
     const updateRow = useCallback(
         (dateKeyValue: string, field: keyof Omit<DayRow, 'dateKey'>, value: string) => {
-            setRows((prev) => {
-                const next = prev.map((row) =>
+            setRows((prev) =>
+                prev.map((row) =>
                     row.dateKey === dateKeyValue ? { ...row, [field]: value } : row,
-                );
-                saveMonthRows(yearNum, monthNum, next);
+                ),
+            );
+            setSaveFeedback((prev) => {
+                if (!(dateKeyValue in prev)) return prev;
+                const next = { ...prev };
+                delete next[dateKeyValue];
                 return next;
             });
         },
-        [yearNum, monthNum],
+        [],
     );
+
+    const handleSaveRow = useCallback(async (row: DayRow) => {
+        setSavingDate(row.dateKey);
+        setError(null);
+        try {
+            await saveDemandSupplyDay(row);
+            setSaveFeedback((prev) => ({ ...prev, [row.dateKey]: 'ok' }));
+        } catch (err) {
+            setSaveFeedback((prev) => ({ ...prev, [row.dateKey]: 'err' }));
+            setError(err instanceof Error ? err.message : 'Failed to save');
+        } finally {
+            setSavingDate(null);
+        }
+    }, []);
 
     const totals = useMemo(() => {
         let demandCount = 0;
@@ -278,6 +241,7 @@ export default function SupplyVsDemand() {
                             onChange={setMonth}
                             options={MONTH_OPTIONS}
                             aria-label="Month"
+                            disabled={loading}
                         />
                     </div>
                     <div className="svd-filter">
@@ -287,6 +251,7 @@ export default function SupplyVsDemand() {
                             onChange={setYear}
                             options={yearOptions}
                             aria-label="Year"
+                            disabled={loading}
                         />
                     </div>
                     <div className="svd-summary">
@@ -327,9 +292,11 @@ export default function SupplyVsDemand() {
                         </div>
                     </div>
                 </div>
+                {error ? <p className="svd-error">{error}</p> : null}
             </div>
 
             <div className="card modules-table-card svd-table-card">
+                {loading ? <Spinner overlay message="Loading demand & supply…" /> : null}
                 <div className="table-scroll-wrapper">
                     <table className="modules-table svd-table">
                         <thead>
@@ -349,6 +316,9 @@ export default function SupplyVsDemand() {
                                 <th className="modules-th svd-col--diff-start" rowSpan={2}>
                                     <span className="svd-th-main">Difference</span>
                                     <span className="svd-th-sub">Supply − Demand</span>
+                                </th>
+                                <th className="modules-th svd-th-action" rowSpan={2}>
+                                    <span className="svd-th-main">Action</span>
                                 </th>
                             </tr>
                             <tr>
@@ -388,6 +358,7 @@ export default function SupplyVsDemand() {
                                 >
                                     {formatAmount(totals.difference)}
                                 </td>
+                                <td className="svd-col--action" aria-hidden />
                             </tr>
                             {rows.map((row, index) => {
                                 const day = index + 1;
@@ -395,6 +366,8 @@ export default function SupplyVsDemand() {
                                 const supplyCount = parseNum(row.supplyCount);
                                 const difference = supplyCount - demandCount;
                                 const hasCountInputs = Boolean(row.demandCount || row.supplyCount);
+                                const isSaving = savingDate === row.dateKey;
+                                const feedback = saveFeedback[row.dateKey];
                                 return (
                                     <tr key={row.dateKey} className="svd-row">
                                         <td className="svd-date-cell" data-label="Date">
@@ -407,6 +380,7 @@ export default function SupplyVsDemand() {
                                             <CountInput
                                                 value={row.demandCount}
                                                 placeholder="Count"
+                                                disabled={loading}
                                                 ariaLabel={`Demand shipment count for ${row.dateKey}`}
                                                 onChange={(value) =>
                                                     updateRow(row.dateKey, 'demandCount', value)
@@ -416,6 +390,7 @@ export default function SupplyVsDemand() {
                                         <td className="svd-col--demand" data-label="Demand · Amount">
                                             <AmountInput
                                                 value={row.demandAmount}
+                                                disabled={loading}
                                                 ariaLabel={`Demand amount for ${row.dateKey}`}
                                                 onChange={(value) =>
                                                     updateRow(row.dateKey, 'demandAmount', value)
@@ -426,6 +401,7 @@ export default function SupplyVsDemand() {
                                             <CountInput
                                                 value={row.supplyCount}
                                                 placeholder="Count"
+                                                disabled={loading}
                                                 ariaLabel={`Supply shipment count for ${row.dateKey}`}
                                                 onChange={(value) =>
                                                     updateRow(row.dateKey, 'supplyCount', value)
@@ -435,6 +411,7 @@ export default function SupplyVsDemand() {
                                         <td className="svd-col--supply" data-label="Supply · Amount">
                                             <AmountInput
                                                 value={row.supplyAmount}
+                                                disabled={loading}
                                                 ariaLabel={`Supply amount for ${row.dateKey}`}
                                                 onChange={(value) =>
                                                     updateRow(row.dateKey, 'supplyAmount', value)
@@ -445,6 +422,7 @@ export default function SupplyVsDemand() {
                                             <CountInput
                                                 value={row.rtoCount}
                                                 placeholder="Count"
+                                                disabled={loading}
                                                 ariaLabel={`RTO shipment count for ${row.dateKey}`}
                                                 onChange={(value) =>
                                                     updateRow(row.dateKey, 'rtoCount', value)
@@ -454,6 +432,7 @@ export default function SupplyVsDemand() {
                                         <td className="svd-col--rto" data-label="RTO · Amount">
                                             <AmountInput
                                                 value={row.rtoAmount}
+                                                disabled={loading}
                                                 ariaLabel={`RTO amount for ${row.dateKey}`}
                                                 onChange={(value) =>
                                                     updateRow(row.dateKey, 'rtoAmount', value)
@@ -476,6 +455,22 @@ export default function SupplyVsDemand() {
                                                 placeholder="—"
                                                 aria-label={`Difference for ${row.dateKey}`}
                                             />
+                                        </td>
+                                        <td className="svd-col--action" data-label="Action">
+                                            <button
+                                                type="button"
+                                                className={`svd-save-btn${
+                                                    feedback === 'ok'
+                                                        ? ' svd-save-btn--ok'
+                                                        : feedback === 'err'
+                                                          ? ' svd-save-btn--err'
+                                                          : ''
+                                                }`}
+                                                disabled={loading || isSaving || savingDate != null}
+                                                onClick={() => void handleSaveRow(row)}
+                                            >
+                                                {isSaving ? 'Saving…' : feedback === 'ok' ? 'Saved' : 'Save'}
+                                            </button>
                                         </td>
                                     </tr>
                                 );
